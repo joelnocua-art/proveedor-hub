@@ -134,8 +134,19 @@
     </div>
   </div>
 
+  <!-- EMAIL MODAL -->
+  <div id="emailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r-lg);padding:30px;max-width:450px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.5);">
+      <div style="width:64px;height:64px;border-radius:50%;background:rgba(0,229,200,0.15);color:#00e5c8;font-size:32px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px;">✉️</div>
+      <h2 style="color:#e2e4ed;font-family:'Syne', sans-serif;margin-bottom:12px;font-size:22px;">Correos listos para enviar</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:24px;line-height:1.5;">Haz clic en cada botón para abrir el borrador de Gmail. Al abrirse el borrador, el botón cambiará de color para que lleves el control.</p>
+      <div id="emailLinksContainer" style="display:flex;flex-direction:column;gap:12px;"></div>
+      <button class="btn btn-secondary" onclick="document.getElementById('emailModal').style.display='none';wizGo(4);" style="margin-top:24px;width:100%;border-radius:10px;font-weight:600;padding:12px;">Ya los envié / Cerrar</button>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="supabase-client.js?v=4"></script>
+  <script src="supabase-client.js?v=7"></script>
   <script src="providers.js"></script>
   <script src="quotes.js"></script>
   <script src="providerProducts.js"></script>
@@ -274,21 +285,38 @@
       
       if(sendEmail){
         var skuTable=skus.map(function(s,i){return (i+1)+'. '+s.sku+' — Cant: '+s.qty}).join('\n');
-        var delay=0;
+        var emailContainer = document.getElementById('emailLinksContainer');
+        if(emailContainer) emailContainer.innerHTML = '';
+        var validEmails = 0;
+
         pa.forEach(function(emp){
           var prov=allProvs.find(function(p){return p.empresa===emp});
           var email=prov?(prov.correo||prov.correo_electronico||''):'';
           if(!email){toast(emp+' no tiene correo.','error');return}
+          
           var skuIds=skus.map(function(s){return s.id+':'+s.qty}).join(',');
           var formLink=baseUrl+'respuesta.html#p='+encodeURIComponent(emp)+'&n='+encodeURIComponent(name.trim())+'&b='+encodeURIComponent(batch)+'&s='+skuIds+'&c='+encodeURIComponent(city)+'&d='+encodeURIComponent(dt);
+          var sub=encodeURIComponent('Solicitud de cotización: '+name.trim()+' — BIA Energy');
+          var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nReciban un cordial saludo de BIA Energy.\n\nSolicitamos cotización formal:\n\n'+skuTable+'\n\nCiudad: '+(city||'Por confirmar')+'\nFecha: '+(dt||'Por confirmar')+(notes?'\nNotas: '+notes:'')+'\n\n━━ RESPONDER ━━\nIngrese precios aquí:\n'+formLink+'\n\nO responda este correo con precios unitarios sin IVA, tiempo de entrega, garantía y condiciones de pago.\n\nCordialmente,\nOperaciones — BIA Energy');
           
-          setTimeout(function(){
-            var sub=encodeURIComponent('Solicitud de cotización: '+name.trim()+' — BIA Energy');
-            var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nReciban un cordial saludo de BIA Energy.\n\nSolicitamos cotización formal:\n\n'+skuTable+'\n\nCiudad: '+(city||'Por confirmar')+'\nFecha: '+(dt||'Por confirmar')+(notes?'\nNotas: '+notes:'')+'\n\n━━ RESPONDER ━━\nIngrese precios aquí:\n'+formLink+'\n\nO responda este correo con precios unitarios sin IVA, tiempo de entrega, garantía y condiciones de pago.\n\nCordialmente,\nOperaciones — BIA Energy');
-            window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body,'_blank');
-          },delay);delay+=1000;
+          var gmailUrl = 'https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body;
+          
+          var a = document.createElement('a');
+          a.href = gmailUrl;
+          a.target = '_blank';
+          a.style.cssText = 'display:flex; align-items:center; justify-content:center; padding:12px; background:#00e5c8; color:#0a0d1a; border-radius:10px; font-weight:700; text-decoration:none; font-size:14px; transition:opacity 0.2s;';
+          a.innerHTML = '📩 Enviar a <strong>' + esc(emp) + '</strong>';
+          a.onclick = function() { this.style.opacity = '0.5'; this.innerHTML = '✓ Enviado a ' + esc(emp); };
+          if(emailContainer) emailContainer.appendChild(a);
+          validEmails++;
         });
-        toast(ct+' solicitudes preparadas. Abriendo Gmail...','success');
+
+        if(validEmails > 0) {
+          document.getElementById('emailModal').style.display = 'flex';
+          toast(ct+' solicitudes preparadas. Revisa la ventana emergente.','success');
+        } else {
+          toast('No hay correos válidos para los proveedores seleccionados.','error');
+        }
       }else{toast(ct+' solicitudes preparadas como "'+name.trim()+'". Guardando...','success')}
       
       var btnSave1 = document.getElementById('wzBtnSave1'), btnSave2 = document.getElementById('wzBtnSave2');
@@ -305,7 +333,7 @@
         } else {
           skus=[];provSet=new Set();renderSkuList();
           ['wz-name','wz-city','wz-date','wz-notes'].forEach(function(id){var e=document.getElementById(id);if(e)e.value=''});
-          wizGo(4);
+          if(!sendEmail) wizGo(4); // Only go to Step 4 if not showing modal
         }
       });
     };
