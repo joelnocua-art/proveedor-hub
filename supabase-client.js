@@ -286,6 +286,35 @@ async function sbDeleteOffer(skuId, provider) {
 }
 
 // ═══ AUTH ═══
+async function sbSubmitProviderResponse(batch, providerName, itemsData, conds) {
+  const sb = getSupabase();
+  if (!sb) return false;
+  let ok = true;
+  for (let i = 0; i < itemsData.length; i++) {
+    const it = itemsData[i];
+    const { error } = await sb.from('quotes')
+      .update({
+        pu_sin_iva: it.price_sin_iva,
+        pu_con_iva: it.price_con_iva,
+        tiempo_entrega_dias: it.delivery_days || conds.delivery_days || 0,
+        garantia_meses: conds.warranty_months,
+        condiciones_pago: conds.payment_terms,
+        observaciones_prov: conds.notes,
+        estado_respuesta: 'respondida',
+        fecha_respuesta: conds.responded_at
+      })
+      .eq('cotizacion_batch', batch)
+      .eq('empresa', providerName)
+      .eq('descripcion', it.sku);
+    if (error) {
+      console.error('[Supabase] Response update error:', error);
+      ok = false;
+    }
+  }
+  return ok;
+}
+
+// ═══ AUTH ═══
 async function sbGetUser() {
   const sb = getSupabase();
   if (!sb) return null;

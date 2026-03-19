@@ -102,6 +102,8 @@
 
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="supabase-client.js?v=5"></script>
   <script src="sku_catalog.js"></script>
   <script>
   var D=null;
@@ -138,7 +140,7 @@
     document.getElementById('vErr').style.display='';
   }
 
-  function doSubmit(){
+  async function doSubmit(){
     var items=[],ok=true;
     D.items.forEach(function(it,i){
       var p=parseFloat(document.getElementById('pr_'+i).value)||0;
@@ -149,52 +151,51 @@
     });
     if(!ok){alert('Ingrese un precio válido (mayor a 0) para cada ítem.');return}
 
-    // Disable button while saving
     var btn=document.getElementById('btnSubmit');
     btn.textContent='Guardando...';btn.disabled=true;btn.classList.add('saving');
 
-    var resp={
-      tipo:'respuesta_proveedor',
-      version:3,
-      quote_name:D.name,
-      provider:D.prov,
-      batch:D.batch,
-      responded_at:new Date().toISOString(),
-      items:items,
+    var conds={
       warranty_months:parseInt(document.getElementById('rGar').value)||0,
       payment_terms:document.getElementById('rPay').value||'',
-      notes:document.getElementById('rObs').value||''
+      notes:document.getElementById('rObs').value||'',
+      responded_at:new Date().toISOString()
     };
 
-    // Save directly to localStorage (same domain = shared storage)
-    try{
-      var pending=JSON.parse(localStorage.getItem('pendingProviderResponses')||'[]');
-      if(!Array.isArray(pending))pending=[];
-      pending.push(resp);
-      localStorage.setItem('pendingProviderResponses',JSON.stringify(pending));
-    }catch(e){console.error('Save error:',e)}
+    var success = false;
+    if (typeof sbSubmitProviderResponse === 'function') {
+      success = await sbSubmitProviderResponse(D.batch, D.prov, items, conds);
+    }
 
-    // Show success and countdown
     document.getElementById('vForm').style.display='none';
-    document.getElementById('vOk').style.display='';
 
-    var count=3;
-    var cdEl=document.getElementById('cdNum');
-    var timer=setInterval(function(){
-      count--;
-      if(cdEl)cdEl.textContent=count;
-      if(count<=0){
-        clearInterval(timer);
-        // Try to close the tab
-        window.close();
-        // If window.close() doesn't work (some browsers block it), show a message
-        setTimeout(function(){
-          if(cdEl)cdEl.textContent='✓';
-          var p=document.querySelector('#vOk p:last-child');
-          if(p)p.textContent='Puede cerrar esta ventana manualmente.';
-        },500);
-      }
-    },1000);
+    if (success) {
+      document.getElementById('vOk').style.display='';
+      var count=4;var cdEl=document.getElementById('cdNum');
+      var timer=setInterval(function(){
+        count--;if(cdEl)cdEl.textContent=count;
+        if(count<=0){
+          clearInterval(timer);window.close();
+          setTimeout(function(){if(cdEl)cdEl.textContent='✓';var p=document.querySelector('#vOk p:last-child');if(p)p.textContent='Puede cerrar esta ventana manualmente.';},500);
+        }
+      },1000);
+    } else {
+      // Fallback: Generate code if RLS blocks or offline
+      var resp={
+        tipo:'respuesta_proveedor',version:3,quote_name:D.name,provider:D.prov,batch:D.batch,
+        responded_at:conds.responded_at,items:items,warranty_months:conds.warranty_months,
+        payment_terms:conds.payment_terms,notes:conds.notes
+      };
+      var code = btoa(unescape(encodeURIComponent(JSON.stringify(resp))));
+      var errHtml = '<div style="text-align:center;padding:30px 20px;">' +
+        '<div style="font-size:40px;margin-bottom:12px;">⚠</div>' +
+        '<h2 style="color:#f5a623;font-size:20px;">No se pudo conectar al servidor</h2>' +
+        '<p style="color:#8088b0;margin-top:8px;margin-bottom:20px;">Por favor, copie el siguiente código y envíelo a BIA Energy respondiendo al correo para que su oferta quede registrada.</p>' +
+        '<textarea readonly onclick="this.select()" style="width:100%;height:140px;font-family:monospace;font-size:11px;background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;color:#fff;">' + code + '</textarea>' +
+        '</div>';
+      var vErr = document.getElementById('vErr');
+      vErr.innerHTML = errHtml;
+      vErr.style.display = '';
+    }
   }
   </script>
 </body>
