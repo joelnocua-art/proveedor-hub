@@ -407,7 +407,7 @@ function deleteQuote(id) {
 function confirmDeleteQuote(id) {
   const q = getAllQuotes().find((x) => String(x.it) === String(id));
   if (!q) return;
-  const action = isExtraQuote(id) ? 'eliminar' : 'ocultar';
+  const action = 'eliminar';
   const ok = confirm(`¿Seguro que deseas ${action} esta cotización?\n\n${q.empresa}\n${q.descripcion}`);
   if (ok) deleteQuote(id);
 }
@@ -792,7 +792,7 @@ function openProviderModal(id) {
     : `<div class="muted" style="font-size: 12px;">Sin servicios/productos registrados.</div>`;
 
   const canEdit = true;
-  const deleteLabel = isExtraProvider(id) ? 'Eliminar' : 'Ocultar';
+  const deleteLabel = 'Eliminar';
 
   body.innerHTML = `
     <div class="grid-2">
@@ -839,7 +839,7 @@ function openProviderModal(id) {
     </div>
 
     <div class="muted" style="margin-top: 10px; font-size: 12px; line-height: 1.6;">
-      Nota: los cambios que hagas aquí se guardan en tu navegador (localStorage). Si necesitas que la base sea compartida por todo el equipo, se requiere un backend.
+      &#9889; Conectado en tiempo real con Supabase.
     </div>
   `;
 
