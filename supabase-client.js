@@ -153,7 +153,7 @@ async function sbUpdateQuote(supaId, updates) {
   const { error } = await sb.from('quotes').update(updates).eq('id', supaId);
   if (error) { console.error('[Supabase] Update quote error:', error); return false; }
   // Update cache
-  const q = window._sbData.quotes.find(x => x._supaId === supaId);
+  const q = window._sbData.quotes.find(x => String(x._supaId) === String(supaId));
   if (q) Object.assign(q, updates);
   return true;
 }
@@ -177,7 +177,7 @@ async function sbUpdateProvider(supaId, updates) {
   if (!sb) return false;
   const { error } = await sb.from('providers').update(updates).eq('id', supaId);
   if (error) { console.error('[Supabase] Update provider error:', error); return false; }
-  const p = window._sbData.providers.find(x => x._supaId === supaId);
+  const p = window._sbData.providers.find(x => String(x._supaId) === String(supaId));
   if (p) {
     Object.assign(p, updates);
     if (updates.correo_electronico) p.correo = updates.correo_electronico;
@@ -191,7 +191,7 @@ async function sbDeleteProvider(supaId) {
   if (!sb) return false;
   const { error } = await sb.from('providers').delete().eq('id', supaId);
   if (error) { console.error('[Supabase] Delete provider error:', error); return false; }
-  window._sbData.providers = window._sbData.providers.filter(x => x._supaId !== supaId);
+  window._sbData.providers = window._sbData.providers.filter(x => String(x._supaId) !== String(supaId));
   return true;
 }
 
