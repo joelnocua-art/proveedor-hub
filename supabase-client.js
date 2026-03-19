@@ -12,9 +12,7 @@ function getSupabase() {
   return _sb;
 }
 
-// Shared Supabase client instance (used across the app)
-const supabase = getSupabase();
-
+// 
 // ═══ DATA CACHE ═══
 // Load from Supabase once, keep in memory for fast sync access
 window._sbData = {
@@ -246,7 +244,8 @@ async function sbSignOut() {
 
 // Public API used by the login button (Google OAuth)
 async function loginWithGoogle() {
-  if (!supabase || !supabase.auth) {
+  const sb = getSupabase();
+  if (!sb || !sb.auth) {
     if (typeof showToast === 'function') {
       showToast('Error al iniciar con Google: Supabase no está listo', 'error');
     } else if (typeof alert === 'function') {
@@ -255,7 +254,7 @@ async function loginWithGoogle() {
     return;
   }
 
-  const { error } = await supabase.auth.signInWithOAuth({
+  const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo: window.location.origin
