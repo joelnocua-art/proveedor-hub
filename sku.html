@@ -53,7 +53,8 @@
             <div class="muted">Selecciona uno o varios SKUs para cotizar.</div>
           </div>
         </div>
-        <div class="topbar-actions">
+        <div class="topbar-actions" style="display:flex;gap:10px;">
+          <button class="btn" style="background:rgba(0,229,200,0.1);color:#00e5c8;border:1px solid rgba(0,229,200,0.3);font-weight:700;" onclick="openPdfModal()">🤖 Analizar Tarifario</button>
           <button id="skuClearBtn" class="btn" type="button">Limpiar búsqueda</button>
         </div>
       </div>
@@ -111,6 +112,35 @@
     <button class="sku-cart-clear" id="btnLimpiarCarrito">Limpiar</button>
   </div>
 
+  <!-- PDF Upload Modal -->
+  <div id="pdfModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9000;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-raised);padding:30px;border-radius:16px;width:90%;max-width:450px;border:1px solid var(--border);box-shadow:0 20px 50px rgba(0,0,0,0.5);">
+      <h2 style="color:#00e5c8;margin-bottom:10px;font-size:20px;display:flex;align-items:center;gap:10px;"><span style="font-size:28px;">🤖</span> Lector de Tarifarios</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:24px;line-height:1.5;">Sube el PDF del proveedor. ChatGPT leerá el archivo, buscará los códigos SKU y actualizará los precios en tu base de datos automáticamente.</p>
+      
+      <div style="margin-bottom:16px;">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;font-weight:600;">¿De qué proveedor es este PDF?</label>
+        <select id="pdfProviderSelect" class="input" style="width:100%;"></select>
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;font-weight:600;">Archivo PDF</label>
+        <input type="file" id="pdfFileInput" accept="application/pdf" class="input" style="width:100%;padding:10px;" />
+      </div>
+
+      <div id="pdfProgress" style="display:none;margin-bottom:24px;text-align:center;padding:15px;background:rgba(0,229,200,0.1);border-radius:10px;border:1px solid rgba(0,229,200,0.2);">
+        <div style="color:var(--accent);font-weight:700;margin-bottom:6px;font-size:14px;" id="pdfStatus">Preparando archivo...</div>
+        <div style="font-size:12px;color:var(--muted);">Procesar documentos grandes puede tardar hasta 30 segundos.</div>
+      </div>
+
+      <div style="display:flex;gap:10px;">
+        <button id="btnProcessPdf" class="btn btn-primary" style="flex:2;" onclick="processPdf()">Analizar e Extraer Precios</button>
+        <button id="btnCancelPdf" class="btn" style="flex:1;" onclick="document.getElementById('pdfModal').style.display='none'">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="supabase-client.js?v=4"></script>
   <script src="providers.js"></script>
@@ -120,5 +150,106 @@
   <script src="sku_offers.js"></script>
   <script src="script.js?v=6"></script>
   <script src="components.js"></script>
+  <script>
+    window.openPdfModal = function() {
+      var sel = document.getElementById('pdfProviderSelect');
+      sel.innerHTML = '<option value="">-- Seleccionar proveedor --</option>';
+      var allProvs = typeof getAllProviders === 'function' ? getAllProviders() : [];
+      var names = allProvs.map(p => p.empresa).filter(Boolean).sort();
+      names.forEach(n => {
+        var opt = document.createElement('option');
+        opt.value = n;
+        opt.textContent = n;
+        sel.appendChild(opt);
+      });
+      document.getElementById('pdfFileInput').value = '';
+      document.getElementById('pdfProgress').style.display = 'none';
+      document.getElementById('btnProcessPdf').disabled = false;
+      document.getElementById('pdfModal').style.display = 'flex';
+    };
+
+    window.processPdf = async function() {
+      var pSelect = document.getElementById('pdfProviderSelect');
+      var fInput = document.getElementById('pdfFileInput');
+      if(!pSelect.value) return toast('Selecciona un proveedor','error');
+      if(!fInput.files.length) return toast('Sube un archivo PDF','error');
+      
+      document.getElementById('btnProcessPdf').disabled = true;
+      document.getElementById('btnCancelPdf').disabled = true;
+      document.getElementById('pdfProgress').style.display = 'block';
+      document.getElementById('pdfStatus').innerText = 'Extrayendo texto del PDF...';
+      
+      try {
+        var file = fInput.files[0];
+        var fileReader = new FileReader();
+        fileReader.onload = async function() {
+           try {
+               var typedarray = new Uint8Array(this.result);
+               pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+               var pdf = await pdfjsLib.getDocument(typedarray).promise;
+               var maxPages = pdf.numPages;
+               var textParts = [];
+               
+               for (var j = 1; j <= maxPages; j++) {
+                  if (j > 30) break; // Limit to 30 pages to avoid huge memory spikes
+                  var page = await pdf.getPage(j);
+                  var textContent = await page.getTextContent();
+                  var pageText = textContent.items.map(function(s) { return s.str; }).join(' ');
+                  textParts.push(pageText);
+               }
+               var fullText = textParts.join('\n');
+               
+               document.getElementById('pdfStatus').innerText = 'ChatGPT analizando precios...';
+               var skuNames = (window.skuCatalogData || []).map(s => s.sku);
+               
+               var req = await fetch('/api/analyze-catalog', {
+                   method: 'POST',
+                   headers: {'Content-Type': 'application/json'},
+                   body: JSON.stringify({ text: fullText, skus: skuNames })
+               });
+               
+               var res = await req.json();
+               if(res.error) throw new Error(res.error + (res.details ? ' ' + res.details : ''));
+               if(!Array.isArray(res)) throw new Error('Respuesta inválida de IA: no es un arreglo.');
+               if(res.length === 0) throw new Error('ChatGPT no encontró ningún SKU de tu catálogo o formato ilegible.');
+               
+               document.getElementById('pdfStatus').innerText = 'Guardando ' + res.length + ' precios...';
+               
+               var provName = pSelect.value;
+               var catMap = {};
+               (window.skuCatalogData||[]).forEach(s => catMap[s.sku] = s.id);
+               
+               let successCount = 0;
+               for(var i=0; i<res.length; i++) {
+                   var offer = res[i];
+                   var sId = catMap[offer.sku];
+                   var pr = Number(offer.price);
+                   if(sId && pr > 0 && typeof sbUpsertOffer === 'function') {
+                      await sbUpsertOffer(sId, provName, pr);
+                      successCount++;
+                   }
+               }
+               
+               toast('Se extrajeron y actualizaron ' + successCount + ' precios con éxito.','success');
+               document.getElementById('pdfModal').style.display='none';
+               // Reload page to visually show the newly extracted SKUs
+               setTimeout(function() { window.location.reload(); }, 1500);
+           } catch (innerErr) {
+               console.error(innerErr);
+               toast('Error: ' + innerErr.message, 'error');
+               document.getElementById('btnProcessPdf').disabled = false;
+               document.getElementById('btnCancelPdf').disabled = false;
+               document.getElementById('pdfStatus').innerText = 'Error en el proceso.';
+           }
+        };
+        fileReader.readAsArrayBuffer(file);
+      } catch(err) {
+        console.error(err);
+        toast('Error general: ' + err.message, 'error');
+        document.getElementById('btnProcessPdf').disabled = false;
+        document.getElementById('btnCancelPdf').disabled = false;
+      }
+    };
+  </script>
 </body>
 </html>
