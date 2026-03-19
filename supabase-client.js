@@ -161,7 +161,24 @@ async function sbUpdateQuote(supaId, updates) {
 async function sbInsertProvider(prov) {
   const sb = getSupabase();
   if (!sb) return null;
-  const { data, error } = await sb.from('providers').insert([prov]).select();
+  // Solo enviar las columnas que existen en la base de datos:
+  const row = {
+    empresa: prov.empresa || '',
+    rut: prov.rut || '',
+    direccion: prov.direccion || '',
+    categoria: prov.categoria || '',
+    estado: prov.estado || '',
+    representante: prov.representante || '',
+    celular_telefono: prov.celular || prov.celular_telefono || '',
+    ciudad: prov.ciudad || '',
+    correo_electronico: prov.correo || prov.correo_electronico || '',
+    pagina_web: prov.pagina_web || '',
+    catalogo: prov.catalogo || '',
+    tiempos_respuesta: prov.tiempos_respuesta || '',
+    servicios_productos: prov.servicios_productos || '',
+    observaciones: prov.observaciones || ''
+  };
+  const { data, error } = await sb.from('providers').insert([row]).select();
   if (error) { console.error('[Supabase] Insert provider error:', error); return null; }
   if (data && data[0]) {
     const p = data[0];
@@ -175,7 +192,24 @@ async function sbInsertProvider(prov) {
 async function sbUpdateProvider(supaId, updates) {
   const sb = getSupabase();
   if (!sb) return false;
-  const { error } = await sb.from('providers').update(updates).eq('id', supaId);
+  // Extraer unicamente columnas de la base de datos
+  const payload = {};
+  if (updates.empresa !== undefined) payload.empresa = updates.empresa;
+  if (updates.rut !== undefined) payload.rut = updates.rut;
+  if (updates.direccion !== undefined) payload.direccion = updates.direccion;
+  if (updates.categoria !== undefined) payload.categoria = updates.categoria;
+  if (updates.estado !== undefined) payload.estado = updates.estado;
+  if (updates.representante !== undefined) payload.representante = updates.representante;
+  if (updates.celular !== undefined || updates.celular_telefono !== undefined) payload.celular_telefono = updates.celular_telefono || updates.celular;
+  if (updates.ciudad !== undefined) payload.ciudad = updates.ciudad;
+  if (updates.correo !== undefined || updates.correo_electronico !== undefined) payload.correo_electronico = updates.correo_electronico || updates.correo;
+  if (updates.pagina_web !== undefined) payload.pagina_web = updates.pagina_web;
+  if (updates.catalogo !== undefined) payload.catalogo = updates.catalogo;
+  if (updates.tiempos_respuesta !== undefined) payload.tiempos_respuesta = updates.tiempos_respuesta;
+  if (updates.servicios_productos !== undefined) payload.servicios_productos = updates.servicios_productos;
+  if (updates.observaciones !== undefined) payload.observaciones = updates.observaciones;
+
+  const { error } = await sb.from('providers').update(payload).eq('id', supaId);
   if (error) { console.error('[Supabase] Update provider error:', error); return false; }
   const p = window._sbData.providers.find(x => String(x._supaId) === String(supaId));
   if (p) {
