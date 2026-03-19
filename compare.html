@@ -185,6 +185,41 @@
       renderQuoteList();
     };
 
+    window.cmpNotifyBulk = function(qName, provName) {
+       var wons = window._currentWonSkus ? window._currentWonSkus[provName] : null;
+       if(!wons || !wons.length) return;
+       var allP=typeof getAllProviders==='function'?getAllProviders():[];
+       var prov=allP.find(function(p){return p.empresa===provName});
+       var email=prov?(prov.correo||prov.correo_electronico||''):'';
+       if(!email){toast(provName+' no tiene correo registrado.','error');return;}
+       
+       var list = wons.map(function(s,i){return (i+1)+'. '+s}).join('\n');
+       var sub=encodeURIComponent('Adjudicación de Cotización: '+qName+' — BIA Energy');
+       var body=encodeURIComponent('Estimado equipo de '+provName+',\n\nNos complace informarles que su propuesta ha sido SELECCIONADA como la opción ganadora en la solicitud "'+qName+'" para los siguientes ítems:\n\n'+list+'\n\nPronto les enviaremos la Orden de Compra oficial con los detalles administrativos.\n\nGracias por su excelente servicio,\nOperaciones — BIA Energy');
+       
+       var a = document.createElement('a');
+       a.href = 'https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body;
+       a.target = '_blank';
+       a.click();
+       toast('Abriendo correo para '+provName,'success');
+    };
+
+    window.cmpNotifySingle = function(qName, sku, provName) {
+       var allP=typeof getAllProviders==='function'?getAllProviders():[];
+       var prov=allP.find(function(p){return p.empresa===provName});
+       var email=prov?(prov.correo||prov.correo_electronico||''):'';
+       if(!email){toast(provName+' no tiene correo registrado.','error');return;}
+       
+       var sub=encodeURIComponent('¡Cotización Adjudicada! '+qName+' — BIA Energy');
+       var body=encodeURIComponent('Estimado equipo de '+provName+',\n\nNos complace informarles que su oferta para el ítem:\n\n✔️ '+sku+'\n\nHa sido adjudicada como la opción ganadora en nuestra solicitud referenciada como ('+qName+').\n\nEn breve enviaremos la Orden de Compra oficial.\n\nAtentamente,\nOperaciones — BIA Energy');
+       
+       var a = document.createElement('a');
+       a.href = 'https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body;
+       a.target = '_blank';
+       a.click();
+       toast('Abriendo correo para '+provName,'success');
+    };
+
     function renderComparison(name){
       var all=getAllQ().filter(function(q){return(q.cotizacion_nombre||'')===name});
       if(!all.length){toast('No hay datos para esta cotización.','error');cmpBack();return}
@@ -232,6 +267,16 @@
       if (!Object.keys(adj).length) {
         try{adj=JSON.parse(localStorage.getItem('adjudications')||'{}')}catch(e){}
       }
+
+      window._currentWonSkus = {};
+      Object.keys(adj).forEach(function(k){
+        if(k.indexOf(name+'::')===0){
+           var s = k.split('::')[1];
+           var p = adj[k];
+           if(!window._currentWonSkus[p]) window._currentWonSkus[p] = [];
+           window._currentWonSkus[p].push(s);
+        }
+      });
 
       // Render SKU sections
       var sectionsEl=document.getElementById('cmpSkuSections');
@@ -282,7 +327,10 @@
                 (hasPr?
                   '<div class="prov-cmp-actions">'+
                     (isAdj?
-                      '<span class="adj-btn adjudicado">★ Adjudicado</span>'
+                      '<div style="display:flex;gap:6px;width:100%;">'+
+                        '<span class="adj-btn adjudicado" style="flex:1;">★ Adjudicado</span>'+
+                        '<button class="btn" style="padding:0 12px;background:rgba(0,229,200,0.1);color:#00e5c8;border:1px solid rgba(0,229,200,0.3);border-radius:10px;cursor:pointer;" onclick="cmpNotifySingle(\''+esc(name).replace(/'/g,"\\'")+'\',\''+esc(sku).replace(/'/g,"\\'")+'\',\''+esc(o.empresa||'').replace(/'/g,"\\'")+'\')" title="Notificar a proveedor">✉️</button>'+
+                      '</div>'
                     :
                       '<button class="adj-btn adjudicar" onclick="cmpAdjudicar(\''+esc(name).replace(/'/g,"\\'")+'\',\''+esc(sku).replace(/'/g,"\\'")+'\',\''+esc(o.empresa||'').replace(/'/g,"\\'")+'\')">Adjudicar</button>'
                     )+
@@ -300,10 +348,12 @@
         var pt=provTotals[p]||{total:0,responded:0,items:0};
         var complete=pt.responded===pt.items;
         var isBest=p===bestProv;
+        var wons = window._currentWonSkus ? window._currentWonSkus[p] : [];
         return '<div style="flex:1;min-width:160px;padding:12px 16px;border:1px solid '+(isBest?'var(--accent)':'var(--border)')+';border-radius:var(--r-md);background:'+(isBest?'rgba(0,229,200,0.04)':'rgba(255,255,255,0.02)')+';">'+
           '<div style="font-weight:700;font-size:13px;">'+esc(p)+(isBest?' <span style="color:var(--accent);font-size:11px;">★ Mejor precio</span>':'')+'</div>'+
           '<div style="font-size:20px;font-weight:800;margin-top:4px;color:'+(complete?'var(--accent)':'var(--muted)')+';">'+(complete?fmt(pt.total):'Incompleto')+'</div>'+
           '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+pt.responded+'/'+pt.items+' ítems cotizados</div>'+
+          ((wons&&wons.length>0) ? '<button class="btn" style="margin-top:12px;width:100%;font-size:12px;padding:6px;background:rgba(0,229,200,0.15);color:var(--accent);border:1px solid rgba(0,229,200,0.3);position:relative;z-index:2;cursor:pointer;" onclick="cmpNotifyBulk(\''+esc(name).replace(/'/g,"\\'")+'\',\''+esc(p).replace(/'/g,"\\'")+'\')">✉️ Notificar ganador ('+wons.length+')</button>' : '')+
         '</div>';
       }).join('');
       totalEl.innerHTML='<div style="margin-top:20px;"><div style="font-weight:700;font-size:14px;margin-bottom:10px;">Total por proveedor</div><div style="display:flex;gap:10px;flex-wrap:wrap;">'+provTotalCards+'</div></div>';
