@@ -66,10 +66,18 @@ function logout() {
 
 function checkLogin() {
   const user = localStorage.getItem('currentUser');
-  const page = (window.location.pathname.split('/').pop() || '').toLowerCase();
+  const page = document.body?.dataset?.page || '';
+  const pagePath = (window.location.pathname.split('/').pop() || '').toLowerCase();
 
-  // Treat root as index
-  const isAuthPage = page === '' || page === 'index.html' || page === 'register.html';
+  // Auth pages: login and register (check both data-page and pathname for flexibility)
+  const isAuthPage = page === 'login' || page === 'register' 
+    || pagePath === '' || pagePath === 'index' || pagePath === 'index.html' 
+    || pagePath === 'register' || pagePath === 'register.html';
+
+  // Public page: respuesta.html (provider response form)
+  const isPublicPage = page === 'respuesta' || pagePath === 'respuesta' || pagePath === 'respuesta.html';
+
+  if (isPublicPage) return; // No auth required
 
   if (!user && !isAuthPage) {
     window.location.href = 'index.html';
@@ -2549,8 +2557,10 @@ document.addEventListener('DOMContentLoaded', () => {
   setActiveNav();
   renderUserChip();
 
+  const page = document.body.dataset.page || '';
+
   // Providers page
-  if (window.location.pathname.endsWith('providers.html')) {
+  if (page === 'providers') {
     document.getElementById('search-provider')?.addEventListener('input', renderProvidersTable);
     document.getElementById('filter-city')?.addEventListener('input', renderProvidersTable);
     document.getElementById('filter-category')?.addEventListener('change', renderProvidersTable);
@@ -2570,12 +2580,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // New provider page
-  if (window.location.pathname.endsWith('new_provider.html')) {
+  if (page === 'new_provider') {
     setupNewProviderForm();
   }
 
   // Quotes page
-  if (window.location.pathname.endsWith('quotes.html')) {
+  if (page === 'quotes') {
     setupQuotesForm();
     setupQuoteSkuSelector();
     renderQuotesTable();
@@ -2583,27 +2593,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Quote detail
-  if (window.location.pathname.endsWith('quote_detail.html')) {
+  if (page === 'quote_detail') {
     setupQuoteDetailPage();
   }
 
   // Compare page
-  if (window.location.pathname.endsWith('compare.html')) {
+  if (page === 'compare') {
     setupCompare();
   }
 
   // Provider detail
-  if (window.location.pathname.endsWith('provider_detail.html')) {
+  if (page === 'provider_detail') {
     setupProviderDetailPage();
   }
 
   // Home page
-  if (window.location.pathname.endsWith('home.html')) {
+  if (page === 'home') {
     updateHomeKpis();
   }
 
   // SKU page
-  if (window.location.pathname.endsWith('sku.html')) {
+  if (page === 'sku') {
     setupSkuPage();
   }
 });
