@@ -256,7 +256,7 @@
     }
 
     // === SAVE & EMAIL ===
-    window.wizSave=function(sendEmail){
+    window.wizSave=async function(sendEmail){
       var name=(document.getElementById('wz-name')||{}).value||'';
       if(!name.trim()){toast('Dale un nombre a la cotización.','error');document.getElementById('wz-name').focus();return}
       if(!skus.length||!provSet.size){toast('Faltan ítems o proveedores.','error');return}
@@ -274,33 +274,41 @@
       
       if(sendEmail){
         var skuTable=skus.map(function(s,i){return (i+1)+'. '+s.sku+' — Cant: '+s.qty}).join('\n');
-        var delay=0;
         pa.forEach(function(emp){
           var prov=allProvs.find(function(p){return p.empresa===emp});
           var email=prov?(prov.correo||prov.correo_electronico||''):'';
           if(!email){toast(emp+' no tiene correo.','error');return}
           var skuIds=skus.map(function(s){return s.id+':'+s.qty}).join(',');
           var formLink=baseUrl+'respuesta.html#p='+encodeURIComponent(emp)+'&n='+encodeURIComponent(name.trim())+'&b='+encodeURIComponent(batch)+'&s='+skuIds+'&c='+encodeURIComponent(city)+'&d='+encodeURIComponent(dt);
-          setTimeout(function(){
-            var sub=encodeURIComponent('Solicitud de cotización: '+name.trim()+' — BIA Energy');
-            var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nReciban un cordial saludo de BIA Energy.\n\nSolicitamos cotización formal:\n\n'+skuTable+'\n\nCiudad: '+(city||'Por confirmar')+'\nFecha: '+(dt||'Por confirmar')+(notes?'\nNotas: '+notes:'')+'\n\n━━ RESPONDER ━━\nIngrese precios aquí:\n'+formLink+'\n\nO responda este correo con precios unitarios sin IVA, tiempo de entrega, garantía y condiciones de pago.\n\nCordialmente,\nOperaciones — BIA Energy');
-            var win = window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body,'_blank');
-            if(!win) {
-              window.location.href = 'mailto:'+encodeURIComponent(email)+'?subject='+sub+'&body='+body;
-            }
-          },delay);delay+=1000;
+          var sub=encodeURIComponent('Solicitud de cotización: '+name.trim()+' — BIA Energy');
+          var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nReciban un cordial saludo de BIA Energy.\n\nSolicitamos cotización formal:\n\n'+skuTable+'\n\nCiudad: '+(city||'Por confirmar')+'\nFecha: '+(dt||'Por confirmar')+(notes?'\nNotas: '+notes:'')+'\n\n━━ RESPONDER ━━\nIngrese precios aquí:\n'+formLink+'\n\nO responda este correo con precios unitarios sin IVA, tiempo de entrega, garantía y condiciones de pago.\n\nCordialmente,\nOperaciones — BIA Energy');
+          
+          var win = window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body,'_blank');
+          if(!win) {
+             window.location.href = 'mailto:'+encodeURIComponent(email)+'?subject='+sub+'&body='+body;
+          }
         });
         toast(ct+' solicitudes preparadas. Abriendo Gmail...','success');
       }else{toast(ct+' solicitudes preparadas como "'+name.trim()+'". Guardando...','success')}
       
+      var btnSave1 = document.getElementById('wzBtnSave1'), btnSave2 = document.getElementById('wzBtnSave2');
+      if (btnSave1) { btnSave1.disabled = true; btnSave1.textContent = "Guardando..."; }
+      if (btnSave2) { btnSave2.disabled = true; btnSave2.textContent = "Guardando..."; }
+
+      // Now save to Supabase asynchronously
+      const ok = await sbInsertQuotes(sbList);
+
+      if (btnSave1) { btnSave1.disabled = false; btnSave1.innerHTML = 'Crear cotizaciones'; }
+      if (btnSave2) { btnSave2.disabled = false; btnSave2.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Crear y enviar correos'; }
+
+      if (!ok) {
+        toast('Error guardando cotizaciones en Supabase. Verifica la consola.', 'error');
+        return;
+      }
+
       skus=[];provSet=new Set();renderSkuList();
       ['wz-name','wz-city','wz-date','wz-notes'].forEach(function(id){var e=document.getElementById(id);if(e)e.value=''});
       wizGo(4);
-
-      // Now save to Supabase asynchronously without breaking synchronity
-      sbInsertQuotes(sbList).then(function(ok) {
-        if (!ok) toast('Error guardando cotizaciones en Supabase. Verifica la consola.', 'error');
-      });
     };
 
     // === STEP 4: Tracking ===
