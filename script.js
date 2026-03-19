@@ -2567,27 +2567,33 @@ function renderSelectedQuoteSkus() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   const page = document.body.dataset.page || '';
+  const isAuthPage = page === 'login' || page === 'register';
+  const isPublicPage = page === 'respuesta' || page === '404';
 
   // Auth check with Supabase
+  let sbUser = null;
   if (typeof sbGetUser === 'function') {
-    const user = await sbGetUser();
-    const isAuthPage = page === 'login' || page === 'register';
-    const isPublicPage = page === 'respuesta' || page === '404';
+    try { sbUser = await sbGetUser(); } catch(e) { console.warn('Auth check failed:', e); }
 
-    if (!isPublicPage) {
-      if (!user && !isAuthPage) { window.location.href = 'index.html'; return; }
-      if (user && isAuthPage) { window.location.href = 'home.html'; return; }
+    // Only redirect NON-auth pages if not logged in
+    if (!isPublicPage && !isAuthPage && !sbUser) {
+      window.location.href = 'index.html';
+      return;
     }
 
     // Store user info for UI
-    if (user) {
+    if (sbUser) {
       localStorage.setItem('currentUser', JSON.stringify({
-        name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',
-        email: user.email || ''
+        name: sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || 'Usuario',
+        email: sbUser.email || ''
       }));
     }
   } else {
-    checkLogin();
+    // Fallback: old localStorage check
+    if (!isPublicPage && !isAuthPage && !localStorage.getItem('currentUser')) {
+      window.location.href = 'index.html';
+      return;
+    }
   }
 
   setActiveNav();

@@ -20,44 +20,44 @@
         </div>
         <div class="divider"></div>
         <p class="muted" style="margin-bottom:14px;">Inicia sesión para continuar.</p>
-        <div id="loginForm" style="display:grid;gap:10px;">
+        <div style="display:grid;gap:10px;">
           <input type="email" id="loginEmail" class="input" placeholder="Correo electrónico" />
           <input type="password" id="loginPass" class="input" placeholder="Contraseña" />
-          <button class="btn btn-primary" onclick="doLogin()">Iniciar sesión</button>
-          <div style="text-align:center;color:var(--text-3);font-size:12px;">— o —</div>
-          <button class="btn" onclick="doGoogleLogin()" style="gap:8px;">
-            <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#4285F4" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#34A853" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.9 7.35 2.56 10.53l7.97-5.94z"/><path fill="#EA4335" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.94C6.51 42.62 14.62 48 24 48z"/></svg>
-            Iniciar con Google
-          </button>
+          <button class="btn btn-primary" id="btnLogin">Iniciar sesión</button>
           <a class="btn" href="register.html" style="text-align:center;">Crear cuenta nueva</a>
         </div>
-        <div id="loginMsg" style="margin-top:10px;font-size:13px;display:none;"></div>
+        <div id="loginMsg" style="margin-top:10px;font-size:13px;display:none;padding:10px;border-radius:10px;"></div>
       </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="supabase-client.js"></script>
-  <script src="script.js"></script>
   <script>
-  async function doLogin(){
-    var email=(document.getElementById('loginEmail')||{}).value||'';
-    var pass=(document.getElementById('loginPass')||{}).value||'';
-    var msg=document.getElementById('loginMsg');
-    if(!email||!pass){showMsg('Ingresa correo y contraseña.','var(--danger)');return}
-    showMsg('Iniciando sesión...','var(--accent)');
-    var r=await sbSignIn(email,pass);
-    if(r.error){showMsg(r.error.message||'Error al iniciar sesión.','var(--danger)');return}
+  var SUPA_URL='https://fepivzcobddybztuiyge.supabase.co';
+  var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlcGl2emNvYmJkeWJ6dHVpeWdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4ODkxMDMsImV4cCI6MjA4OTQ2NTEwM30.ZwUjlkqiucO3bzLW-Rw4CGUS3N4wsNFrjLl2ZyPa4PU';
+  var sb=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+
+  function showMsg(t,ok){var m=document.getElementById('loginMsg');m.style.display='block';m.style.background=ok?'rgba(0,229,200,0.1)':'rgba(255,77,109,0.1)';m.style.color=ok?'#00e5c8':'#ff4d6d';m.textContent=t}
+
+  document.getElementById('btnLogin').onclick=async function(){
+    var email=document.getElementById('loginEmail').value.trim();
+    var pass=document.getElementById('loginPass').value;
+    if(!email||!pass){showMsg('Ingresa correo y contraseña.',false);return}
+    this.disabled=true;this.textContent='Iniciando sesión...';
+    var r=await sb.auth.signInWithPassword({email:email,password:pass});
+    if(r.error){showMsg(r.error.message,false);this.disabled=false;this.textContent='Iniciar sesión';return}
+    localStorage.setItem('currentUser',JSON.stringify({name:r.data.user.user_metadata?.full_name||email.split('@')[0],email:email}));
     window.location.href='home.html';
-  }
-  async function doGoogleLogin(){
-    showMsg('Redirigiendo a Google...','var(--accent)');
-    await sbSignInWithGoogle();
-  }
-  function showMsg(t,c){var m=document.getElementById('loginMsg');if(m){m.style.display='block';m.style.color=c||'var(--text)';m.textContent=t}}
-  // Check if already logged in
+  };
+
+  // If already logged in, go to home
   (async function(){
-    var u=await sbGetUser();
-    if(u)window.location.href='home.html';
+    try{
+      var r=await sb.auth.getUser();
+      if(r.data&&r.data.user){
+        localStorage.setItem('currentUser',JSON.stringify({name:r.data.user.user_metadata?.full_name||r.data.user.email.split('@')[0],email:r.data.user.email}));
+        window.location.href='home.html';
+      }
+    }catch(e){}
   })();
   </script>
 </body>

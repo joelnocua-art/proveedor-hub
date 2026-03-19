@@ -15,7 +15,7 @@
           <img src="https://i.ibb.co/BfCjKQt/logo-bia-blanco.png" alt="BIA Energy" loading="lazy" />
           <div>
             <div class="auth-title">Crear cuenta</div>
-            <div class="auth-sub">Regístrate en Proveedor Hub.</div>
+            <div class="auth-sub">Regístrate en Proveedor Hub — BIA Energy.</div>
           </div>
         </div>
         <div class="divider"></div>
@@ -23,31 +23,33 @@
           <input type="text" id="regName" class="input" placeholder="Nombre completo" />
           <input type="email" id="regEmail" class="input" placeholder="Correo electrónico" />
           <input type="password" id="regPass" class="input" placeholder="Contraseña (mínimo 6 caracteres)" />
-          <button class="btn btn-primary" onclick="doRegister()">Crear cuenta</button>
-          <a class="btn" href="index.html" style="text-align:center;">Ya tengo cuenta</a>
+          <button class="btn btn-primary" id="btnReg">Crear cuenta</button>
+          <a class="btn" href="index.html" style="text-align:center;">Ya tengo cuenta — Iniciar sesión</a>
         </div>
-        <div id="regMsg" style="margin-top:10px;font-size:13px;display:none;"></div>
+        <div id="regMsg" style="margin-top:10px;font-size:13px;display:none;padding:10px;border-radius:10px;"></div>
       </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="supabase-client.js"></script>
-  <script src="script.js"></script>
   <script>
-  async function doRegister(){
-    var name=(document.getElementById('regName')||{}).value||'';
-    var email=(document.getElementById('regEmail')||{}).value||'';
-    var pass=(document.getElementById('regPass')||{}).value||'';
-    var msg=document.getElementById('regMsg');
-    if(!name||!email||!pass){showMsg('Completa todos los campos.','var(--danger)');return}
-    if(pass.length<6){showMsg('La contraseña debe tener al menos 6 caracteres.','var(--danger)');return}
-    showMsg('Creando cuenta...','var(--accent)');
-    var r=await sbSignUp(email,pass,name);
-    if(r.error){showMsg(r.error.message||'Error al registrar.','var(--danger)');return}
-    showMsg('Cuenta creada. Revisa tu correo para confirmar, o inicia sesión.','var(--accent)');
-    setTimeout(function(){window.location.href='index.html'},2000);
-  }
-  function showMsg(t,c){var m=document.getElementById('regMsg');if(m){m.style.display='block';m.style.color=c;m.textContent=t}}
+  var SUPA_URL='https://fepivzcobddybztuiyge.supabase.co';
+  var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlcGl2emNvYmJkeWJ6dHVpeWdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4ODkxMDMsImV4cCI6MjA4OTQ2NTEwM30.ZwUjlkqiucO3bzLW-Rw4CGUS3N4wsNFrjLl2ZyPa4PU';
+  var sb=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+
+  function showMsg(t,ok){var m=document.getElementById('regMsg');m.style.display='block';m.style.background=ok?'rgba(0,229,200,0.1)':'rgba(255,77,109,0.1)';m.style.color=ok?'#00e5c8':'#ff4d6d';m.textContent=t}
+
+  document.getElementById('btnReg').onclick=async function(){
+    var name=document.getElementById('regName').value.trim();
+    var email=document.getElementById('regEmail').value.trim();
+    var pass=document.getElementById('regPass').value;
+    if(!name||!email||!pass){showMsg('Completa todos los campos.',false);return}
+    if(pass.length<6){showMsg('La contraseña debe tener al menos 6 caracteres.',false);return}
+    this.disabled=true;this.textContent='Creando cuenta...';
+    var r=await sb.auth.signUp({email:email,password:pass,options:{data:{full_name:name}}});
+    if(r.error){showMsg(r.error.message,false);this.disabled=false;this.textContent='Crear cuenta';return}
+    showMsg('Cuenta creada. Redirigiendo...',true);
+    setTimeout(function(){window.location.href='index.html'},1500);
+  };
   </script>
 </body>
 </html>
