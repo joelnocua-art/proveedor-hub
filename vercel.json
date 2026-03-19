@@ -1,0 +1,36 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    },
+    {
+      "source": "/(.*\\.js)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*\\.css)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
+  ],
+  "rewrites": [
+    { "source": "/login", "destination": "/index.html" },
+    { "source": "/registro", "destination": "/register.html" },
+    { "source": "/inicio", "destination": "/home.html" },
+    { "source": "/proveedores", "destination": "/providers.html" },
+    { "source": "/cotizaciones", "destination": "/quotes.html" },
+    { "source": "/comparativo", "destination": "/compare.html" },
+    { "source": "/sku", "destination": "/sku.html" },
+    { "source": "/respuesta", "destination": "/respuesta.html" }
+  ]
+}

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Iniciar sesión - Proveedor Hub</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="card auth-card">
+      <div class="card-body">
+        <div class="auth-top">
+          <!-- Logo (desde el archivo que compartiste) -->
+          <img
+            src="https://i.ibb.co/BfCjKQt/logo-bia-blanco.png"
+            alt="BIA Energy"
+            loading="lazy"
+          />
+          <div>
+            <div class="auth-title">Proveedor Hub</div>
+            <div class="auth-sub">Gestión de proveedores, cotizaciones y comparativos.</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <p class="muted" style="margin-bottom: 14px;">
+          Inicia sesión para continuar.
+        </p>
+
+        <div style="display: grid; gap: 10px;">
+          <button class="btn btn-primary" onclick="loginWithGoogle()">
+            Iniciar sesión con Google
+          </button>
+          <a class="btn" href="register.html">Crear cuenta</a>
+        </div>
+
+        
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

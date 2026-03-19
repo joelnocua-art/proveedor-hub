@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comparativo - Proveedor Hub</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+  <style>
+    .cmp-select-card{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 20px;margin-bottom:10px;cursor:pointer;transition:all .15s;display:flex;justify-content:space-between;align-items:center}
+    .cmp-select-card:hover{border-color:var(--accent);background:rgba(0,229,200,0.03)}
+    .cmp-select-card.active{border-color:var(--accent);background:rgba(0,229,200,0.06)}
+    .cmp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+    .cmp-kpi{border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;background:rgba(255,255,255,0.02)}
+    .cmp-kpi-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+    .cmp-kpi-val{font-size:22px;font-weight:800;margin-top:2px}
+    .sku-compare-section{margin-bottom:20px}
+    .sku-compare-header{display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 16px;background:rgba(91,107,255,0.08);border-radius:var(--r-md)}
+    .sku-compare-header .sku-name{font-weight:700;font-size:14px;flex:1}
+    .sku-compare-header .sku-qty{font-size:12px;color:var(--muted)}
+    .prov-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+    .prov-cmp-card{border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 20px;position:relative;transition:all .2s;background:rgba(255,255,255,0.02)}
+    .prov-cmp-card:hover{border-color:var(--border-hi)}
+    .prov-cmp-card.winner{border-color:var(--accent);background:rgba(0,229,200,0.04)}
+    .prov-cmp-card.pending{opacity:0.5;border-style:dashed}
+    .prov-cmp-card.adjudicado{border-color:#f5a623;background:rgba(245,166,35,0.06);box-shadow:0 0 0 1px rgba(245,166,35,0.3)}
+    .medal{position:absolute;top:-8px;right:12px;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px}
+    .medal.g1{background:#f5a623;color:#1a1209}
+    .medal.g2{background:#b0b8c8;color:#111}
+    .medal.g3{background:#cd7f32;color:#fff}
+    .prov-cmp-name{font-weight:700;font-size:14px;margin-bottom:8px}
+    .prov-cmp-price{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:6px}
+    .prov-cmp-price.no-price{color:var(--muted);font-size:14px;font-weight:400}
+    .prov-cmp-details{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:var(--muted)}
+    .prov-cmp-details .det-val{font-weight:600;color:var(--text)}
+    .prov-cmp-actions{margin-top:10px;display:flex;gap:6px}
+    .adj-btn{padding:6px 14px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid;transition:all .15s}
+    .adj-btn.adjudicar{background:rgba(245,166,35,0.1);border-color:rgba(245,166,35,0.3);color:#f5a623}
+    .adj-btn.adjudicar:hover{background:rgba(245,166,35,0.2)}
+    .adj-btn.adjudicado{background:#f5a623;border-color:#f5a623;color:#1a1209;cursor:default}
+    .empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+    .empty-state h3{font-size:16px;color:var(--text);margin-bottom:8px}
+    .badge-sm{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700}
+    .badge-resp{background:rgba(40,200,100,.15);color:#28c864}
+    .badge-pend{background:rgba(255,180,0,.18);color:#f5a623}
+    .total-row{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border:1px solid var(--border);border-radius:var(--r-md);margin-top:8px;background:rgba(255,255,255,0.02)}
+    @media(max-width:768px){.cmp-kpis{grid-template-columns:1fr 1fr}.prov-cards{grid-template-columns:1fr}}
+    @media(max-width:480px){.cmp-kpis{grid-template-columns:1fr}}
+  </style>
+</head>
+<body data-page="compare">
+  <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar(false)"></div>
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand">
+        <img src="https://i.ibb.co/BfCjKQt/logo-bia-blanco.png" alt="BIA" loading="lazy" />
+        <div class="brand-text"><div class="brand-title">Proveedor Hub</div><div class="brand-sub">BIA Energy - Operaciones</div></div>
+      </div>
+      <nav class="nav">
+        <a href="home.html" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>Inicio</a>
+        <a href="providers.html" data-nav="providers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M9 21v-8h6v8"/><path d="M8 9h8"/></svg>Proveedores</a>
+        <a href="new_provider.html" data-nav="new_provider"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Nuevo proveedor</a>
+        <a href="quotes.html" data-nav="quotes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8l4 4v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M8 11h8"/><path d="M8 15h8"/><path d="M8 19h6"/></svg>Cotizaciones</a>
+        <a href="compare.html" data-nav="compare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 16V9"/><path d="M12 16V7"/><path d="M17 16V11"/></svg>Comparativo</a>
+        <a href="sku.html" data-nav="sku"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>SKU</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="userChip" class="muted" style="margin-bottom:10px;"></div>
+        <button class="btn btn-danger" style="width:100%;" onclick="logout()">Cerrar sesión</button>
+      </div>
+    </aside>
+    <div class="content">
+      <header class="topbar">
+        <div class="title">
+          <button class="icon-btn" onclick="toggleSidebar()" aria-label="Menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button>
+          <div><div class="page-title">Comparativo</div><div class="muted">Compara proveedores y adjudica la mejor opción.</div></div>
+        </div>
+        <div class="topbar-actions">
+          <a class="btn" href="quotes.html">+ Nueva cotización</a>
+        </div>
+      </header>
+      <main class="main" id="main-content">
+
+        <!-- Step 1: Select quotation -->
+        <div class="card" id="cmpSelectCard">
+          <div class="card-header"><div class="card-title">Selecciona una cotización para comparar</div><div class="card-subtitle">Solo se muestran cotizaciones con al menos una respuesta de proveedor.</div></div>
+          <div class="card-body" id="cmpQuoteList"></div>
+        </div>
+
+        <!-- Comparison view (hidden until selection) -->
+        <div id="cmpView" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-size:18px;font-weight:700;" id="cmpTitle"></div>
+              <div style="font-size:13px;color:var(--muted);" id="cmpSubtitle"></div>
+            </div>
+            <button class="btn" onclick="cmpBack()">← Volver a selección</button>
+          </div>
+
+          <!-- KPIs -->
+          <div class="cmp-kpis" id="cmpKpis"></div>
+
+          <!-- SKU comparisons -->
+          <div id="cmpSkuSections"></div>
+
+          <!-- Total row -->
+          <div id="cmpTotalRow"></div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="providers.js"></script>
+  <script src="quotes.js"></script>
+  <script src="providerProducts.js"></script>
+  <script src="script.js"></script>
+  <script src="components.js"></script>
+  <script>
+  (function(){
+    var selectedQuote=null;
+    function esc(s){return typeof escapeHtml==='function'?escapeHtml(s):s}
+    function fmt(v){var n=Number(v);if(!n)return '—';return typeof formatCOP==='function'?formatCOP(n):('$ '+Math.round(n).toLocaleString())}
+    function toast(m,t){if(typeof showToast==='function')showToast(m,t)}
+
+    function getAllQ(){return typeof getAllQuotes==='function'?getAllQuotes():[]}
+
+    // Get quotation groups that have at least 1 response
+    function getQuoteGroups(){
+      var all=getAllQ(),groups={};
+      all.forEach(function(q){
+        var name=q.cotizacion_nombre||'';
+        if(!name)return;
+        if(!groups[name])groups[name]={items:[],fecha:'',responded:0,total:0,provs:{},skus:{}};
+        groups[name].items.push(q);
+        groups[name].total++;
+        if(q.pu_sin_iva&&Number(q.pu_sin_iva)>0)groups[name].responded++;
+        groups[name].provs[q.empresa||'']=1;
+        groups[name].skus[q.descripcion||'']=1;
+        if(q.fecha>groups[name].fecha)groups[name].fecha=q.fecha;
+      });
+      return groups;
+    }
+
+    // Render quotation list
+    function renderQuoteList(){
+      var el=document.getElementById('cmpQuoteList');
+      if(!el)return;
+      var groups=getQuoteGroups();
+      var keys=Object.keys(groups).sort(function(a,b){return(groups[b].fecha||'').localeCompare(groups[a].fecha||'')});
+      if(!keys.length){
+        el.innerHTML='<div class="empty-state"><h3>Sin cotizaciones para comparar</h3><p style="color:var(--muted);">Crea una cotización en el <a href="quotes.html" style="color:var(--accent);">wizard de cotizaciones</a> y espera respuestas de proveedores.</p></div>';
+        return;
+      }
+      el.innerHTML=keys.map(function(name){
+        var g=groups[name];
+        var pCount=Object.keys(g.provs).length;
+        var sCount=Object.keys(g.skus).length;
+        return '<div class="cmp-select-card" onclick="cmpSelect(\''+esc(name).replace(/'/g,"\\'")+'\')">'+ 
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="font-weight:700;font-size:14px;">'+esc(name)+'</div>'+
+            '<div style="font-size:12px;color:var(--muted);margin-top:3px;">'+esc(g.fecha)+' — '+sCount+' ítem(s) — '+pCount+' proveedor(es)</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:8px;align-items:center;">'+
+            (g.responded>0?'<span class="badge-sm badge-resp">'+g.responded+'/'+g.total+' resp.</span>':'<span class="badge-sm badge-pend">Sin respuestas</span>')+
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;color:var(--muted);"><path d="M9 18l6-6-6-6"/></svg>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+    }
+
+    window.cmpSelect=function(name){
+      selectedQuote=name;
+      document.getElementById('cmpSelectCard').style.display='none';
+      document.getElementById('cmpView').style.display='';
+      renderComparison(name);
+    };
+
+    window.cmpBack=function(){
+      selectedQuote=null;
+      document.getElementById('cmpSelectCard').style.display='';
+      document.getElementById('cmpView').style.display='none';
+      renderQuoteList();
+    };
+
+    function renderComparison(name){
+      var all=getAllQ().filter(function(q){return(q.cotizacion_nombre||'')===name});
+      if(!all.length){toast('No hay datos para esta cotización.','error');cmpBack();return}
+
+      // Group by SKU
+      var skuMap={};
+      all.forEach(function(q){
+        var sku=q.descripcion||'?';
+        if(!skuMap[sku])skuMap[sku]={qty:q.und||1,offers:[]};
+        skuMap[sku].offers.push(q);
+      });
+      var skuKeys=Object.keys(skuMap);
+      var allProvs=[];
+      all.forEach(function(q){if(allProvs.indexOf(q.empresa)===-1)allProvs.push(q.empresa)});
+      var responded=all.filter(function(q){return q.pu_sin_iva&&Number(q.pu_sin_iva)>0}).length;
+
+      // Title
+      document.getElementById('cmpTitle').textContent=name;
+      document.getElementById('cmpSubtitle').textContent=skuKeys.length+' ítems — '+allProvs.length+' proveedores — '+responded+'/'+all.length+' respuestas';
+
+      // Find cheapest total per provider
+      var provTotals={};
+      all.forEach(function(q){
+        var p=q.empresa||'';var price=Number(q.pu_sin_iva)||0;var qty=Number(q.und)||1;
+        if(!provTotals[p])provTotals[p]={total:0,responded:0,items:0};
+        provTotals[p].items++;
+        if(price>0){provTotals[p].total+=price*qty;provTotals[p].responded++}
+      });
+      var bestProv='';var bestTotal=Infinity;
+      Object.keys(provTotals).forEach(function(p){
+        var pt=provTotals[p];
+        if(pt.responded===pt.items&&pt.total<bestTotal){bestTotal=pt.total;bestProv=p}
+      });
+
+      // KPIs
+      var kpiEl=document.getElementById('cmpKpis');
+      kpiEl.innerHTML=
+        '<div class="cmp-kpi"><div class="cmp-kpi-label">Ítems</div><div class="cmp-kpi-val">'+skuKeys.length+'</div></div>'+
+        '<div class="cmp-kpi"><div class="cmp-kpi-label">Proveedores</div><div class="cmp-kpi-val">'+allProvs.length+'</div></div>'+
+        '<div class="cmp-kpi"><div class="cmp-kpi-label">Respuestas</div><div class="cmp-kpi-val" style="color:'+(responded===all.length?'var(--accent)':'#f5a623')+';">'+responded+'/'+all.length+'</div></div>'+
+        '<div class="cmp-kpi"><div class="cmp-kpi-label">Mejor total</div><div class="cmp-kpi-val" style="color:var(--accent);">'+(bestProv?fmt(bestTotal):'—')+'</div></div>';
+
+      // Read adjudications
+      var adj={};
+      try{adj=JSON.parse(localStorage.getItem('adjudications')||'{}')}catch(e){}
+
+      // Render SKU sections
+      var sectionsEl=document.getElementById('cmpSkuSections');
+      sectionsEl.innerHTML=skuKeys.map(function(sku){
+        var data=skuMap[sku];
+        var offers=data.offers.slice().sort(function(a,b){
+          var pa=Number(a.pu_sin_iva)||Infinity;var pb=Number(b.pu_sin_iva)||Infinity;
+          return pa-pb;
+        });
+        var cheapest=offers.find(function(o){return Number(o.pu_sin_iva)>0});
+        var cheapestPrice=cheapest?Number(cheapest.pu_sin_iva):0;
+        var adjKey=name+'::'+sku;
+        var adjProv=adj[adjKey]||'';
+
+        return '<div class="sku-compare-section">'+
+          '<div class="sku-compare-header">'+
+            '<div class="sku-name">'+esc(sku)+'</div>'+
+            '<div class="sku-qty">Cant: '+data.qty+'</div>'+
+          '</div>'+
+          '<div class="prov-cards">'+
+            offers.map(function(o,rank){
+              var price=Number(o.pu_sin_iva)||0;
+              var hasPr=price>0;
+              var isWinner=hasPr&&cheapestPrice>0&&price===cheapestPrice;
+              var isAdj=adjProv===(o.empresa||'');
+              var cls='prov-cmp-card'+(isWinner?' winner':'')+(isAdj?' adjudicado':'')+(!hasPr?' pending':'');
+              var medalHtml='';
+              if(hasPr&&rank<3){var mc=['g1','g2','g3'];medalHtml='<div class="medal '+mc[rank]+'">'+(rank+1)+'</div>'}
+              var dias=o.tiempo_entrega_dias||o.dias_entrega||'—';
+              var gar=o.garantia_meses||'—';
+              var pago=o.condiciones_pago||'—';
+
+              return '<div class="'+cls+'">'+
+                medalHtml+
+                '<div class="prov-cmp-name">'+esc(o.empresa||'')+'</div>'+
+                (hasPr?
+                  '<div class="prov-cmp-price">'+fmt(price)+'</div>'+
+                  '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Total: '+fmt(price*(data.qty||1))+' ('+data.qty+' und)</div>'
+                :
+                  '<div class="prov-cmp-price no-price">Pendiente de respuesta</div>'
+                )+
+                '<div class="prov-cmp-details">'+
+                  '<div><div style="color:var(--muted);">Entrega</div><div class="det-val">'+esc(String(dias))+(dias!=='—'?' días':'')+'</div></div>'+
+                  '<div><div style="color:var(--muted);">Garantía</div><div class="det-val">'+esc(String(gar))+(gar!=='—'?' meses':'')+'</div></div>'+
+                  '<div><div style="color:var(--muted);">Pago</div><div class="det-val">'+esc(String(pago))+'</div></div>'+
+                  '<div><div style="color:var(--muted);">Ciudad</div><div class="det-val">'+esc(o.ciudad_entrega||'—')+'</div></div>'+
+                '</div>'+
+                (hasPr?
+                  '<div class="prov-cmp-actions">'+
+                    (isAdj?
+                      '<span class="adj-btn adjudicado">★ Adjudicado</span>'
+                    :
+                      '<button class="adj-btn adjudicar" onclick="cmpAdjudicar(\''+esc(name).replace(/'/g,"\\'")+'\',\''+esc(sku).replace(/'/g,"\\'")+'\',\''+esc(o.empresa||'').replace(/'/g,"\\'")+'\')">Adjudicar</button>'
+                    )+
+                  '</div>'
+                :'')+
+              '</div>';
+            }).join('')+
+          '</div>'+
+        '</div>';
+      }).join('');
+
+      // Total comparison row
+      var totalEl=document.getElementById('cmpTotalRow');
+      var provTotalCards=allProvs.map(function(p){
+        var pt=provTotals[p]||{total:0,responded:0,items:0};
+        var complete=pt.responded===pt.items;
+        var isBest=p===bestProv;
+        return '<div style="flex:1;min-width:160px;padding:12px 16px;border:1px solid '+(isBest?'var(--accent)':'var(--border)')+';border-radius:var(--r-md);background:'+(isBest?'rgba(0,229,200,0.04)':'rgba(255,255,255,0.02)')+';">'+
+          '<div style="font-weight:700;font-size:13px;">'+esc(p)+(isBest?' <span style="color:var(--accent);font-size:11px;">★ Mejor precio</span>':'')+'</div>'+
+          '<div style="font-size:20px;font-weight:800;margin-top:4px;color:'+(complete?'var(--accent)':'var(--muted)')+';">'+(complete?fmt(pt.total):'Incompleto')+'</div>'+
+          '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+pt.responded+'/'+pt.items+' ítems cotizados</div>'+
+        '</div>';
+      }).join('');
+      totalEl.innerHTML='<div style="margin-top:20px;"><div style="font-weight:700;font-size:14px;margin-bottom:10px;">Total por proveedor</div><div style="display:flex;gap:10px;flex-wrap:wrap;">'+provTotalCards+'</div></div>';
+    }
+
+    window.cmpAdjudicar=function(qName,sku,prov){
+      var adj={};
+      try{adj=JSON.parse(localStorage.getItem('adjudications')||'{}')}catch(e){}
+      var key=qName+'::'+sku;
+      adj[key]=prov;
+      localStorage.setItem('adjudications',JSON.stringify(adj));
+      toast('Adjudicado a '+prov+' para '+sku,'success');
+      renderComparison(qName);
+    };
+
+    // Init
+    renderQuoteList();
+
+    // Check URL param
+    try{
+      var params=new URLSearchParams(window.location.search);
+      var q=params.get('q');
+      if(q){cmpSelect(q)}
+    }catch(e){}
+  })();
+  </script>
+</body>
+</html>

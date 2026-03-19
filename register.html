@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registro - Proveedor Hub</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="card auth-card">
+      <div class="card-body">
+        <div class="auth-top">
+          <img
+            src="https://i.ibb.co/BfCjKQt/logo-bia-blanco.png"
+            alt="BIA Energy"
+            loading="lazy"
+          />
+          <div>
+            <div class="auth-title">Crear cuenta</div>
+            <div class="auth-sub">Registro rápido para acceder al panel.</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <form onsubmit="event.preventDefault(); registerUser();" style="margin-top: 6px;">
+          <div class="form-grid">
+            <div class="col-12">
+              <label for="reg-name">Nombre</label>
+              <input class="input" id="reg-name" type="text" placeholder="Tu nombre" />
+            </div>
+            <div class="col-12">
+              <label for="reg-email">Correo</label>
+              <input class="input" id="reg-email" type="email" placeholder="tucorreo@empresa.com" />
+            </div>
+            <div class="col-12">
+              <label for="reg-password">Contraseña</label>
+              <input class="input" id="reg-password" type="password" placeholder="••••••••" />
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top: 14px; flex-wrap: wrap;">
+            <button class="btn btn-primary" type="submit">Crear cuenta</button>
+            <a class="btn" href="index.html">Volver</a>
+          </div>
+
+          
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

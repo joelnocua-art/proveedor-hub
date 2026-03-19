@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cotizaciones - Proveedor Hub</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+  <style>
+    .wizard-stepper{display:flex;align-items:center;gap:0;margin-bottom:20px;padding:16px 20px;background:rgba(255,255,255,0.03);border-radius:var(--r-lg);border:1px solid var(--border)}
+    .wz-step{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;padding:8px 12px;border-radius:var(--r-md);transition:background .15s}
+    .wz-step:hover{background:rgba(255,255,255,0.04)}
+    .wz-num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid var(--border);color:var(--muted);transition:all .25s;flex-shrink:0}
+    .wz-step.active .wz-num{background:var(--accent);border-color:var(--accent);color:#fff}
+    .wz-step.done .wz-num{background:rgba(0,229,200,0.15);border-color:var(--accent);color:var(--accent)}
+    .wz-label{font-size:13px;font-weight:600;color:var(--muted)}.wz-step.active .wz-label{color:var(--text)}.wz-step.done .wz-label{color:var(--accent)}
+    .wz-sub{font-size:11px;color:var(--muted);margin-top:1px}
+    .wz-line{width:24px;height:2px;background:var(--border);flex-shrink:0}.wz-line.done{background:var(--accent)}
+    .wz-panel{display:none}.wz-panel.active{display:block}
+    .wz-footer{display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}.wz-footer .btn{min-width:130px}
+    .sku-search-box{position:relative}
+    .sku-dd{display:none;position:absolute;top:100%;left:0;right:0;max-height:260px;overflow-y:auto;border:1px solid var(--border-md);border-radius:var(--r-md);background:var(--bg-raised);margin-top:4px;box-shadow:0 12px 32px rgba(0,0,0,0.5);z-index:20}
+    .sku-dd-item{padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.04);transition:background .13s}
+    .sku-dd-item:hover{background:rgba(255,255,255,0.06)}.sku-dd-item.added{opacity:0.4}
+    .sku-selected{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:6px;background:rgba(255,255,255,0.03)}
+    .prov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;max-height:400px;overflow-y:auto;padding:4px}
+    .prov-card{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r-md);cursor:pointer;transition:all .15s}
+    .prov-card:hover{border-color:var(--border-hi);background:rgba(255,255,255,0.03)}
+    .prov-card.selected{border-color:var(--accent);background:rgba(0,229,200,0.06)}
+    .prov-card input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;flex-shrink:0}
+    .review-section{padding:16px;border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:12px;background:rgba(255,255,255,0.02)}
+    .review-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+    .review-chip{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;margin:2px}
+    .review-chip.sku{background:rgba(91,107,255,0.15);color:var(--primary)}.review-chip.prov{background:rgba(0,229,200,0.15);color:var(--accent)}
+    .counter-badge{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:12px;font-size:12px;font-weight:700;padding:0 8px}
+    .track-group{border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:12px;overflow:hidden}
+    .track-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:rgba(255,255,255,0.03);cursor:pointer}
+    .track-head:hover{background:rgba(255,255,255,0.05)}
+    @media(max-width:768px){.wizard-stepper{flex-direction:column;align-items:stretch}.wz-line{width:2px;height:16px;margin:0 auto}.prov-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body data-page="quotes">
+  <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar(false)"></div>
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand"><img src="https://i.ibb.co/BfCjKQt/logo-bia-blanco.png" alt="BIA" loading="lazy" /><div class="brand-text"><div class="brand-title">Proveedor Hub</div><div class="brand-sub">BIA Energy - Operaciones</div></div></div>
+      <nav class="nav">
+        <a href="home.html" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>Inicio</a>
+        <a href="providers.html" data-nav="providers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M9 21v-8h6v8"/><path d="M8 9h8"/></svg>Proveedores</a>
+        <a href="new_provider.html" data-nav="new_provider"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Nuevo proveedor</a>
+        <a href="quotes.html" data-nav="quotes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8l4 4v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M8 11h8"/><path d="M8 15h8"/><path d="M8 19h6"/></svg>Cotizaciones</a>
+        <a href="compare.html" data-nav="compare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 16V9"/><path d="M12 16V7"/><path d="M17 16V11"/></svg>Comparativo</a>
+        <a href="sku.html" data-nav="sku"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>SKU</a>
+      </nav>
+      <div class="sidebar-footer"><div id="userChip" class="muted" style="margin-bottom:10px;"></div><button class="btn btn-danger" style="width:100%;" onclick="logout()">Cerrar sesion</button></div>
+    </aside>
+    <div class="content">
+      <header class="topbar">
+        <div class="title"><button class="icon-btn" onclick="toggleSidebar()" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button><div><div class="page-title">Cotizaciones</div><div class="muted">Solicita, envía y rastrea cotizaciones.</div></div></div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" onclick="wizardReset()">+ Nueva solicitud</button>
+          <button class="btn btn-danger" onclick="wizardClearAll()" id="btnLimpiar">Limpiar todo</button>
+          <a class="btn" href="compare.html">Comparativo</a>
+        </div>
+      </header>
+      <main class="main" id="main-content">
+        <div class="wizard-stepper" id="wizStepper">
+          <div class="wz-step active" data-step="1" onclick="wizGo(1)"><div class="wz-num">1</div><div class="wz-info"><div class="wz-label">Seleccionar ítems</div><div class="wz-sub">SKUs del catálogo</div></div></div>
+          <div class="wz-line" id="wzL1"></div>
+          <div class="wz-step" data-step="2" onclick="wizGo(2)"><div class="wz-num">2</div><div class="wz-info"><div class="wz-label">Proveedores</div><div class="wz-sub">A quién pedir</div></div></div>
+          <div class="wz-line" id="wzL2"></div>
+          <div class="wz-step" data-step="3" onclick="wizGo(3)"><div class="wz-num">3</div><div class="wz-info"><div class="wz-label">Revisar y enviar</div><div class="wz-sub">Confirmar</div></div></div>
+          <div class="wz-line" id="wzL3"></div>
+          <div class="wz-step" data-step="4" onclick="wizGo(4)"><div class="wz-num">4</div><div class="wz-info"><div class="wz-label">Seguimiento</div><div class="wz-sub">Historial</div></div></div>
+        </div>
+
+        <!-- STEP 1 -->
+        <div class="wz-panel active" id="wzP1">
+          <div class="card"><div class="card-header"><div class="card-title">¿Qué necesitas cotizar?</div><div class="card-subtitle">Busca en el catálogo y agrega ítems.</div></div>
+            <div class="card-body">
+              <div class="sku-search-box"><input type="text" id="wz-sku-search" class="input" placeholder="Buscar: TC, Medidor, Condensador, Canaleta..." autocomplete="off" style="font-size:14px;padding:12px 16px;" /><div class="sku-dd" id="wzSkuDd"></div></div>
+              <div style="margin-top:16px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span class="muted" style="font-size:13px;">Ítems seleccionados</span><span class="counter-badge" style="background:rgba(91,107,255,0.15);color:var(--primary);" id="wzSkuC">0</span></div><div id="wzSkuList"><div class="muted" style="font-size:13px;padding:20px 0;text-align:center;">Busca arriba para agregar ítems.</div></div></div>
+            </div></div>
+          <div class="wz-footer"><div></div><button class="btn btn-primary" onclick="wizNext()">Siguiente: Proveedores →</button></div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div class="wz-panel" id="wzP2">
+          <div class="card"><div class="card-header"><div class="card-title">¿A quién le pides?</div><div class="card-subtitle">Se muestran primero los proveedores con precios para tus ítems.</div></div>
+            <div class="card-body">
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+                <input type="text" id="wz-prov-search" class="input" placeholder="Filtrar por nombre, ciudad..." autocomplete="off" style="flex:1;min-width:180px;" />
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--muted);white-space:nowrap;"><input type="checkbox" id="wzOnlyMatch" checked style="accent-color:var(--accent);width:15px;height:15px;" onchange="renderProvs()" /> Solo con precios</label>
+              </div>
+              <div id="wzProvInfo" style="padding:10px 14px;border-radius:var(--r-md);margin-bottom:12px;font-size:12px;display:none;"></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span class="muted" style="font-size:13px;">Proveedores</span><span class="counter-badge" style="background:rgba(0,229,200,0.15);color:var(--accent);" id="wzProvC">0</span></div>
+              <div class="prov-grid" id="wzProvGrid"></div>
+            </div></div>
+          <div class="wz-footer"><button class="btn" onclick="wizPrev()">← Volver</button><button class="btn btn-primary" onclick="wizNext()">Siguiente: Revisar →</button></div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="wz-panel" id="wzP3">
+          <div class="card"><div class="card-header"><div class="card-title">Revisar y enviar</div><div class="card-subtitle">Nombre, detalles, y confirma.</div></div>
+            <div class="card-body">
+              <div class="review-section" style="border-color:var(--accent);background:rgba(0,229,200,0.03);"><div class="review-label">Nombre de la cotización *</div><input type="text" id="wz-name" class="input" placeholder="Ej: Compra TCs Marzo 2026..." style="font-size:14px;padding:12px 16px;" /><div class="muted" style="font-size:11px;margin-top:4px;">Identifica esta cotización en el seguimiento.</div></div>
+              <div class="review-section" id="wzRevSkus"></div>
+              <div class="review-section" id="wzRevProvs"></div>
+              <div class="review-section"><div class="review-label">Detalles de entrega</div><div class="form-grid" style="margin:0;"><div class="col-6"><label>Ciudad de entrega</label><input type="text" id="wz-city" class="input" placeholder="Bogotá, Medellín..." /></div><div class="col-6"><label>Fecha de solicitud</label><input type="date" id="wz-date" class="input" /></div><div class="col-12"><label>Notas (opcional)</label><textarea id="wz-notes" class="input" rows="2" placeholder="Condiciones especiales..."></textarea></div></div></div>
+              <div style="background:rgba(0,229,200,0.06);border:1px solid rgba(0,229,200,0.2);border-radius:var(--r-md);padding:14px 16px;"><div style="font-size:13px;color:var(--accent);font-weight:600;" id="wzSum">Se crearán 0 solicitudes</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">Se abre Gmail por cada proveedor con un formulario de respuesta incluido.</div></div>
+            </div></div>
+          <div class="wz-footer"><button class="btn" onclick="wizPrev()">← Volver</button><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary" onclick="wizSave(false)">Solo guardar</button><button class="btn" onclick="wizSave(true)" style="background:linear-gradient(135deg,#1a6fdb,#0f4fa3);color:#fff;border:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;margin-right:5px;vertical-align:-2px;"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 7L2 7"/></svg>Guardar y abrir Gmail</button></div></div>
+        </div>
+
+        <!-- STEP 4 -->
+        <div class="wz-panel" id="wzP4">
+          <div class="card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;"><div><div class="card-title">Seguimiento</div><div class="card-subtitle">Cotizaciones agrupadas por nombre.</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary" onclick="document.getElementById('importModal').style.display='flex'" style="padding:6px 12px;font-size:12px;">Importar respuesta</button><button id="exportQuotesBtn" class="btn" style="padding:6px 12px;font-size:12px;">Exportar CSV</button></div></div>
+            <div class="card-body"><input id="trackSearch" class="input" placeholder="Buscar..." style="font-size:13px;padding:7px 12px;margin-bottom:16px;" /><div id="wzTrack"></div></div></div>
+        </div>
+      </main>
+
+      <!-- Import modal -->
+      <div id="importModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;max-width:500px;width:100%;">
+          <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Importar respuesta de proveedor</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Pega el código que el proveedor generó en el formulario de respuesta.</div>
+          <textarea id="importCode" class="input" rows="5" placeholder="Pegar código aquí..." style="font-family:monospace;font-size:12px;"></textarea>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-primary" onclick="importResponse()" style="flex:1;">Importar</button>
+            <button class="btn" onclick="document.getElementById('importModal').style.display='none'" style="flex:1;">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="providers.js"></script>
+  <script src="quotes.js"></script>
+  <script src="providerProducts.js"></script>
+  <script src="sku_catalog.js"></script>
+  <script src="sku_offers.js"></script>
+  <script src="script.js"></script>
+  <script src="components.js"></script>
+  <script>
+  (function(){
+    var step=4,skus=[],provSet=new Set();
+    var cat=Array.isArray(window.skuCatalogData)?window.skuCatalogData:[];
+    var allProvs=typeof getAllProviders==='function'?getAllProviders():[];
+    var PMAP={'proelco':'PROELCO SAS','adler':'Adler TEC','laumayer':'Laumayer','selda':'SELDA 1 SAS','4s':'4S INGENIERIA S.A.S','bia technologies':'BIA TECHNOLOGIES'};
+    var baseUrl=window.location.origin+window.location.pathname.replace('quotes.html','');
+
+    function esc(s){return typeof escapeHtml==='function'?escapeHtml(s):String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+    function toast(m,t){if(typeof showToast==='function')showToast(m,t);else alert(m)}
+
+    // === WIZARD NAV ===
+    window.wizGo=function(s){
+      if(s<1||s>4)return;step=s;
+      for(var i=1;i<=4;i++){var el=document.querySelector('.wz-step[data-step="'+i+'"]');if(el){el.classList.remove('active','done');if(i===s)el.classList.add('active');else if(i<s)el.classList.add('done')}}
+      for(var j=1;j<=3;j++){var l=document.getElementById('wzL'+j);if(l)l.classList.toggle('done',j<s)}
+      document.querySelectorAll('.wz-panel').forEach(function(p){p.classList.remove('active')});
+      var pn=document.getElementById('wzP'+s);if(pn)pn.classList.add('active');
+      if(s===2)renderProvs();if(s===3)renderReview();if(s===4)renderTrack();
+      var btn=document.getElementById('btnLimpiar');if(btn)btn.style.display=s<4?'':'none';
+      window.scrollTo({top:0,behavior:'smooth'});
+    };
+    window.wizNext=function(){
+      if(step===1&&!skus.length){toast('Agrega al menos un ítem.','error');return}
+      if(step===2&&!provSet.size){toast('Selecciona al menos un proveedor.','error');return}
+      wizGo(step+1);
+    };
+    window.wizPrev=function(){wizGo(step-1)};
+    window.wizardReset=function(){skus=[];provSet=new Set();renderSkuList();wizGo(1)};
+    window.wizardClearAll=function(){
+      skus=[];provSet=new Set();renderSkuList();
+      ['wz-name','wz-city','wz-date','wz-notes'].forEach(function(id){var e=document.getElementById(id);if(e)e.value=''});
+      toast('Cotización limpiada.','success');wizGo(1);
+    };
+
+    // === STEP 1: SKUs ===
+    var sI=document.getElementById('wz-sku-search'),sD=document.getElementById('wzSkuDd');
+    if(sI&&sD){
+      sI.addEventListener('input',function(){
+        var q=(sI.value||'').trim().toLowerCase();
+        if(q.length<2){sD.style.display='none';return}
+        var m=cat.filter(function(x){return((x.sku||'')+' '+(x.category||'')).toLowerCase().indexOf(q)!==-1}).slice(0,12);
+        if(!m.length){sD.innerHTML='<div style="padding:14px 16px;color:var(--muted);font-size:13px;">Sin resultados</div>';sD.style.display='block';return}
+        sD.innerHTML='';m.forEach(function(x){
+          var has=skus.some(function(s){return s.id===x.id});
+          var d=document.createElement('div');d.className='sku-dd-item'+(has?' added':'');
+          d.innerHTML='<div><div style="font-weight:600;font-size:13px;">'+esc(x.sku)+'</div><div style="font-size:11px;color:var(--muted);">'+esc(x.category||'')+'</div></div><span style="font-size:11px;color:'+(has?'var(--muted)':'var(--accent)')+';">'+(has?'Agregado':'+ Agregar')+'</span>';
+          if(!has)d.onclick=function(){skus.push({id:x.id,sku:x.sku,cat:x.category,qty:1});renderSkuList();sI.value='';sD.style.display='none';sI.focus();toast(x.sku+' agregado')};
+          sD.appendChild(d);
+        });sD.style.display='block';
+      });
+      document.addEventListener('click',function(e){if(!e.target.closest('#wz-sku-search')&&!e.target.closest('#wzSkuDd'))sD.style.display='none'});
+    }
+    function renderSkuList(){
+      var el=document.getElementById('wzSkuList'),c=document.getElementById('wzSkuC');
+      if(c)c.textContent=skus.length;if(!el)return;
+      if(!skus.length){el.innerHTML='<div class="muted" style="font-size:13px;padding:20px 0;text-align:center;">Busca arriba para agregar ítems.</div>';return}
+      el.innerHTML=skus.map(function(s,i){return '<div class="sku-selected"><div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:13px;">'+esc(s.sku)+'</div><div style="font-size:11px;color:var(--muted);">'+esc(s.cat||'')+'</div></div><div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:var(--muted);">Cant:</span><input type="number" min="1" value="'+s.qty+'" class="input" style="width:64px;text-align:center;padding:6px;" onchange="window._sq('+i+',this.value)" /></div><button onclick="window._sr('+i+')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;padding:4px 8px;">&times;</button></div>'}).join('');
+    }
+    window._sq=function(i,v){if(skus[i])skus[i].qty=parseInt(v)||1};
+    window._sr=function(i){skus.splice(i,1);renderSkuList()};
+
+    // === STEP 2: Providers with PROPER matching ===
+    function offersStore(){
+      var st={};try{var r=localStorage.getItem('skuOffersById');st=r?JSON.parse(r):{}}catch(e){st={}}
+      if(Array.isArray(window.skuOffersData))window.skuOffersData.forEach(function(e){var sid=String(e[0]);if(!st[sid]||!st[sid].length)st[sid]=e[1]});
+      return st;
+    }
+    function matchedEmpresas(){
+      var st=offersStore(),names=new Set();
+      skus.forEach(function(s){(st[s.id]||[]).forEach(function(o){
+        var pn=(o.provider||'').trim().toLowerCase();
+        var mapped=PMAP[pn];
+        if(mapped){names.add(mapped);return}
+        allProvs.forEach(function(p){if(p.empresa.toLowerCase().indexOf(pn)!==-1||pn.indexOf(p.empresa.toLowerCase().split(' ')[0])!==-1)names.add(p.empresa)});
+      })});
+      return names;
+    }
+    window.renderProvs=function(){
+      var g=document.getElementById('wzProvGrid'),inf=document.getElementById('wzProvInfo');if(!g)return;
+      allProvs=typeof getAllProviders==='function'?getAllProviders():[];
+      var q=(document.getElementById('wz-prov-search')||{}).value||'';q=q.trim().toLowerCase();
+      var only=document.getElementById('wzOnlyMatch');var filt=only?only.checked:false;
+      var matched=matchedEmpresas(),yes=[],no=[];
+      allProvs.forEach(function(p){
+        if(q&&((p.empresa||'')+' '+(p.ciudad||'')).toLowerCase().indexOf(q)===-1)return;
+        if(matched.has(p.empresa))yes.push(p);else no.push(p);
+      });
+      if(inf){
+        if(yes.length){inf.style.display='block';inf.style.background='rgba(0,229,200,0.06)';inf.style.color='var(--accent)';inf.innerHTML='<strong>'+yes.length+'</strong> proveedor(es) tienen precios para tus ítems.'+(filt&&no.length?' Desmarca "Solo con precios" para ver '+no.length+' más.':'')}
+        else if(skus.length){inf.style.display='block';inf.style.background='rgba(255,180,0,0.08)';inf.style.color='#f5a623';inf.innerHTML='Ningún proveedor tiene precios registrados. Mostrando todos.';filt=false}
+        else inf.style.display='none';
+      }
+      var show=filt&&yes.length?yes:yes.concat(no);
+      g.innerHTML=show.map(function(p){
+        var sel=provSet.has(p.empresa),m=matched.has(p.empresa);
+        return '<div class="prov-card '+(sel?'selected':'')+'" onclick="window._tp(this,\''+esc(p.empresa).replace(/'/g,"\\'")+'\')"><input type="checkbox" '+(sel?'checked':'')+' /><div><div style="font-size:13px;font-weight:600;">'+esc(p.empresa)+(m?' <span style="font-size:10px;color:var(--accent);">✓ tiene precios</span>':'')+'</div><div style="font-size:11px;color:var(--muted);">'+esc(p.ciudad||'Sin ciudad')+(p.correo_electronico?' · '+esc(p.correo_electronico):'')+'</div></div></div>'}).join('');
+      if(!show.length)g.innerHTML='<div class="muted" style="padding:20px;text-align:center;">Sin proveedores.</div>';
+      document.getElementById('wzProvC').textContent=provSet.size;
+    };
+    window._tp=function(el,n){if(provSet.has(n))provSet.delete(n);else provSet.add(n);el.classList.toggle('selected');el.querySelector('input').checked=provSet.has(n);document.getElementById('wzProvC').textContent=provSet.size};
+    var ps=document.getElementById('wz-prov-search');if(ps)ps.addEventListener('input',renderProvs);
+
+    // === STEP 3: Review ===
+    function renderReview(){
+      var se=document.getElementById('wzRevSkus'),pe=document.getElementById('wzRevProvs'),su=document.getElementById('wzSum');
+      if(se)se.innerHTML='<div class="review-label">Ítems ('+skus.length+')</div>'+skus.map(function(s){return '<span class="review-chip sku">'+esc(s.sku)+' x'+s.qty+'</span>'}).join('');
+      var pa=Array.from(provSet);
+      if(pe)pe.innerHTML='<div class="review-label">Proveedores ('+pa.length+')</div>'+pa.map(function(n){return '<span class="review-chip prov">'+esc(n)+'</span>'}).join('');
+      if(su)su.textContent='Se crearán '+(skus.length*pa.length)+' solicitudes ('+skus.length+' ítems × '+pa.length+' proveedores)';
+    }
+
+    // === SAVE & EMAIL ===
+    window.wizSave=function(sendEmail){
+      var name=(document.getElementById('wz-name')||{}).value||'';
+      if(!name.trim()){toast('Dale un nombre a la cotización.','error');document.getElementById('wz-name').focus();return}
+      if(!skus.length||!provSet.size){toast('Faltan ítems o proveedores.','error');return}
+      var fecha=new Date().toISOString().slice(0,10),city=(document.getElementById('wz-city')||{}).value||'',dt=(document.getElementById('wz-date')||{}).value||'',notes=(document.getElementById('wz-notes')||{}).value||'';
+      var extra;try{extra=JSON.parse(localStorage.getItem('extraQuotes')||'[]')}catch(e){extra=[]}
+      if(!Array.isArray(extra))extra=[];
+      var pa=Array.from(provSet),ct=0,batch='COT-'+Date.now().toString(36).toUpperCase();
+      pa.forEach(function(emp){skus.forEach(function(s){extra.push({it:Date.now().toString()+Math.random().toString(36).slice(2,8),empresa:emp,fecha:fecha,descripcion:s.sku,und:s.qty||1,pu_sin_iva:0,pu_con_iva:0,ciudad_entrega:city,fecha_entrega:dt,observaciones:notes,cotizacion_nombre:name.trim(),cotizacion_batch:batch});ct++})});
+      if(typeof setExtraQuotes==='function')setExtraQuotes(extra);else localStorage.setItem('extraQuotes',JSON.stringify(extra));
+
+      if(sendEmail){
+        var skuTable=skus.map(function(s,i){return (i+1)+'. '+s.sku+' — Cant: '+s.qty}).join('\n');
+        var delay=0;
+        pa.forEach(function(emp){
+          var prov=allProvs.find(function(p){return p.empresa===emp});
+          var email=prov?(prov.correo||prov.correo_electronico||''):'';
+          if(!email){toast(emp+' no tiene correo.','error');return}
+          var skuIds=skus.map(function(s){return s.id+':'+s.qty}).join(',');
+          var formLink=baseUrl+'respuesta.html#p='+encodeURIComponent(emp)+'&n='+encodeURIComponent(name.trim())+'&b='+encodeURIComponent(batch)+'&s='+skuIds+'&c='+encodeURIComponent(city)+'&d='+encodeURIComponent(dt);
+          setTimeout(function(){
+            var sub=encodeURIComponent('Solicitud de cotización: '+name.trim()+' — BIA Energy');
+            var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nReciban un cordial saludo de BIA Energy.\n\nSolicitamos cotización formal:\n\n'+skuTable+'\n\nCiudad: '+(city||'Por confirmar')+'\nFecha: '+(dt||'Por confirmar')+(notes?'\nNotas: '+notes:'')+'\n\n━━ RESPONDER ━━\nIngrese precios aquí:\n'+formLink+'\n\nO responda este correo con precios unitarios sin IVA, tiempo de entrega, garantía y condiciones de pago.\n\nCordialmente,\nOperaciones — BIA Energy');
+            window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body,'_blank');
+          },delay);delay+=1000;
+        });
+        toast(ct+' solicitudes guardadas. Abriendo Gmail...','success');
+      }else{toast(ct+' solicitudes guardadas como "'+name.trim()+'".','success')}
+      skus=[];provSet=new Set();renderSkuList();
+      ['wz-name','wz-city','wz-date','wz-notes'].forEach(function(id){var e=document.getElementById(id);if(e)e.value=''});
+      wizGo(4);
+    };
+
+    // === STEP 4: Tracking ===
+    function renderTrack(){
+      var el=document.getElementById('wzTrack');if(!el)return;
+      var all=typeof getAllQuotes==='function'?getAllQuotes():[];
+      var sq=((document.getElementById('trackSearch')||{}).value||'').trim().toLowerCase();
+      if(sq)all=all.filter(function(q){return((q.cotizacion_nombre||'')+(q.empresa||'')+(q.descripcion||'')).toLowerCase().indexOf(sq)!==-1});
+      var groups={};
+      all.forEach(function(q){var n=q.cotizacion_nombre||'Sin nombre';if(!groups[n])groups[n]={items:[],fecha:'',batch:q.cotizacion_batch||''};groups[n].items.push(q);if(q.fecha>groups[n].fecha)groups[n].fecha=q.fecha});
+      var keys=Object.keys(groups).sort(function(a,b){return(groups[b].fecha||'').localeCompare(groups[a].fecha||'')});
+      if(!keys.length){el.innerHTML='<div class="muted" style="text-align:center;padding:30px 0;">Sin cotizaciones. Crea una con "+ Nueva solicitud".</div>';return}
+      el.innerHTML=keys.map(function(name,gi){
+        var g=groups[name],ps={},ss={};
+        g.items.forEach(function(q){ps[q.empresa||'?']=1;ss[q.descripcion||'?']=1});
+        var resp=g.items.filter(function(q){return Number(q.pu_sin_iva)>0}).length;
+        return '<div class="track-group"><div class="track-head" onclick="var d=this.nextElementSibling;d.style.display=d.style.display===\'none\'?\'block\':\'none\'"><div style="flex:1;"><div style="font-weight:600;font-size:14px;">'+esc(name)+'</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">'+esc(g.fecha)+' — '+Object.keys(ps).length+' prov. — '+Object.keys(ss).length+' ítem(s)</div></div><div style="display:flex;gap:8px;align-items:center;">'+(resp?'<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:700;background:rgba(40,200,100,.15);color:#28c864;">'+resp+'/'+g.items.length+' resp.</span>':'<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:700;background:rgba(255,180,0,.18);color:#f5a623;">Pendiente</span>')+'<button class="btn btn-danger" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();window._delGroup(\''+esc(name).replace(/'/g,"\\'")+'\')">Eliminar</button></div></div>'+
+          '<div style="display:none;padding:12px 18px;">'+
+            '<div style="overflow-x:auto;"><table style="width:100%;font-size:13px;"><thead><tr><th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:11px;">Proveedor</th><th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:11px;">SKU</th><th style="text-align:center;padding:6px 8px;color:var(--muted);font-size:11px;">Cant.</th><th style="text-align:right;padding:6px 8px;color:var(--muted);font-size:11px;">Precio</th><th style="text-align:center;padding:6px 8px;color:var(--muted);font-size:11px;">Estado</th></tr></thead><tbody>'+
+            g.items.map(function(q){var hp=Number(q.pu_sin_iva)>0;return '<tr style="border-top:1px solid rgba(255,255,255,0.04);"><td style="padding:8px;">'+esc(q.empresa)+'</td><td style="padding:8px;font-size:12px;">'+esc(q.descripcion)+'</td><td style="padding:8px;text-align:center;">'+esc(q.und||1)+'</td><td style="padding:8px;text-align:right;'+(hp?'color:var(--accent);font-weight:600;':'color:var(--muted);')+'">'+(hp?(typeof formatCOP==='function'?formatCOP(q.pu_sin_iva):'$'+Number(q.pu_sin_iva).toLocaleString()):'Pendiente')+'</td><td style="padding:8px;text-align:center;">'+(hp?'<span style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700;background:rgba(40,200,100,.15);color:#28c864;">Respondida</span>':'<span style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700;background:rgba(255,180,0,.18);color:#f5a623;">Enviada</span>')+'</td></tr>'}).join('')+
+            '</tbody></table></div></div></div>';
+      }).join('');
+    }
+    window._delGroup=function(name){
+      if(!confirm('¿Eliminar todas las solicitudes de "'+name+'"?'))return;
+      var extra;try{extra=JSON.parse(localStorage.getItem('extraQuotes')||'[]')}catch(e){extra=[]}
+      extra=extra.filter(function(q){return(q.cotizacion_nombre||'Sin nombre')!==name});
+      if(typeof setExtraQuotes==='function')setExtraQuotes(extra);else localStorage.setItem('extraQuotes',JSON.stringify(extra));
+      toast('Cotización "'+name+'" eliminada.','success');renderTrack();
+    };
+    var ts=document.getElementById('trackSearch');if(ts)ts.addEventListener('input',renderTrack);
+
+    // === IMPORT RESPONSE ===
+    window.importResponse=function(){
+      var code=(document.getElementById('importCode')||{}).value||'';
+      if(!code.trim()){toast('Pega el código del proveedor.','error');return}
+      try{
+        var json=decodeURIComponent(escape(atob(code.trim())));
+        var resp=JSON.parse(json);
+        if(!resp.items||!resp.provider){toast('Código inválido.','error');return}
+        var extra;try{extra=JSON.parse(localStorage.getItem('extraQuotes')||'[]')}catch(e){extra=[]}
+        if(!Array.isArray(extra))extra=[];
+        var updated=0;
+        resp.items.forEach(function(item){
+          var match=extra.find(function(q){return q.cotizacion_batch===resp.batch&&q.empresa===resp.provider&&q.descripcion===item.sku});
+          if(match){
+            match.pu_sin_iva=item.price_sin_iva;match.pu_con_iva=item.price_con_iva;
+            match.garantia_meses=resp.warranty_months;match.tiempo_entrega_dias=resp.delivery_days;
+            match.condiciones_pago=resp.payment_terms;match.observaciones_prov=resp.notes;
+            match.respondido_at=resp.responded_at;updated++;
+          }else{
+            extra.push({it:Date.now().toString()+Math.random().toString(36).slice(2,8),empresa:resp.provider,fecha:resp.responded_at?resp.responded_at.slice(0,10):new Date().toISOString().slice(0,10),descripcion:item.sku,und:item.qty||1,pu_sin_iva:item.price_sin_iva,pu_con_iva:item.price_con_iva,cotizacion_nombre:resp.quote_name||'Importada',cotizacion_batch:resp.batch,garantia_meses:resp.warranty_months,tiempo_entrega_dias:resp.delivery_days,condiciones_pago:resp.payment_terms,observaciones_prov:resp.notes});
+            updated++;
+          }
+        });
+        if(typeof setExtraQuotes==='function')setExtraQuotes(extra);else localStorage.setItem('extraQuotes',JSON.stringify(extra));
+        document.getElementById('importModal').style.display='none';
+        document.getElementById('importCode').value='';
+        toast(updated+' precios importados de '+resp.provider+'.','success');
+        renderTrack();
+      }catch(e){toast('Error al decodificar: '+e.message,'error')}
+    };
+
+    // === INIT ===
+    wizGo(4);renderSkuList();
+    // Auto-fill today's date
+    var dateEl=document.getElementById('wz-date');
+    if(dateEl)dateEl.value=new Date().toISOString().slice(0,10);
+    // Check for provider responses saved directly from respuesta.html
+    function checkProviderResponses(){
+      try{
+        var pending=JSON.parse(localStorage.getItem('pendingProviderResponses')||'[]');
+        if(!pending.length)return;
+        var extra;try{extra=JSON.parse(localStorage.getItem('extraQuotes')||'[]')}catch(e){extra=[]}
+        if(!Array.isArray(extra))extra=[];
+        var totalUpdated=0;
+        pending.forEach(function(resp){
+          if(!resp||!resp.items)return;
+          resp.items.forEach(function(ri){
+            // Try to match existing quotes
+            var matched=false;
+            extra.forEach(function(q){
+              if(matched)return;
+              var nameOk=(q.cotizacion_nombre||'')===(resp.quote_name||'');
+              var provOk=(q.empresa||'')===(resp.provider||'');
+              var skuOk=(q.descripcion||'')===ri.sku;
+              if(nameOk&&provOk&&skuOk){
+                q.pu_sin_iva=ri.price_sin_iva||0;
+                q.pu_con_iva=(ri.price_sin_iva||0)*1.19;
+                q.tiempo_entrega_dias=ri.delivery_days||0;
+                q.garantia_meses=resp.warranty_months||0;
+                q.condiciones_pago=resp.payment_terms||'';
+                q.observaciones_prov=resp.notes||'';
+                q.fecha_respuesta=resp.responded_at||'';
+                q.estado_respuesta='respondida';
+                matched=true;totalUpdated++;
+              }
+            });
+            // If no match, add as new entry
+            if(!matched){
+              extra.push({it:Date.now().toString()+Math.random().toString(36).slice(2,8),empresa:resp.provider,fecha:resp.responded_at?resp.responded_at.slice(0,10):new Date().toISOString().slice(0,10),descripcion:ri.sku,und:ri.qty||1,pu_sin_iva:ri.price_sin_iva,pu_con_iva:(ri.price_sin_iva||0)*1.19,cotizacion_nombre:resp.quote_name||'Importada',cotizacion_batch:resp.batch,garantia_meses:resp.warranty_months,tiempo_entrega_dias:ri.delivery_days,condiciones_pago:resp.payment_terms,observaciones_prov:resp.notes,estado_respuesta:'respondida'});
+              totalUpdated++;
+            }
+          });
+        });
+        if(totalUpdated>0){
+          if(typeof setExtraQuotes==='function')setExtraQuotes(extra);
+          else localStorage.setItem('extraQuotes',JSON.stringify(extra));
+          localStorage.removeItem('pendingProviderResponses');
+          toast(totalUpdated+' respuesta(s) de proveedor importada(s) automáticamente.','success');
+          renderTrack();
+        }
+      }catch(e){console.error('Auto-import error:',e)}
+    }
+    checkProviderResponses();
+    // Also check periodically (in case provider responds while page is open)
+    setInterval(checkProviderResponses,5000);
+    try{var pf=JSON.parse(localStorage.getItem('quotePrefill')||'null');if(pf&&pf.skus&&pf.skus.length){pf.skus.forEach(function(s){skus.push({id:s.skuId||s.id||'',sku:s.sku||s.description||'',cat:s.category||'',qty:1})});localStorage.removeItem('quotePrefill');renderSkuList();wizGo(1)}}catch(e){}
+  })();
+  </script>
+</body>
+</html>

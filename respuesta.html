@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Responder cotización — BIA Energy</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'DM Sans','Segoe UI',system-ui,sans-serif;background:#0a0d1a;color:#e2e4ed;min-height:100vh}
+    .hdr{background:rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.08);padding:16px 24px;display:flex;align-items:center;gap:12px}
+    .logo{font-weight:800;font-size:16px;color:#00e5c8}
+    .wrap{max-width:720px;margin:0 auto;padding:24px 16px 60px}
+    h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;margin-bottom:4px}
+    .sub{color:#8088b0;font-size:14px;margin-bottom:24px}
+    .card{background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px 24px;margin-bottom:16px}
+    .ct{font-weight:700;font-size:15px;margin-bottom:12px}
+    .info{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:#8088b0;margin-bottom:6px}
+    .info b{color:#e2e4ed;font-weight:600}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+    th{text-align:left;padding:8px 10px;color:#8088b0;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid rgba(255,255,255,0.08)}
+    td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle}
+    input,textarea{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#e2e4ed;padding:10px 12px;font-size:13px;font-family:inherit;width:100%}
+    input:focus,textarea:focus{outline:none;border-color:#00e5c8}
+    input[type=number]{text-align:right}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:14px 32px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+    .btn-p{background:#00e5c8;color:#0a0d1a}.btn-p:hover{opacity:.88}
+    .err-input{border-color:#ff4d6d !important}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .ok{text-align:center;padding:50px 20px}
+    .ok h2{color:#00e5c8;font-size:24px;margin:16px 0 8px}
+    .ok p{color:#8088b0;font-size:14px;line-height:1.6}
+    .countdown{font-size:32px;font-weight:800;color:#00e5c8;margin-top:16px}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    .saving{animation:pulse 0.8s ease-in-out infinite}
+    @media(max-width:600px){.wrap{padding:16px 12px}.card{padding:16px}.grid2{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="hdr">
+    <div class="logo">⚡ BIA Energy</div>
+    <span style="color:#8088b0;font-size:13px;">Formulario de respuesta a cotización</span>
+  </div>
+  <div class="wrap">
+
+    <!-- FORM VIEW -->
+    <div id="vForm">
+      <h1>Responder cotización</h1>
+      <div class="sub" id="qSub">Cargando...</div>
+
+      <div class="card" id="cInfo" style="display:none">
+        <div class="ct">Datos de la solicitud</div>
+        <div class="info">Cotización: <b id="rName"></b></div>
+        <div class="info">Proveedor: <b id="rProv"></b></div>
+        <div class="info">Ciudad: <b id="rCity"></b> — Fecha: <b id="rDate"></b></div>
+      </div>
+
+      <div class="card" id="cItems" style="display:none">
+        <div class="ct">Complete su oferta por cada ítem</div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr>
+              <th style="width:40%">Ítem / SKU</th>
+              <th>Cant.</th>
+              <th>Precio unit. sin IVA ($)</th>
+              <th>Días entrega</th>
+            </tr></thead>
+            <tbody id="rBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="cCond" style="display:none">
+        <div class="ct">Condiciones generales</div>
+        <div class="grid2">
+          <div><label style="font-size:12px;color:#8088b0;display:block;margin-bottom:4px;">Garantía (meses)</label><input type="number" id="rGar" min="0" value="12" /></div>
+          <div><label style="font-size:12px;color:#8088b0;display:block;margin-bottom:4px;">Condiciones de pago</label><input type="text" id="rPay" placeholder="Ej: 30 días, contado..." /></div>
+          <div style="grid-column:span 2"><label style="font-size:12px;color:#8088b0;display:block;margin-bottom:4px;">Observaciones</label><textarea id="rObs" rows="2" placeholder="Disponibilidad, alternativas..."></textarea></div>
+        </div>
+      </div>
+
+      <button class="btn btn-p" onclick="doSubmit()" id="btnSubmit" style="display:none;width:100%;">
+        Enviar respuesta
+      </button>
+    </div>
+
+    <!-- SUCCESS VIEW -->
+    <div id="vOk" class="ok" style="display:none">
+      <div style="width:80px;height:80px;border-radius:50%;background:rgba(0,229,200,0.15);display:inline-flex;align-items:center;justify-content:center;font-size:36px;color:#00e5c8;">✓</div>
+      <h2>Respuesta guardada</h2>
+      <p>Su cotización fue enviada al sistema de BIA Energy.<br/>El equipo de Operaciones la verá automáticamente.</p>
+      <div class="countdown" id="cdNum">3</div>
+      <p style="font-size:12px;color:#8088b0;margin-top:4px;">Esta ventana se cerrará automáticamente...</p>
+    </div>
+
+    <!-- ERROR VIEW -->
+    <div id="vErr" style="display:none;text-align:center;padding:50px 20px;">
+      <div style="font-size:40px;margin-bottom:12px;">⚠</div>
+      <h2 style="color:#f5a623;font-size:20px;">Enlace inválido</h2>
+      <p style="color:#8088b0;margin-top:8px;">Este enlace no contiene datos válidos.<br/>Solicite un nuevo enlace al comprador.</p>
+    </div>
+
+  </div>
+
+  <script src="sku_catalog.js"></script>
+  <script>
+  var D=null;
+  try{
+    var h=window.location.hash.substring(1);
+    var params={};
+    h.split('&').forEach(function(p){var kv=p.split('=');if(kv.length===2)params[kv[0]]=decodeURIComponent(kv[1])});
+    if(params.p&&params.s){
+      var catalog=Array.isArray(window.skuCatalogData)?window.skuCatalogData:[];
+      var items=params.s.split(',').map(function(x){
+        var parts=x.split(':');var id=parts[0],qty=parseInt(parts[1])||1;
+        var found=catalog.find(function(c){return c.id===id});
+        return{id:id,sku:found?found.sku:('SKU #'+id),category:found?(found.category||''):'',qty:qty};
+      }).filter(function(x){return x.sku});
+      D={prov:params.p,name:params.n||'',batch:params.b||'',city:params.c||'',date:params.d||'',items:items};
+    }
+  }catch(e){console.error(e)}
+
+  function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+  if(D&&D.items.length){
+    document.getElementById('qSub').textContent='Complete los precios y tiempos para cada ítem.';
+    ['cInfo','cItems','cCond'].forEach(function(id){document.getElementById(id).style.display=''});
+    document.getElementById('btnSubmit').style.display='';
+    document.getElementById('rName').textContent=D.name;
+    document.getElementById('rProv').textContent=D.prov;
+    document.getElementById('rCity').textContent=D.city||'Por confirmar';
+    document.getElementById('rDate').textContent=D.date||new Date().toISOString().slice(0,10);
+    document.getElementById('rBody').innerHTML=D.items.map(function(it,i){
+      return '<tr><td><div style="font-weight:600;">'+esc(it.sku)+'</div><div style="font-size:11px;color:#8088b0;">'+esc(it.category)+'</div></td><td style="text-align:center;font-weight:600;">'+it.qty+'</td><td><input type="number" id="pr_'+i+'" min="0" step="any" placeholder="$ 0" /></td><td><input type="number" id="dy_'+i+'" min="0" placeholder="15" /></td></tr>';
+    }).join('');
+  }else{
+    document.getElementById('vForm').style.display='none';
+    document.getElementById('vErr').style.display='';
+  }
+
+  function doSubmit(){
+    var items=[],ok=true;
+    D.items.forEach(function(it,i){
+      var p=parseFloat(document.getElementById('pr_'+i).value)||0;
+      var d=parseInt(document.getElementById('dy_'+i).value)||0;
+      var el=document.getElementById('pr_'+i);
+      if(p<=0){ok=false;el.classList.add('err-input')}else{el.classList.remove('err-input')}
+      items.push({sku:it.sku,qty:it.qty,price_sin_iva:p,price_con_iva:Math.round(p*1.19),delivery_days:d});
+    });
+    if(!ok){alert('Ingrese un precio válido (mayor a 0) para cada ítem.');return}
+
+    // Disable button while saving
+    var btn=document.getElementById('btnSubmit');
+    btn.textContent='Guardando...';btn.disabled=true;btn.classList.add('saving');
+
+    var resp={
+      tipo:'respuesta_proveedor',
+      version:3,
+      quote_name:D.name,
+      provider:D.prov,
+      batch:D.batch,
+      responded_at:new Date().toISOString(),
+      items:items,
+      warranty_months:parseInt(document.getElementById('rGar').value)||0,
+      payment_terms:document.getElementById('rPay').value||'',
+      notes:document.getElementById('rObs').value||''
+    };
+
+    // Save directly to localStorage (same domain = shared storage)
+    try{
+      var pending=JSON.parse(localStorage.getItem('pendingProviderResponses')||'[]');
+      if(!Array.isArray(pending))pending=[];
+      pending.push(resp);
+      localStorage.setItem('pendingProviderResponses',JSON.stringify(pending));
+    }catch(e){console.error('Save error:',e)}
+
+    // Show success and countdown
+    document.getElementById('vForm').style.display='none';
+    document.getElementById('vOk').style.display='';
+
+    var count=3;
+    var cdEl=document.getElementById('cdNum');
+    var timer=setInterval(function(){
+      count--;
+      if(cdEl)cdEl.textContent=count;
+      if(count<=0){
+        clearInterval(timer);
+        // Try to close the tab
+        window.close();
+        // If window.close() doesn't work (some browsers block it), show a message
+        setTimeout(function(){
+          if(cdEl)cdEl.textContent='✓';
+          var p=document.querySelector('#vOk p:last-child');
+          if(p)p.textContent='Puede cerrar esta ventana manualmente.';
+        },500);
+      }
+    },1000);
+  }
+  </script>
+</body>
+</html>

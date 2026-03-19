@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Proveedores - Proveedor Hub</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+  <style>
+    .filter-tag {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+      border-radius: 999px; font-size: 12px; font-weight: 500;
+      background: rgba(91,107,255,0.15); border: 1px solid rgba(91,107,255,0.3); color: var(--text);
+    }
+    .filter-tag button { background:none; border:none; color:inherit; cursor:pointer; font-size:14px; line-height:1; padding:0; opacity:.7; }
+    .filter-tag button:hover { opacity:1; color: var(--danger); }
+    .services-dropdown {
+      display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; min-width: 260px;
+      background: var(--bg-raised); border: 1px solid var(--border-md);
+      border-radius: var(--r-md); max-height: 240px; overflow-y: auto;
+      z-index: 30; box-shadow: var(--shadow-md);
+    }
+    .services-dropdown.open { display: block; }
+    .services-dropdown label {
+      display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+      cursor: pointer; color: var(--text-2); font-size: 13px; font-weight: 400;
+      transition: background 0.15s; margin: 0;
+    }
+    .services-dropdown label:hover { background: var(--surface-1); color: var(--text); }
+    .services-dropdown input[type=checkbox] { accent-color: var(--primary); width: 14px; height: 14px; }
+    .results-meta {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0 4px; margin-bottom: 4px;
+    }
+    .sort-select {
+      background: var(--surface-1); border: 1px solid var(--border-md); color: var(--text);
+      border-radius: var(--r-sm); padding: 6px 10px; font-size: 12px; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; outline: none;
+    }
+  </style>
+</head>
+<body data-page="providers">
+  <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar(false)"></div>
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand">
+        <img src="https://i.ibb.co/BfCjKQt/logo-bia-blanco.png" alt="BIA" loading="lazy" />
+        <div class="brand-text">
+          <div class="brand-title">Proveedor Hub</div>
+          <div class="brand-sub">BIA Energy - Operaciones</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="home.html" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>Inicio</a>
+        <a href="providers.html" data-nav="providers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M9 21v-8h6v8"/><path d="M8 9h8"/></svg>Proveedores</a>
+        <a href="new_provider.html" data-nav="new_provider"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Nuevo proveedor</a>
+        <a href="quotes.html" data-nav="quotes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8l4 4v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M8 11h8"/><path d="M8 15h8"/><path d="M8 19h6"/></svg>Cotizaciones</a>
+        <a href="compare.html" data-nav="compare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 16V9"/><path d="M12 16V7"/><path d="M17 16V11"/></svg>Comparativo</a>
+        <a href="sku.html" data-nav="sku"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>SKU</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="userChip" class="muted" style="margin-bottom:10px;"></div>
+        <button class="btn btn-danger" style="width:100%;" onclick="logout()">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <div class="content">
+      <div class="topbar">
+        <div class="title">
+          <button class="icon-btn" onclick="toggleSidebar()" aria-label="Menú">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+          </button>
+          <div>
+            <div class="page-title">Proveedores</div>
+            <div class="muted">Explora, filtra y gestiona proveedores.</div>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <a class="btn btn-primary" href="new_provider.html">+ Nuevo</a>
+        </div>
+      </div>
+
+      <main class="main">
+        <div class="page-header">
+          <div>
+            <h1>Listado</h1>
+            <p class="muted" style="margin-top:6px;">Vista tipo tarjetas por defecto. Puedes alternar a tabla si lo prefieres.</p>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button id="viewCardsBtn" class="btn" type="button">Tarjetas</button>
+            <button id="viewTableBtn" class="btn" type="button">Tabla</button>
+          </div>
+        </div>
+
+        <!-- FILTROS -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-header">
+            <div class="card-title">Filtros avanzados</div>
+            <div class="card-subtitle">Combina criterios para encontrar el proveedor ideal.</div>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="col-6">
+                <label for="search-provider">Buscar empresa o RUT</label>
+                <input class="input" type="text" id="search-provider" placeholder="Escribe para buscar..." />
+              </div>
+              <div class="col-6">
+                <label for="filter-city">Ciudad</label>
+                <input class="input" type="text" id="filter-city" placeholder="Ej: Bogotá" list="provider-cities" />
+                <datalist id="provider-cities"></datalist>
+              </div>
+              <div class="col-3">
+                <label for="filter-category">Categoría</label>
+                <select class="input" id="filter-category">
+                  <option value="">Todas</option>
+                  <option value="NUEVO">Nuevo</option>
+                  <option value="DISPONIBLE">Disponible</option>
+                </select>
+              </div>
+              <div class="col-3">
+                <label for="filter-state">Estado</label>
+                <select class="input" id="filter-state">
+                  <option value="">Todos</option>
+                  <option value="ACTIVO">Activo</option>
+                  <option value="INACTIVO">Inactivo</option>
+                </select>
+              </div>
+              <!-- Filtro por servicios: búsqueda de texto libre + chips sugeridos -->
+              <div class="col-6" style="position:relative;">
+                <label>Servicio / Producto</label>
+                <input class="input" type="text" id="filter-service-text"
+                  placeholder="Ej: Tableros, Medidores, Certificación..."
+                  autocomplete="off" />
+                <div id="service-suggestions" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;
+                  background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-md);
+                  max-height:220px;overflow-y:auto;box-shadow:var(--shadow-md);"></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="triggerAllFilters()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                Buscar
+              </button>
+              <button class="btn" onclick="clearAllFilters()">Limpiar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- barra de resultados -->
+        <div class="results-meta">
+          <span id="providersCount" style="font-size:13px;color:var(--text-2);"></span>
+          <select class="sort-select" id="sort-providers" onchange="triggerAllFilters()">
+            <option value="">Ordenar: predeterminado</option>
+            <option value="az">A → Z</option>
+            <option value="za">Z → A</option>
+            <option value="activos">Activos primero</option>
+          </select>
+        </div>
+
+        <div id="providersCards" class="cards-grid"></div>
+
+        <div id="providersTableWrap" class="card" style="margin-top:14px;display:none;">
+          <div class="card-header">
+            <div class="card-title">Tabla</div>
+            <div class="card-subtitle">Vista detallada en formato tabla.</div>
+          </div>
+          <div class="card-body table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Empresa</th><th>RUT</th><th>Ciudad</th><th>Categoría</th>
+                  <th>Estado</th><th>Representante</th><th>Teléfono</th><th>Servicios/Productos</th>
+                </tr>
+              </thead>
+              <tbody id="providersTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Modal detalle -->
+        <div id="providerModal" class="modal-backdrop" onclick="closeProviderModal(event)">
+          <div class="modal" role="dialog" aria-modal="true">
+            <div class="modal-header">
+              <div class="modal-title" id="providerModalTitle">Proveedor</div>
+              <button class="icon-btn" onclick="closeProviderModal()" aria-label="Cerrar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div class="modal-body" id="providerModalBody"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="providers.js"></script>
+  <script src="quotes.js"></script>
+  <script src="providerProducts.js"></script>
+  <script src="script.js"></script>
+  <script src="components.js"></script>
+
+  <!-- Extensión de filtros: servicios texto libre + sort -->
+  <script>
+    // ── Filter by service text ───────────────────────────────────────────
+    window.addEventListener('load', () => {
+      // Poblar datalist de ciudades
+      if (window.getAllProviders) {
+        const cities = [...new Set(window.getAllProviders().map(p => (p.ciudad||'').trim()).filter(Boolean))].sort();
+        const dl = document.getElementById('provider-cities');
+        if (dl) cities.forEach(c => { const o = document.createElement('option'); o.value = c; dl.appendChild(o); });
+      }
+
+      // Service text filter with autocomplete suggestions
+      const serviceInput = document.getElementById('filter-service-text');
+      const suggestBox   = document.getElementById('service-suggestions');
+
+      if (serviceInput && window.getAllProviders) {
+        // Build unique services list
+        const allServices = new Set();
+        window.getAllProviders().forEach(p => {
+          String(p.servicios_productos||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(s => allServices.add(s));
+        });
+        const serviceList = [...allServices].sort();
+
+        serviceInput.addEventListener('input', () => {
+          const q = serviceInput.value.trim().toLowerCase();
+          applyServiceFilter();
+          if (q.length < 2) { suggestBox.style.display='none'; return; }
+          const matches = serviceList.filter(s => s.toLowerCase().includes(q)).slice(0, 10);
+          if (!matches.length) { suggestBox.style.display='none'; return; }
+          suggestBox.innerHTML = matches.map(s =>
+            `<div onclick="selectServiceSuggestion('${s.replace(/'/g,"\'")}'); " style="padding:9px 14px;cursor:pointer;font-size:13px;color:var(--text-2);border-bottom:1px solid rgba(255,255,255,0.04);transition:background .13s;"
+              onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background=''">${s}</div>`
+          ).join('');
+          suggestBox.style.display = 'block';
+        });
+
+        document.addEventListener('click', e => {
+          if (!e.target.closest('#filter-service-text') && !e.target.closest('#service-suggestions')) {
+            suggestBox.style.display = 'none';
+          }
+        });
+      }
+
+      // Hook remaining filters
+      ['search-provider','filter-city','filter-category','filter-state'].forEach(id => {
+        document.getElementById(id)?.addEventListener('change', applyServiceFilter);
+        document.getElementById(id)?.addEventListener('input',  applyServiceFilter);
+      });
+    });
+
+    function selectServiceSuggestion(val) {
+      const inp = document.getElementById('filter-service-text');
+      if (inp) inp.value = val;
+      const sb = document.getElementById('service-suggestions');
+      if (sb) sb.style.display = 'none';
+      applyServiceFilter();
+    }
+
+    function applyServiceFilter() {
+      if (typeof renderProvidersTable === 'function') renderProvidersTable();
+    }
+
+    function triggerAllFilters() { applyServiceFilter(); }
+
+    function clearAllFilters() {
+      ['search-provider','filter-city','filter-service-text'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+      ['filter-category','filter-state'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+      if (typeof renderProvidersTable === 'function') renderProvidersTable();
+    }
+
+    // Override getFilteredProviders to include service text filter + sort
+    const _originalGetFiltered = window.getFilteredProviders;
+    window.getFilteredProviders = function() {
+      let list = _originalGetFiltered ? _originalGetFiltered() : (window.getAllProviders ? window.getAllProviders() : []);
+
+      // Filter by service text
+      const svcQ = (document.getElementById('filter-service-text')?.value || '').trim().toLowerCase();
+      if (svcQ) {
+        list = list.filter(p => (p.servicios_productos||'').toLowerCase().includes(svcQ));
+      }
+
+      // Sort
+      const sort = document.getElementById('sort-providers')?.value || '';
+      if (sort === 'az') list = [...list].sort((a,b) => (a.empresa||'').localeCompare(b.empresa||''));
+      if (sort === 'za') list = [...list].sort((a,b) => (b.empresa||'').localeCompare(a.empresa||''));
+      if (sort === 'activos') list = [...list].sort((a,b) => {
+        const sa = (a.estado||'').toUpperCase() === 'ACTIVO' ? 0 : 1;
+        const sb2 = (b.estado||'').toUpperCase() === 'ACTIVO' ? 0 : 1;
+        return sa - sb2;
+      });
+
+      // Update count
+      const countEl = document.getElementById('providersCount');
+      if (countEl) countEl.textContent = `${list.length} proveedor${list.length !== 1 ? 'es' : ''}`;
+
+      return list;
+    };
+  </script>
+</body>
