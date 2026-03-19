@@ -197,12 +197,13 @@ function hashCode(str) {
 }
 
 function escapeHtml(str) {
+  // Avoid `String.prototype.replaceAll` for broader browser compatibility.
   return String(str || '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function formatMoneyCOP(value) {
@@ -442,7 +443,8 @@ function toCsv(rows) {
   const esc = (v) => {
     const s = String(v ?? '');
     if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
-      return '"' + s.replaceAll('"', '""') + '"';
+      // Avoid `String.prototype.replaceAll` for broader browser compatibility.
+      return '"' + s.replace(/"/g, '""') + '"';
     }
     return s;
   };
@@ -2553,9 +2555,10 @@ function renderSelectedQuoteSkus() {
 // ------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
-  checkLogin();
-  setActiveNav();
-  renderUserChip();
+  // Make init resilient: a single UI error shouldn't break page KPIs.
+  try { checkLogin(); } catch (e) { console.error('checkLogin:', e); }
+  try { setActiveNav(); } catch (e) { console.error('setActiveNav:', e); }
+  try { renderUserChip(); } catch (e) { console.error('renderUserChip:', e); }
 
   const page = document.body.dataset.page || '';
 
@@ -2609,7 +2612,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Home page
   if (page === 'home') {
-    updateHomeKpis();
+    try { updateHomeKpis(); } catch (e) { console.error('updateHomeKpis:', e); }
   }
 
   // SKU page
