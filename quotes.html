@@ -147,7 +147,7 @@
     var cat=Array.isArray(window.skuCatalogData)?window.skuCatalogData:[];
     var allProvs=typeof getAllProviders==='function'?getAllProviders():[];
     var PMAP={'proelco':'PROELCO SAS','adler':'Adler TEC','laumayer':'Laumayer','selda':'SELDA 1 SAS','4s':'4S INGENIERIA S.A.S','bia technologies':'BIA TECHNOLOGIES'};
-    var baseUrl=window.location.origin+window.location.pathname.replace('quotes.html','');
+    var baseUrl=window.location.origin+window.location.pathname.replace(/quotes(\.html)?$/,'');
 
     function esc(s){return typeof escapeHtml==='function'?escapeHtml(s):String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
     function toast(m,t){if(typeof showToast==='function')showToast(m,t);else alert(m)}

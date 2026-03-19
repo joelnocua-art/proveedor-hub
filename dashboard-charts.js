@@ -96,7 +96,8 @@ function renderActivityFeed() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (!window.location.pathname.endsWith('home.html')) return;
+  var page = document.body?.dataset?.page || '';
+  if (page !== 'home') return;
   console.log('[Dashboard] providers:', getAllProviders().length, 'quotes:', getAllQuotes().length);
   try { renderAlerts(); } catch(e) { console.error('renderAlerts:', e); }
   try { renderActivityFeed(); } catch(e) { console.error('renderActivityFeed:', e); }
