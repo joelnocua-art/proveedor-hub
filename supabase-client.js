@@ -12,6 +12,9 @@ function getSupabase() {
   return _sb;
 }
 
+// Shared Supabase client instance (used across the app)
+const supabase = getSupabase();
+
 // ═══ DATA CACHE ═══
 // Load from Supabase once, keep in memory for fast sync access
 window._sbData = {
@@ -241,10 +244,28 @@ async function sbSignOut() {
   window.location.href = 'index.html';
 }
 
-async function sbSignInWithGoogle() {
-  const sb = getSupabase();
-  if (!sb) return;
-  await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin + '/home' } });
+// Public API used by the login button (Google OAuth)
+async function loginWithGoogle() {
+  if (!supabase || !supabase.auth) {
+    if (typeof showToast === 'function') {
+      showToast('Error al iniciar con Google: Supabase no está listo', 'error');
+    } else if (typeof alert === 'function') {
+      alert('Error al iniciar con Google: Supabase no está listo');
+    }
+    return;
+  }
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin
+    }
+  });
+  if (error) {
+    const msg = 'Error al iniciar con Google: ' + (error.message || String(error));
+    if (typeof showToast === 'function') showToast(msg, 'error');
+    else if (typeof alert === 'function') alert(msg);
+  }
 }
 
 console.log('[Supabase] Client module loaded');

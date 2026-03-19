@@ -32,17 +32,8 @@ function showToast(msg, durationOrType = 3000) {
 }
 
 // ------------------------
-// Auth (demo)
+// Auth
 // ------------------------
-
-function loginWithGoogle() {
-  // Demo: just set a fake user
-  localStorage.setItem(
-    'currentUser',
-    JSON.stringify({ name: 'Usuario BIA', email: 'usuario@bia.app' })
-  );
-  window.location.href = 'home.html';
-}
 
 function registerUser() {
   const name = document.getElementById('reg-name')?.value?.trim() || 'Usuario';
@@ -153,21 +144,20 @@ function renderUserChip() {
     return;
   }
 
-  const initials = (user.name || 'U')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((x) => x[0].toUpperCase())
-    .join('');
+  const displayName = String(user.name || user.email || 'Usuario');
+  const displayEmail = String(user.email || '');
+  const initial = displayName.trim().charAt(0).toUpperCase() || 'U';
+
+  const avatarHtml = user.avatar
+    ? `<img src="${escapeHtml(String(user.avatar))}" style="width:28px;height:28px;border-radius:50%;margin-right:8px;vertical-align:-8px;object-fit:cover;" />`
+    : `<span style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;margin-right:8px;vertical-align:-8px;">${escapeHtml(initial)}</span>`;
 
   el.innerHTML = `
-    <div style="display:flex; gap:10px; align-items:center; padding: 10px 10px 12px 10px; border: 1px solid rgba(255,255,255,0.10); border-radius: 14px; background: rgba(255,255,255,0.05);">
-      <div style="width:34px; height:34px; border-radius: 12px; background: linear-gradient(135deg, rgba(3,219,201,0.25), rgba(71,50,255,0.25)); border: 1px solid rgba(255,255,255,0.12); display:flex; align-items:center; justify-content:center; font-weight:700;">
-        ${escapeHtml(initials)}
-      </div>
-      <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
-        <div class="userchip-name">${escapeHtml(user.name || 'Usuario')}</div>
-        <div class="muted userchip-email">${escapeHtml(user.email || '')}</div>
+    <div style="display:flex;align-items:center;">
+      ${avatarHtml}
+      <div style="min-width:0;">
+        <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(displayName)}</div>
+        <div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(displayEmail)}</div>
       </div>
     </div>
   `;
@@ -2566,6 +2556,35 @@ function renderSelectedQuoteSkus() {
 // ------------------------
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Manejar redirect de OAuth (Google)
+  try {
+    if (typeof getSupabase === 'function') {
+      const sb = getSupabase();
+      if (sb && sb.auth && typeof sb.auth.onAuthStateChange === 'function') {
+        sb.auth.onAuthStateChange((event, session) => {
+          if (event === 'SIGNED_IN' && session) {
+            const user = session.user;
+            localStorage.setItem('currentUser', JSON.stringify({
+              name: user.user_metadata?.full_name || user.email,
+              email: user.email,
+              avatar: user.user_metadata?.avatar_url || null
+            }));
+            const path = window.location.pathname;
+            if (path === '/' || path.includes('index') || path.includes('login')) {
+              window.location.href = 'home.html';
+            }
+          }
+          if (event === 'SIGNED_OUT') {
+            localStorage.removeItem('currentUser');
+            window.location.href = 'index.html';
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.error('Supabase auth state listener:', e);
+  }
+
   const page = document.body.dataset.page || '';
   const isAuthPage = page === 'login' || page === 'register';
   const isPublicPage = page === 'respuesta' || page === '404';
