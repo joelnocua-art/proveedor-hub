@@ -195,7 +195,7 @@
        
        var list = wons.map(function(s,i){return (i+1)+'. '+s}).join('\n');
        var sub=encodeURIComponent('Adjudicación de Cotización: '+qName+' — BIA Energy');
-       var body=encodeURIComponent('Estimado equipo de '+provName+',\n\nNos complace informarles que su propuesta ha sido SELECCIONADA como la opción ganadora en la solicitud "'+qName+'" para los siguientes ítems:\n\n'+list+'\n\nPronto les enviaremos la Orden de Compra oficial con los detalles administrativos.\n\nGracias por su excelente servicio,\nOperaciones — BIA Energy');
+       var body=encodeURIComponent('Estimado equipo de '+provName+',\n\nNos complace informarles que su propuesta para la solicitud "'+qName+'" ha sido seleccionada y adjudicada para los siguientes ítems:\n\n'+list+'\n\nPronto les enviaremos la Orden de Compra oficial con los detalles administrativos.\n\nAtentamente,\nOperaciones — BIA Energy');
        
        var a = document.createElement('a');
        a.href = 'https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body;
@@ -211,7 +211,7 @@
        if(!email){toast(provName+' no tiene correo registrado.','error');return;}
        
        var sub=encodeURIComponent('¡Cotización Adjudicada! '+qName+' — BIA Energy');
-       var body=encodeURIComponent('Estimado equipo de '+provName+',\n\nNos complace informarles que su oferta para el ítem:\n\n✔️ '+sku+'\n\nHa sido adjudicada como la opción ganadora en nuestra solicitud referenciada como ('+qName+').\n\nEn breve enviaremos la Orden de Compra oficial.\n\nAtentamente,\nOperaciones — BIA Energy');
+       var body=encodeURIComponent('Estimado equipo de '+provName+',\n\nNos complace informarles que su oferta para el ítem:\n\n✔️ '+sku+'\n\nha sido seleccionada y adjudicada dentro de nuestra solicitud referenciada como ('+qName+').\n\nEn breve enviaremos la Orden de Compra oficial con los detalles correspondientes.\n\nAtentamente,\nOperaciones — BIA Energy');
        
        var a = document.createElement('a');
        a.href = 'https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body;
