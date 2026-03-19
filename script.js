@@ -45,6 +45,12 @@ function registerUser() {
     return;
   }
 
+  const emailLower = email.toLowerCase();
+  if (!emailLower.endsWith('@bia.app') && !emailLower.endsWith('@bia.com')) {
+    alert('Acceso restringido: Debes usar un correo corporativo de BIA Energy (@bia.app o @bia.com).');
+    return;
+  }
+
   localStorage.setItem('registeredUser', JSON.stringify({ name, email, password }));
   localStorage.setItem('currentUser', JSON.stringify({ name, email }));
   window.location.href = 'home.html';
@@ -2598,6 +2604,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   let sbUser = null;
   if (typeof sbGetUser === 'function') {
     try { sbUser = await sbGetUser(); } catch(e) { console.warn('Auth check failed:', e); }
+
+    // Validate Corporate Email
+    if (sbUser && sbUser.email) {
+      const emailLower = sbUser.email.toLowerCase();
+      if (!emailLower.endsWith('@bia.app') && !emailLower.endsWith('@bia.com')) {
+         if (typeof sbSignOut === 'function') await sbSignOut();
+         localStorage.removeItem('currentUser');
+         sbUser = null;
+         alert('Acceso denegado: Esta herramienta es exclusiva para personal de BIA Energy. Inicia sesión con tu cuenta de @bia.app o @bia.com.');
+         window.location.href = 'index.html';
+         return;
+      }
+    }
 
     // Only redirect NON-auth pages if not logged in
     if (!isPublicPage && !isAuthPage && !sbUser) {
