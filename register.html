@@ -12,46 +12,42 @@
     <div class="card auth-card">
       <div class="card-body">
         <div class="auth-top">
-          <img
-            src="https://i.ibb.co/BfCjKQt/logo-bia-blanco.png"
-            alt="BIA Energy"
-            loading="lazy"
-          />
+          <img src="https://i.ibb.co/BfCjKQt/logo-bia-blanco.png" alt="BIA Energy" loading="lazy" />
           <div>
             <div class="auth-title">Crear cuenta</div>
-            <div class="auth-sub">Registro rápido para acceder al panel.</div>
+            <div class="auth-sub">Regístrate en Proveedor Hub.</div>
           </div>
         </div>
-
         <div class="divider"></div>
-
-        <form onsubmit="event.preventDefault(); registerUser();" style="margin-top: 6px;">
-          <div class="form-grid">
-            <div class="col-12">
-              <label for="reg-name">Nombre</label>
-              <input class="input" id="reg-name" type="text" placeholder="Tu nombre" />
-            </div>
-            <div class="col-12">
-              <label for="reg-email">Correo</label>
-              <input class="input" id="reg-email" type="email" placeholder="tucorreo@empresa.com" />
-            </div>
-            <div class="col-12">
-              <label for="reg-password">Contraseña</label>
-              <input class="input" id="reg-password" type="password" placeholder="••••••••" />
-            </div>
-          </div>
-
-          <div style="display:flex; gap:10px; margin-top: 14px; flex-wrap: wrap;">
-            <button class="btn btn-primary" type="submit">Crear cuenta</button>
-            <a class="btn" href="index.html">Volver</a>
-          </div>
-
-          
-        </form>
+        <div style="display:grid;gap:10px;">
+          <input type="text" id="regName" class="input" placeholder="Nombre completo" />
+          <input type="email" id="regEmail" class="input" placeholder="Correo electrónico" />
+          <input type="password" id="regPass" class="input" placeholder="Contraseña (mínimo 6 caracteres)" />
+          <button class="btn btn-primary" onclick="doRegister()">Crear cuenta</button>
+          <a class="btn" href="index.html" style="text-align:center;">Ya tengo cuenta</a>
+        </div>
+        <div id="regMsg" style="margin-top:10px;font-size:13px;display:none;"></div>
       </div>
     </div>
   </div>
-
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="supabase-client.js"></script>
   <script src="script.js"></script>
+  <script>
+  async function doRegister(){
+    var name=(document.getElementById('regName')||{}).value||'';
+    var email=(document.getElementById('regEmail')||{}).value||'';
+    var pass=(document.getElementById('regPass')||{}).value||'';
+    var msg=document.getElementById('regMsg');
+    if(!name||!email||!pass){showMsg('Completa todos los campos.','var(--danger)');return}
+    if(pass.length<6){showMsg('La contraseña debe tener al menos 6 caracteres.','var(--danger)');return}
+    showMsg('Creando cuenta...','var(--accent)');
+    var r=await sbSignUp(email,pass,name);
+    if(r.error){showMsg(r.error.message||'Error al registrar.','var(--danger)');return}
+    showMsg('Cuenta creada. Revisa tu correo para confirmar, o inicia sesión.','var(--accent)');
+    setTimeout(function(){window.location.href='index.html'},2000);
+  }
+  function showMsg(t,c){var m=document.getElementById('regMsg');if(m){m.style.display='block';m.style.color=c;m.textContent=t}}
+  </script>
 </body>
 </html>

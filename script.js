@@ -61,6 +61,7 @@ function registerUser() {
 
 function logout() {
   localStorage.removeItem('currentUser');
+  if (typeof sbSignOut === 'function') { sbSignOut(); return; }
   window.location.href = 'index.html';
 }
 
@@ -197,13 +198,12 @@ function hashCode(str) {
 }
 
 function escapeHtml(str) {
-  // Avoid `String.prototype.replaceAll` for broader browser compatibility.
   return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
 }
 
 function formatMoneyCOP(value) {
@@ -310,9 +310,14 @@ function clearProviderOverride(id) {
 }
 
 function getAllProviders() {
-  // providersData comes from providers.js
-  // Note: `providers.js` defines a top-level const (not a `window.*` property in all browsers)
-  // so we read it via `typeof` first, then fall back to `window`.
+  // Use Supabase data if loaded
+  if (window._sbData && window._sbData.loaded && window._sbData.providers) {
+    return window._sbData.providers.map(p => {
+      const perf = normalizeProviderPerf(p);
+      return { correo: p.correo_electronico || p.correo || '', celular: p.celular_telefono || p.celular || '', ...p, ...perf };
+    });
+  }
+  // Fallback to static files + localStorage
   const base = (typeof providersData !== 'undefined' && Array.isArray(providersData))
     ? providersData
     : (Array.isArray(window.providersData) ? window.providersData : []);
@@ -372,8 +377,11 @@ function ensureQuoteId(q, idx = 0) {
 }
 
 function getAllQuotes() {
-  // quotesData comes from quotes.js
-  // Note: `quotes.js` defines a top-level const (not a `window.*` property in all browsers)
+  // Use Supabase data if loaded
+  if (window._sbData && window._sbData.loaded && window._sbData.quotes) {
+    return window._sbData.quotes;
+  }
+  // Fallback to static files + localStorage
   const baseRaw = (typeof quotesData !== 'undefined' && Array.isArray(quotesData))
     ? quotesData
     : (Array.isArray(window.quotesData) ? window.quotesData : []);
@@ -443,8 +451,7 @@ function toCsv(rows) {
   const esc = (v) => {
     const s = String(v ?? '');
     if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
-      // Avoid `String.prototype.replaceAll` for broader browser compatibility.
-      return '"' + s.replace(/"/g, '""') + '"';
+      return '"' + s.replaceAll('"', '""') + '"';
     }
     return s;
   };
@@ -1809,6 +1816,10 @@ function setupSkuPage() {
   }
 
   function loadOffersStore() {
+    // Use Supabase data if available
+    if (window._sbData && window._sbData.loaded && window._sbData.skuOffers) {
+      return window._sbData.skuOffers;
+    }
     var store = {};
     try { var r = localStorage.getItem(OFFERS_KEY); store = r ? JSON.parse(r) : {}; if (typeof store !== 'object' || store === null) store = {}; } catch(e) { store = {}; }
     // Fallback: merge from window.skuOffersData (JS variable from sku_offers.js)
@@ -2554,13 +2565,43 @@ function renderSelectedQuoteSkus() {
 // Compare page
 // ------------------------
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Make init resilient: a single UI error shouldn't break page KPIs.
-  try { checkLogin(); } catch (e) { console.error('checkLogin:', e); }
-  try { setActiveNav(); } catch (e) { console.error('setActiveNav:', e); }
-  try { renderUserChip(); } catch (e) { console.error('renderUserChip:', e); }
-
+document.addEventListener('DOMContentLoaded', async () => {
   const page = document.body.dataset.page || '';
+
+  // Auth check with Supabase
+  if (typeof sbGetUser === 'function') {
+    const user = await sbGetUser();
+    const isAuthPage = page === 'login' || page === 'register';
+    const isPublicPage = page === 'respuesta' || page === '404';
+
+    if (!isPublicPage) {
+      if (!user && !isAuthPage) { window.location.href = 'index.html'; return; }
+      if (user && isAuthPage) { window.location.href = 'home.html'; return; }
+    }
+
+    // Store user info for UI
+    if (user) {
+      localStorage.setItem('currentUser', JSON.stringify({
+        name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',
+        email: user.email || ''
+      }));
+    }
+  } else {
+    checkLogin();
+  }
+
+  setActiveNav();
+  renderUserChip();
+
+  // Load Supabase data before rendering pages
+  if (typeof sbLoadAll === 'function' && !['login','register','respuesta','404'].includes(page)) {
+    await sbLoadAll();
+  }
+
+  // Also make skuCatalogData available from Supabase
+  if (window._sbData && window._sbData.loaded && window._sbData.skuCatalog) {
+    window.skuCatalogData = window._sbData.skuCatalog;
+  }
 
   // Providers page
   if (page === 'providers') {
@@ -2612,7 +2653,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Home page
   if (page === 'home') {
-    try { updateHomeKpis(); } catch (e) { console.error('updateHomeKpis:', e); }
+    updateHomeKpis();
   }
 
   // SKU page
