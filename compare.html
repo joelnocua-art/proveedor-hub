@@ -325,12 +325,19 @@
     // Init
     renderQuoteList();
 
-    // Check URL param
-    try{
-      var params=new URLSearchParams(window.location.search);
-      var q=params.get('q');
-      if(q){cmpSelect(q)}
-    }catch(e){}
+    // Re-render and handle URL params after Supabase finishes loading
+    var sbCheckInterval = setInterval(function() {
+      if (window._sbData && window._sbData.loaded) {
+        clearInterval(sbCheckInterval);
+        renderQuoteList();
+        
+        try{
+          var params=new URLSearchParams(window.location.search);
+          var q=params.get('q');
+          if(q){cmpSelect(q)}
+        }catch(e){}
+      }
+    }, 100);
   })();
   </script>
 </body>
