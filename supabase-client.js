@@ -1,6 +1,6 @@
 /* ═══ Supabase Client — Proveedor Hub ═══ */
 
-const SUPABASE_URL = 'https://fepivzcobddybztuiyge.supabase.co';
+const SUPABASE_URL = 'https://fepivzcobbdybztuiyge.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlcGl2emNvYmJkeWJ6dHVpeWdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4ODkxMDMsImV4cCI6MjA4OTQ2NTEwM30.ZwUjlkqiucO3bzLW-Rw4CGUS3N4wsNFrjLl2ZyPa4PU';
 
 // Initialize client (supabase-js loaded via CDN)
