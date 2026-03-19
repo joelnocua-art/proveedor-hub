@@ -272,12 +272,6 @@
         ct++;
       })});
       
-      const ok = await sbInsertQuotes(sbList);
-      if (!ok) {
-        toast('Error guardando cotizaciones en Supabase. Verifica la consola.', 'error');
-        return;
-      }
-
       if(sendEmail){
         var skuTable=skus.map(function(s,i){return (i+1)+'. '+s.sku+' — Cant: '+s.qty}).join('\n');
         var delay=0;
@@ -293,11 +287,19 @@
             window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body,'_blank');
           },delay);delay+=1000;
         });
-        toast(ct+' solicitudes guardadas. Abriendo Gmail...','success');
-      }else{toast(ct+' solicitudes guardadas como "'+name.trim()+'".','success')}
+        toast(ct+' solicitudes preparadas. Abriendo Gmail...','success');
+      }else{toast(ct+' solicitudes preparadas como "'+name.trim()+'". Guardando...','success')}
+      
       skus=[];provSet=new Set();renderSkuList();
       ['wz-name','wz-city','wz-date','wz-notes'].forEach(function(id){var e=document.getElementById(id);if(e)e.value=''});
       wizGo(4);
+
+      // Now save to Supabase asynchronously
+      const ok = await sbInsertQuotes(sbList);
+      if (!ok) {
+        toast('Error guardando cotizaciones en Supabase. Verifica la consola.', 'error');
+        return;
+      }
     };
 
     // === STEP 4: Tracking ===
