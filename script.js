@@ -1762,7 +1762,7 @@ function updateSkuCartTray() {
   }
 }
 
-function setupSkuPage() {
+async function setupSkuPage() {
   const input      = document.getElementById('skuSearchInput');
   const form       = document.getElementById('skuSearchForm');
   const resultsEl  = document.getElementById('skuResults');
@@ -1825,10 +1825,16 @@ function setupSkuPage() {
     const arr = Array.isArray(store?.[skuId]) ? store[skuId] : [];
     return arr.map((o) => ({ provider: String(o.provider||'').trim(), price_sin_iva: Number(o.price_sin_iva)||0, updatedAt: o.updatedAt||'' })).filter((o) => o.provider && o.price_sin_iva > 0);
   }
-  function upsertOffer(skuId, providerName, priceSinIva) {
+  async function upsertOffer(skuId, providerName, priceSinIva) {
     const provider = String(providerName||'').trim();
     const price = Number(priceSinIva);
     if (!provider || !(price > 0)) return { ok: false };
+    
+    if (window._sbData && window._sbData.loaded) {
+      const ok = await sbUpsertOffer(skuId, provider, price);
+      return { ok };
+    }
+
     const store = loadOffersStore();
     const list = Array.isArray(store[skuId]) ? store[skuId] : [];
     const pNorm = normalizeText(provider);
@@ -1840,8 +1846,13 @@ function setupSkuPage() {
     saveOffersStore(store);
     return { ok: true };
   }
-  function deleteOffer(skuId, providerName) {
-    const pNorm = normalizeText(String(providerName||'').trim());
+  async function deleteOffer(skuId, providerName) {
+    const provider = String(providerName||'').trim();
+    if (window._sbData && window._sbData.loaded) {
+      await sbDeleteOffer(skuId, provider);
+      return;
+    }
+    const pNorm = normalizeText(provider);
     const store = loadOffersStore();
     const list = Array.isArray(store[skuId]) ? store[skuId] : [];
     const next = list.filter((x) => normalizeText(String(x.provider||'')) !== pNorm);
@@ -2054,21 +2065,21 @@ function setupSkuPage() {
 
     // Delete offer
     resultsEl.querySelectorAll('[data-del-offer]').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const provider = btn.getAttribute('data-del-offer')||'';
         if (!provider) return;
         if (!confirm(`¿Quitar la oferta de ${provider}?`)) return;
-        deleteOffer(match.id, provider);
+        await deleteOffer(match.id, provider);
         renderSelectedSku(match.id);
       });
     });
 
     // Add offer form
-    document.getElementById('skuAddOfferForm')?.addEventListener('submit', (e) => {
+    document.getElementById('skuAddOfferForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const prov  = document.getElementById('skuOfferProvider')?.value||'';
       const price = document.getElementById('skuOfferPrice')?.value||'';
-      const res = upsertOffer(match.id, prov, price);
+      const res = await upsertOffer(match.id, prov, price);
       if (!res.ok) { alert('Completa proveedor y precio (> 0).'); return; }
       renderSelectedSku(match.id);
     });

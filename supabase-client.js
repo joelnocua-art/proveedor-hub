@@ -20,6 +20,7 @@ window._sbData = {
   skuCatalog: null,
   skuOffers: null,
   quotes: null,
+  adjudications: null,
   loaded: false
 };
 
@@ -93,8 +94,15 @@ async function sbLoadAll() {
       _supaId: q.id
     }));
 
+    // Load Adjudications
+    const { data: adjs, error: e5 } = await sb.from('adjudications').select('*');
+    if (e5) throw e5;
+    const adjMap = {};
+    (adjs || []).forEach(a => { adjMap[a.cotizacion_nombre + '::' + a.sku] = a.provider; });
+    window._sbData.adjudications = adjMap;
+
     window._sbData.loaded = true;
-    console.log('[Supabase] Data loaded:', window._sbData.providers.length, 'providers,', window._sbData.skuCatalog.length, 'SKUs,', Object.keys(window._sbData.skuOffers).length, 'SKUs with prices,', window._sbData.quotes.length, 'quotes');
+    console.log('[Supabase] Data loaded:', window._sbData.providers.length, 'providers,', window._sbData.skuCatalog.length, 'SKUs,', Object.keys(window._sbData.skuOffers).length, 'SKUs with prices,', window._sbData.quotes.length, 'quotes,', Object.keys(window._sbData.adjudications).length, 'adjudications');
     return true;
   } catch(err) {
     console.error('[Supabase] Load error:', err);
@@ -234,6 +242,9 @@ async function sbSetAdjudication(nombre, sku, provider) {
   if (!sb) return false;
   const { error } = await sb.from('adjudications').upsert({ cotizacion_nombre: nombre, sku: sku, provider: provider }, { onConflict: 'cotizacion_nombre,sku' });
   if (error) { console.error('[Supabase] Adjudication error:', error); return false; }
+  // Update cache
+  if (!window._sbData.adjudications) window._sbData.adjudications = {};
+  window._sbData.adjudications[nombre + '::' + sku] = provider;
   return true;
 }
 
@@ -245,6 +256,33 @@ async function sbGetAdjudications() {
   const map = {};
   (data || []).forEach(a => { map[a.cotizacion_nombre + '::' + a.sku] = a.provider; });
   return map;
+}
+
+async function sbUpsertOffer(skuId, provider, price_sin_iva) {
+  const sb = getSupabase();
+  if (!sb) return false;
+  const { error } = await sb.from('sku_offers').upsert({ sku_id: skuId, provider, price_sin_iva }, { onConflict: 'sku_id,provider' });
+  if (error) { console.error('[Supabase] Offer upsert error:', error); return false; }
+  // Update cache
+  if (!window._sbData.skuOffers) window._sbData.skuOffers = {};
+  if (!window._sbData.skuOffers[skuId]) window._sbData.skuOffers[skuId] = [];
+  const list = window._sbData.skuOffers[skuId];
+  const idx = list.findIndex(o => o.provider === provider);
+  if (idx >= 0) list[idx].price_sin_iva = price_sin_iva;
+  else list.push({ provider, price_sin_iva });
+  return true;
+}
+
+async function sbDeleteOffer(skuId, provider) {
+  const sb = getSupabase();
+  if (!sb) return false;
+  const { error } = await sb.from('sku_offers').delete().eq('sku_id', skuId).eq('provider', provider);
+  if (error) { console.error('[Supabase] Offer delete error:', error); return false; }
+  // Update cache
+  if (window._sbData.skuOffers && window._sbData.skuOffers[skuId]) {
+    window._sbData.skuOffers[skuId] = window._sbData.skuOffers[skuId].filter(o => o.provider !== provider);
+  }
+  return true;
 }
 
 // ═══ AUTH ═══
