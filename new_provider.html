@@ -419,7 +419,7 @@
       setTimeout(() => t.remove(), 3200);
     }
 
-    function saveNewProvider() {
+    async function saveNewProvider() {
       const empresa = document.getElementById('np-empresa').value.trim();
       if (!empresa) { showToast('Por favor ingresa el nombre de la empresa.', 'error'); return; }
 
@@ -453,12 +453,12 @@
         observaciones:    document.getElementById('np-observaciones').value.trim(),
       };
 
-      // Use the same localStorage key that script.js uses: 'extraProviders'
-      const raw    = localStorage.getItem('extraProviders');
-      const extras = (raw ? JSON.parse(raw) : null) || [];
-      extras.push(newProvider);
-      localStorage.setItem('extraProviders', JSON.stringify(extras));
-
+      // Enviar a Supabase
+      const inserted = await sbInsertProvider(newProvider);
+      if (!inserted) {
+        showToast('Error al guardar en la base de datos (verifica los permisos RLS o la red).', 'error');
+        return;
+      }
       showToast(`✓ Proveedor "${empresa}" guardado correctamente con ${selectedSkus.size} SKU(s).`);
       setTimeout(() => { window.location.href = 'providers.html'; }, 1200);
     }

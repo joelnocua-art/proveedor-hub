@@ -256,16 +256,27 @@
     }
 
     // === SAVE & EMAIL ===
-    window.wizSave=function(sendEmail){
+    window.wizSave=async function(sendEmail){
       var name=(document.getElementById('wz-name')||{}).value||'';
       if(!name.trim()){toast('Dale un nombre a la cotización.','error');document.getElementById('wz-name').focus();return}
       if(!skus.length||!provSet.size){toast('Faltan ítems o proveedores.','error');return}
       var fecha=new Date().toISOString().slice(0,10),city=(document.getElementById('wz-city')||{}).value||'',dt=(document.getElementById('wz-date')||{}).value||'',notes=(document.getElementById('wz-notes')||{}).value||'';
-      var extra;try{extra=JSON.parse(localStorage.getItem('extraQuotes')||'[]')}catch(e){extra=[]}
-      if(!Array.isArray(extra))extra=[];
       var pa=Array.from(provSet),ct=0,batch='COT-'+Date.now().toString(36).toUpperCase();
-      pa.forEach(function(emp){skus.forEach(function(s){extra.push({it:Date.now().toString()+Math.random().toString(36).slice(2,8),empresa:emp,fecha:fecha,descripcion:s.sku,und:s.qty||1,pu_sin_iva:0,pu_con_iva:0,ciudad_entrega:city,fecha_entrega:dt,observaciones:notes,cotizacion_nombre:name.trim(),cotizacion_batch:batch});ct++})});
-      if(typeof setExtraQuotes==='function')setExtraQuotes(extra);else localStorage.setItem('extraQuotes',JSON.stringify(extra));
+      var sbList = [];
+      pa.forEach(function(emp){skus.forEach(function(s){
+        sbList.push({
+          empresa:emp,fecha:fecha,descripcion:s.sku,und:s.qty||1,
+          pu_sin_iva:0,pu_con_iva:0,ciudad_entrega:city,fecha_entrega:dt,
+          observaciones:notes,cotizacion_nombre:name.trim(),cotizacion_batch:batch
+        });
+        ct++;
+      })});
+      
+      const ok = await sbInsertQuotes(sbList);
+      if (!ok) {
+        toast('Error guardando cotizaciones en Supabase. Verifica la consola.', 'error');
+        return;
+      }
 
       if(sendEmail){
         var skuTable=skus.map(function(s,i){return (i+1)+'. '+s.sku+' — Cant: '+s.qty}).join('\n');
@@ -310,12 +321,12 @@
             '</tbody></table></div></div></div>';
       }).join('');
     }
-    window._delGroup=function(name){
+    window._delGroup=async function(name){
       if(!confirm('¿Eliminar todas las solicitudes de "'+name+'"?'))return;
-      var extra;try{extra=JSON.parse(localStorage.getItem('extraQuotes')||'[]')}catch(e){extra=[]}
-      extra=extra.filter(function(q){return(q.cotizacion_nombre||'Sin nombre')!==name});
-      if(typeof setExtraQuotes==='function')setExtraQuotes(extra);else localStorage.setItem('extraQuotes',JSON.stringify(extra));
-      toast('Cotización "'+name+'" eliminada.','success');renderTrack();
+      var ok = await sbDeleteQuotesByName(name);
+      if (!ok) { toast('Error eliminando en Supabase','error'); return; }
+      toast('Cotización "'+name+'" eliminada.','success');
+      renderTrack();
     };
     var ts=document.getElementById('trackSearch');if(ts)ts.addEventListener('input',renderTrack);
 

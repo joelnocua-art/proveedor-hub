@@ -327,19 +327,10 @@ function getAllProviders() {
     });
 }
 
-function deleteProvider(id) {
+async function deleteProvider(id) {
   const pid = String(id);
-
-  // If it is an extra provider, delete permanently (from localStorage)
-  if (isExtraProvider(pid)) {
-    const extra = getExtraProviders().filter((p) => String(p.it) !== pid);
-    setExtraProviders(extra);
-  } else {
-    // Base provider: hide (so the source file is untouched)
-    const hidden = new Set(getHiddenProviderIds().map(String));
-    hidden.add(pid);
-    setHiddenProviderIds([...hidden]);
-  }
+  const ok = await sbDeleteProvider(pid);
+  if (!ok) { showToast('Error al eliminar en Supabase', 'error'); return; }
 
   if (typeof renderProvidersTable === 'function') renderProvidersTable();
   if (typeof updateHomeKpis === 'function') updateHomeKpis();
@@ -740,7 +731,7 @@ function toggleProviderInlineEdit(id, forceClose = false) {
   el.style.display = el.style.display === 'none' || !el.style.display ? 'block' : 'none';
 }
 
-function saveProviderInlineEdit(id) {
+async function saveProviderInlineEdit(id) {
   const pid = String(id);
 
   const patch = {
@@ -768,8 +759,11 @@ function saveProviderInlineEdit(id) {
   patch.entrega_dias = perf.entrega_dias;
   patch.garantia_meses = perf.garantia_meses;
 
-  // Save as override (works for base and extra providers)
-  saveProviderOverride(pid, patch);
+  const ok = await sbUpdateProvider(pid, patch);
+  if (!ok) {
+    showToast('Error al actualizar en Supabase', 'error');
+    return;
+  }
 
   showToast('Proveedor actualizado correctamente.');
   toggleProviderInlineEdit(pid, true);
