@@ -401,6 +401,17 @@
 
     // === INIT ===
     wizGo(4);renderSkuList();
+    
+    // Wait for Supabase to finish loading asynchronously, then repaint Step 4
+    var sbCheckInterval = setInterval(function() {
+      if (window._sbData && window._sbData.loaded) {
+        clearInterval(sbCheckInterval);
+        if (step === 4) {
+          wizGo(4);
+        }
+      }
+    }, 100);
+
     // Auto-fill today's date
     var dateEl=document.getElementById('wz-date');
     if(dateEl)dateEl.value=new Date().toISOString().slice(0,10);
