@@ -2633,6 +2633,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.skuCatalogData = window._sbData.skuCatalog;
   }
 
+  // Re-render Quotes step 4 if data changed asynchronously
+  if (page === 'quotes' && typeof window.wizGo === 'function') {
+    window.wizGo(4);
+  }
+
   // Providers page
   if (page === 'providers') {
     document.getElementById('search-provider')?.addEventListener('input', renderProvidersTable);
