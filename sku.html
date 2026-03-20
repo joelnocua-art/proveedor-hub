@@ -225,8 +225,8 @@
                    var sId = catMap[offer.sku];
                    var pr = Number(offer.price);
                    if(sId && pr > 0 && typeof sbUpsertOffer === 'function') {
-                      await sbUpsertOffer(sId, provName, pr);
-                      successCount++;
+                      const ok = await sbUpsertOffer(sId, provName, pr);
+                      if (ok === true) successCount++;
                    }
                }
                

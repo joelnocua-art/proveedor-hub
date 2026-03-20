@@ -678,18 +678,7 @@ function renderProvidersCards(list) {
                   <input class="input" id="ie-web-${escapeHtml(p.it)}" value="${escapeHtml(p.pagina_web || '')}" />
                 </div>
 
-                <div class="col-4">
-                  <label>Calidad (1-5)</label>
-                  <input class="input" type="number" min="1" max="5" step="1" id="ie-calidad-${escapeHtml(p.it)}" value="${escapeHtml(perf.calidad)}" />
-                </div>
-                <div class="col-4">
-                  <label>Entrega (días)</label>
-                  <input class="input" type="number" min="0" step="1" id="ie-entrega-${escapeHtml(p.it)}" value="${escapeHtml(perf.entrega_dias)}" />
-                </div>
-                <div class="col-4">
-                  <label>Garantía (meses)</label>
-                  <input class="input" type="number" min="0" step="1" id="ie-garantia-${escapeHtml(p.it)}" value="${escapeHtml(perf.garantia_meses)}" />
-                </div>
+                <!-- Removed Calidad, Entrega, Garantía from inline edit table -->
 
                 <div class="col-12">
                   <label>Servicios / Productos (coma)</label>
@@ -955,18 +944,7 @@ function openProviderEdit(id) {
             <label>Servicios/Productos (coma)</label>
             <textarea class="input" id="ep-servicios">${escapeHtml(p.servicios_productos || '')}</textarea>
           </div>
-          <div class="col-4">
-            <label>Calidad (1-5)</label>
-            <input class="input" type="number" min="1" max="5" step="1" id="ep-calidad" value="${escapeHtml(perf.calidad)}" />
-          </div>
-          <div class="col-4">
-            <label>Entrega (días)</label>
-            <input class="input" type="number" min="0" step="1" id="ep-entrega" value="${escapeHtml(perf.entrega_dias)}" />
-          </div>
-          <div class="col-4">
-            <label>Garantía (meses)</label>
-            <input class="input" type="number" min="0" step="1" id="ep-garantia" value="${escapeHtml(perf.garantia_meses)}" />
-          </div>
+          <!-- Removed Calidad, Entrega, Garantía from Edit Provider Modal -->
           <div class="col-12">
             <label>Observaciones</label>
             <textarea class="input" id="ep-observaciones">${escapeHtml(p.observaciones || '')}</textarea>
@@ -1865,7 +1843,7 @@ async function setupSkuPage() {
     
     if (window._sbData && window._sbData.loaded) {
       const ok = await sbUpsertOffer(skuId, provider, price);
-      return { ok };
+      return { ok: ok === true };
     }
 
     const store = loadOffersStore();
@@ -1882,8 +1860,8 @@ async function setupSkuPage() {
   async function deleteOffer(skuId, providerName) {
     const provider = String(providerName||'').trim();
     if (window._sbData && window._sbData.loaded) {
-      await sbDeleteOffer(skuId, provider);
-      return;
+      const ok = await sbDeleteOffer(skuId, provider);
+      return { ok: ok === true };
     }
     const pNorm = normalizeText(provider);
     const store = loadOffersStore();
@@ -2358,21 +2336,7 @@ function setupProviderDetailPage() {
           <span class="badge ${String(p.estado||'').toUpperCase()==='ACTIVO'?'good':'warn'}">${escapeHtml(String(p.estado||'—').toUpperCase())}</span>
         </div>
 
-        <div class="grid-3">
-          <div class="kpi">
-            <div class="kpi-label">Calidad</div>
-            <div class="kpi-value">${escapeHtml(perf.calidad)} <span class="stars">${escapeHtml(stars(perf.calidad))}</span></div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-label">Entrega (días)</div>
-            <div class="kpi-value">${escapeHtml(perf.entrega_dias)}</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-label">Garantía (meses)</div>
-            <div class="kpi-value">${escapeHtml(perf.garantia_meses)}</div>
-          </div>
-        </div>
-
+        <!-- Removed Calidad, Entrega, Garantía display blocks as requested -->
         <div class="divider" style="margin: 14px 0;"></div>
 
         <div class="grid-2">
@@ -2449,19 +2413,7 @@ function setupProviderDetailPage() {
               <input class="input" id="ie-web-${escapeHtml(p.it)}" value="${escapeHtml(p.pagina_web || '')}" />
             </div>
 
-            <div class="col-4">
-              <label>Calidad (1-5)</label>
-              <input class="input" type="number" min="1" max="5" step="1" id="ie-calidad-${escapeHtml(p.it)}" value="${escapeHtml(perf.calidad)}" />
-            </div>
-            <div class="col-4">
-              <label>Entrega (días)</label>
-              <input class="input" type="number" min="0" step="1" id="ie-entrega-${escapeHtml(p.it)}" value="${escapeHtml(perf.entrega_dias)}" />
-            </div>
-            <div class="col-4">
-              <label>Garantía (meses)</label>
-              <input class="input" type="number" min="0" step="1" id="ie-garantia-${escapeHtml(p.it)}" value="${escapeHtml(perf.garantia_meses)}" />
-            </div>
-
+            <!-- Removed Calidad, Entrega, Garantía edit inputs as requested -->
             <div class="col-12">
               <label>Servicios / Productos (coma)</label>
               <textarea class="input" id="ie-servicios-${escapeHtml(p.it)}">${escapeHtml(p.servicios_productos || '')}</textarea>
