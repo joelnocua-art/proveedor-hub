@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cotizaciones - Proveedor Hub</title>
   <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>‚ö°</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>‘‹Ì</text></svg>" />
   <style>
     .wizard-stepper{display:flex;align-items:center;gap:0;margin-bottom:20px;padding:16px 20px;background:rgba(255,255,255,0.03);border-radius:var(--r-lg);border:1px solid var(--border)}
     .wz-step{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;padding:8px 12px;border-radius:var(--r-md);transition:background .15s}
@@ -56,7 +56,7 @@
     </aside>
     <div class="content">
       <header class="topbar">
-        <div class="title"><button class="icon-btn" onclick="toggleSidebar()" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button><div><div class="page-title">Cotizaciones</div><div class="muted">Solicita, env√≠a y rastrea cotizaciones.</div></div></div>
+        <div class="title"><button class="icon-btn" onclick="toggleSidebar()" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button><div><div class="page-title">Cotizaciones</div><div class="muted">Solicita, env+°a y rastrea cotizaciones.</div></div></div>
         <div class="topbar-actions">
           <button class="btn btn-primary" onclick="wizardReset()">+ Nueva solicitud</button>
           <button class="btn btn-danger" onclick="wizardClearAll()" id="btnLimpiar">Limpiar todo</button>
@@ -65,9 +65,9 @@
       </header>
       <main class="main" id="main-content">
         <div class="wizard-stepper" id="wizStepper">
-          <div class="wz-step active" data-step="1" onclick="wizGo(1)"><div class="wz-num">1</div><div class="wz-info"><div class="wz-label">Seleccionar √≠tems</div><div class="wz-sub">SKUs del cat√°logo</div></div></div>
+          <div class="wz-step active" data-step="1" onclick="wizGo(1)"><div class="wz-num">1</div><div class="wz-info"><div class="wz-label">Seleccionar +°tems</div><div class="wz-sub">SKUs del cat+Ìlogo</div></div></div>
           <div class="wz-line" id="wzL1"></div>
-          <div class="wz-step" data-step="2" onclick="wizGo(2)"><div class="wz-num">2</div><div class="wz-info"><div class="wz-label">Proveedores</div><div class="wz-sub">A qui√©n pedir</div></div></div>
+          <div class="wz-step" data-step="2" onclick="wizGo(2)"><div class="wz-num">2</div><div class="wz-info"><div class="wz-label">Proveedores</div><div class="wz-sub">A qui+Æn pedir</div></div></div>
           <div class="wz-line" id="wzL2"></div>
           <div class="wz-step" data-step="3" onclick="wizGo(3)"><div class="wz-num">3</div><div class="wz-info"><div class="wz-label">Revisar y enviar</div><div class="wz-sub">Confirmar</div></div></div>
           <div class="wz-line" id="wzL3"></div>
@@ -76,17 +76,17 @@
 
         <!-- STEP 1 -->
         <div class="wz-panel active" id="wzP1">
-          <div class="card"><div class="card-header"><div class="card-title">¬øQu√© necesitas cotizar?</div><div class="card-subtitle">Busca en el cat√°logo y agrega √≠tems.</div></div>
+          <div class="card"><div class="card-header"><div class="card-title">-+Qu+Æ necesitas cotizar?</div><div class="card-subtitle">Busca en el cat+Ìlogo y agrega +°tems.</div></div>
             <div class="card-body">
               <div class="sku-search-box"><input type="text" id="wz-sku-search" class="input" placeholder="Buscar: TC, Medidor, Condensador, Canaleta..." autocomplete="off" style="font-size:14px;padding:12px 16px;" /><div class="sku-dd" id="wzSkuDd"></div></div>
-              <div style="margin-top:16px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span class="muted" style="font-size:13px;">√çtems seleccionados</span><span class="counter-badge" style="background:rgba(91,107,255,0.15);color:var(--primary);" id="wzSkuC">0</span></div><div id="wzSkuList"><div class="muted" style="font-size:13px;padding:20px 0;text-align:center;">Busca arriba para agregar √≠tems.</div></div></div>
+              <div style="margin-top:16px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span class="muted" style="font-size:13px;">+Ïtems seleccionados</span><span class="counter-badge" style="background:rgba(91,107,255,0.15);color:var(--primary);" id="wzSkuC">0</span></div><div id="wzSkuList"><div class="muted" style="font-size:13px;padding:20px 0;text-align:center;">Busca arriba para agregar +°tems.</div></div></div>
             </div></div>
-          <div class="wz-footer"><div></div><button class="btn btn-primary" onclick="wizNext()">Siguiente: Proveedores ‚Üí</button></div>
+          <div class="wz-footer"><div></div><button class="btn btn-primary" onclick="wizNext()">Siguiente: Proveedores ‘Â∆</button></div>
         </div>
 
         <!-- STEP 2 -->
         <div class="wz-panel" id="wzP2">
-          <div class="card"><div class="card-header"><div class="card-title">¬øA qui√©n le pides?</div><div class="card-subtitle">Se muestran primero los proveedores con precios para tus √≠tems.</div></div>
+          <div class="card"><div class="card-header"><div class="card-title">-+A qui+Æn le pides?</div><div class="card-subtitle">Se muestran primero los proveedores con precios para tus +°tems.</div></div>
             <div class="card-body">
               <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
                 <input type="text" id="wz-prov-search" class="input" placeholder="Filtrar por nombre, ciudad..." autocomplete="off" style="flex:1;min-width:180px;" />
@@ -96,20 +96,20 @@
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span class="muted" style="font-size:13px;">Proveedores</span><span class="counter-badge" style="background:rgba(0,229,200,0.15);color:var(--accent);" id="wzProvC">0</span></div>
               <div class="prov-grid" id="wzProvGrid"></div>
             </div></div>
-          <div class="wz-footer"><button class="btn" onclick="wizPrev()">‚Üê Volver</button><button class="btn btn-primary" onclick="wizNext()">Siguiente: Revisar ‚Üí</button></div>
+          <div class="wz-footer"><button class="btn" onclick="wizPrev()">‘Â… Volver</button><button class="btn btn-primary" onclick="wizNext()">Siguiente: Revisar ‘Â∆</button></div>
         </div>
 
         <!-- STEP 3 -->
         <div class="wz-panel" id="wzP3">
           <div class="card"><div class="card-header"><div class="card-title">Revisar y enviar</div><div class="card-subtitle">Nombre, detalles, y confirma.</div></div>
             <div class="card-body">
-              <div class="review-section" style="border-color:var(--accent);background:rgba(0,229,200,0.03);"><div class="review-label">Nombre de la cotizaci√≥n *</div><input type="text" id="wz-name" class="input" placeholder="Ej: Compra TCs Marzo 2026..." style="font-size:14px;padding:12px 16px;" /><div class="muted" style="font-size:11px;margin-top:4px;">Identifica esta cotizaci√≥n en el seguimiento.</div></div>
+              <div class="review-section" style="border-color:var(--accent);background:rgba(0,229,200,0.03);"><div class="review-label">Nombre de la cotizaci+¶n *</div><input type="text" id="wz-name" class="input" placeholder="Ej: Compra TCs Marzo 2026..." style="font-size:14px;padding:12px 16px;" /><div class="muted" style="font-size:11px;margin-top:4px;">Identifica esta cotizaci+¶n en el seguimiento.</div></div>
               <div class="review-section" id="wzRevSkus"></div>
               <div class="review-section" id="wzRevProvs"></div>
-              <div class="review-section"><div class="review-label">Detalles de entrega</div><div class="form-grid" style="margin:0;"><div class="col-6"><label>Ciudad de entrega</label><input type="text" id="wz-city" class="input" placeholder="Bogot√°, Medell√≠n..." /></div><div class="col-6"><label>Fecha de solicitud</label><input type="date" id="wz-date" class="input" /></div><div class="col-12"><label>Notas (opcional)</label><textarea id="wz-notes" class="input" rows="2" placeholder="Condiciones especiales..."></textarea></div></div></div>
-              <div style="background:rgba(0,229,200,0.06);border:1px solid rgba(0,229,200,0.2);border-radius:var(--r-md);padding:14px 16px;"><div style="font-size:13px;color:var(--accent);font-weight:600;" id="wzSum">Se crear√°n 0 solicitudes</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">Se abre Gmail por cada proveedor con un formulario de respuesta incluido.</div></div>
+              <div class="review-section"><div class="review-label">Detalles de entrega</div><div class="form-grid" style="margin:0;"><div class="col-6"><label>Ciudad de entrega</label><input type="text" id="wz-city" class="input" placeholder="Bogot+Ì, Medell+°n..." /></div><div class="col-6"><label>Fecha de solicitud</label><input type="date" id="wz-date" class="input" /></div><div class="col-12"><label>Notas (opcional)</label><textarea id="wz-notes" class="input" rows="2" placeholder="Condiciones especiales..."></textarea></div></div></div>
+              <div style="background:rgba(0,229,200,0.06);border:1px solid rgba(0,229,200,0.2);border-radius:var(--r-md);padding:14px 16px;"><div style="font-size:13px;color:var(--accent);font-weight:600;" id="wzSum">Se crear+Ìn 0 solicitudes</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">Se abre Gmail por cada proveedor con un formulario de respuesta incluido.</div></div>
             </div></div>
-          <div class="wz-footer"><button class="btn" onclick="wizPrev()">‚Üê Volver</button><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary" onclick="wizSave(false)">Solo guardar</button><button class="btn" onclick="wizSave(true)" style="background:linear-gradient(135deg,#1a6fdb,#0f4fa3);color:#fff;border:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;margin-right:5px;vertical-align:-2px;"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 7L2 7"/></svg>Guardar y abrir Gmail</button></div></div>
+          <div class="wz-footer"><button class="btn" onclick="wizPrev()">‘Â… Volver</button><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary" onclick="wizSave(false)">Solo guardar</button><button class="btn" onclick="wizSave(true)" style="background:linear-gradient(135deg,#1a6fdb,#0f4fa3);color:#fff;border:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;margin-right:5px;vertical-align:-2px;"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 7L2 7"/></svg>Guardar y abrir Gmail</button></div></div>
         </div>
 
         <!-- STEP 4 -->
@@ -123,25 +123,14 @@
       <div id="importModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;align-items:center;justify-content:center;padding:20px;">
         <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;max-width:500px;width:100%;">
           <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Importar respuesta de proveedor</div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Pega el c√≥digo que el proveedor gener√≥ en el formulario de respuesta.</div>
-          <textarea id="importCode" class="input" rows="5" placeholder="Pegar c√≥digo aqu√≠..." style="font-family:monospace;font-size:12px;"></textarea>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Pega el c+¶digo que el proveedor gener+¶ en el formulario de respuesta.</div>
+          <textarea id="importCode" class="input" rows="5" placeholder="Pegar c+¶digo aqu+°..." style="font-family:monospace;font-size:12px;"></textarea>
           <div style="display:flex;gap:8px;margin-top:12px;">
             <button class="btn btn-primary" onclick="importResponse()" style="flex:1;">Importar</button>
             <button class="btn" onclick="document.getElementById('importModal').style.display='none'" style="flex:1;">Cancelar</button>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- EMAIL MODAL -->
-  <div id="emailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center;padding:20px;">
-    <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--r-lg);padding:30px;max-width:450px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.5);">
-      <div style="width:64px;height:64px;border-radius:50%;background:rgba(0,229,200,0.15);color:#00e5c8;font-size:32px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px;">‚úâÔ∏è</div>
-      <h2 style="color:#e2e4ed;font-family:'Syne', sans-serif;margin-bottom:12px;font-size:22px;">Correos listos para enviar</h2>
-      <p style="color:var(--muted);font-size:13px;margin-bottom:24px;line-height:1.5;">Haz clic en cada bot√≥n para abrir el borrador de Gmail. Al abrirse el borrador, el bot√≥n cambiar√° de color para que lleves el control.</p>
-      <div id="emailLinksContainer" style="display:flex;flex-direction:column;gap:12px;"></div>
-      <button class="btn btn-secondary" onclick="document.getElementById('emailModal').style.display='none';wizGo(4);" style="margin-top:24px;width:100%;border-radius:10px;font-weight:600;padding:12px;">Ya los envi√© / Cerrar</button>
     </div>
   </div>
 
@@ -152,7 +141,7 @@
   <script src="providerProducts.js"></script>
   <script src="sku_catalog.js"></script>
   <script src="sku_offers.js"></script>
-  <script src="script.js?v=12"></script>
+  <script src="script.js"></script>
   <script src="components.js"></script>
   <script>
   (function(){
@@ -177,7 +166,7 @@
       window.scrollTo({top:0,behavior:'smooth'});
     };
     window.wizNext=function(){
-      if(step===1&&!skus.length){toast('Agrega al menos un √≠tem.','error');return}
+      if(step===1&&!skus.length){toast('Agrega al menos un +°tem.','error');return}
       if(step===2&&!provSet.size){toast('Selecciona al menos un proveedor.','error');return}
       wizGo(step+1);
     };
@@ -186,7 +175,7 @@
     window.wizardClearAll=function(){
       skus=[];provSet=new Set();renderSkuList();
       ['wz-name','wz-city','wz-date','wz-notes'].forEach(function(id){var e=document.getElementById(id);if(e)e.value=''});
-      toast('Cotizaci√≥n limpiada.','success');wizGo(1);
+      toast('Cotizaci+¶n limpiada.','success');wizGo(1);
     };
 
     // === STEP 1: SKUs ===
@@ -210,7 +199,7 @@
     function renderSkuList(){
       var el=document.getElementById('wzSkuList'),c=document.getElementById('wzSkuC');
       if(c)c.textContent=skus.length;if(!el)return;
-      if(!skus.length){el.innerHTML='<div class="muted" style="font-size:13px;padding:20px 0;text-align:center;">Busca arriba para agregar √≠tems.</div>';return}
+      if(!skus.length){el.innerHTML='<div class="muted" style="font-size:13px;padding:20px 0;text-align:center;">Busca arriba para agregar +°tems.</div>';return}
       el.innerHTML=skus.map(function(s,i){return '<div class="sku-selected"><div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:13px;">'+esc(s.sku)+'</div><div style="font-size:11px;color:var(--muted);">'+esc(s.cat||'')+'</div></div><div style="display:flex;align-items:center;gap:6px;"><span style="font-size:11px;color:var(--muted);">Cant:</span><input type="number" min="1" value="'+s.qty+'" class="input" style="width:64px;text-align:center;padding:6px;" onchange="window._sq('+i+',this.value)" /></div><button onclick="window._sr('+i+')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;padding:4px 8px;">&times;</button></div>'}).join('');
     }
     window._sq=function(i,v){if(skus[i])skus[i].qty=parseInt(v)||1};
@@ -243,14 +232,14 @@
         if(matched.has(p.empresa))yes.push(p);else no.push(p);
       });
       if(inf){
-        if(yes.length){inf.style.display='block';inf.style.background='rgba(0,229,200,0.06)';inf.style.color='var(--accent)';inf.innerHTML='<strong>'+yes.length+'</strong> proveedor(es) tienen precios para tus √≠tems.'+(filt&&no.length?' Desmarca "Solo con precios" para ver '+no.length+' m√°s.':'')}
-        else if(skus.length){inf.style.display='block';inf.style.background='rgba(255,180,0,0.08)';inf.style.color='#f5a623';inf.innerHTML='Ning√∫n proveedor tiene precios registrados. Mostrando todos.';filt=false}
+        if(yes.length){inf.style.display='block';inf.style.background='rgba(0,229,200,0.06)';inf.style.color='var(--accent)';inf.innerHTML='<strong>'+yes.length+'</strong> proveedor(es) tienen precios para tus +°tems.'+(filt&&no.length?' Desmarca "Solo con precios" para ver '+no.length+' m+Ìs.':'')}
+        else if(skus.length){inf.style.display='block';inf.style.background='rgba(255,180,0,0.08)';inf.style.color='#f5a623';inf.innerHTML='Ning+¶n proveedor tiene precios registrados. Mostrando todos.';filt=false}
         else inf.style.display='none';
       }
       var show=filt&&yes.length?yes:yes.concat(no);
       g.innerHTML=show.map(function(p){
         var sel=provSet.has(p.empresa),m=matched.has(p.empresa);
-        return '<div class="prov-card '+(sel?'selected':'')+'" onclick="window._tp(this,\''+esc(p.empresa).replace(/'/g,"\\'")+'\')"><input type="checkbox" '+(sel?'checked':'')+' /><div><div style="font-size:13px;font-weight:600;">'+esc(p.empresa)+(m?' <span style="font-size:10px;color:var(--accent);">‚úì tiene precios</span>':'')+'</div><div style="font-size:11px;color:var(--muted);">'+esc(p.ciudad||'Sin ciudad')+(p.correo_electronico?' ¬∑ '+esc(p.correo_electronico):'')+'</div></div></div>'}).join('');
+        return '<div class="prov-card '+(sel?'selected':'')+'" onclick="window._tp(this,\''+esc(p.empresa).replace(/'/g,"\\'")+'\')"><input type="checkbox" '+(sel?'checked':'')+' /><div><div style="font-size:13px;font-weight:600;">'+esc(p.empresa)+(m?' <span style="font-size:10px;color:var(--accent);">‘£Ù tiene precios</span>':'')+'</div><div style="font-size:11px;color:var(--muted);">'+esc(p.ciudad||'Sin ciudad')+(p.correo_electronico?' -¿ '+esc(p.correo_electronico):'')+'</div></div></div>'}).join('');
       if(!show.length)g.innerHTML='<div class="muted" style="padding:20px;text-align:center;">Sin proveedores.</div>';
       document.getElementById('wzProvC').textContent=provSet.size;
     };
@@ -260,82 +249,44 @@
     // === STEP 3: Review ===
     function renderReview(){
       var se=document.getElementById('wzRevSkus'),pe=document.getElementById('wzRevProvs'),su=document.getElementById('wzSum');
-      if(se)se.innerHTML='<div class="review-label">√çtems ('+skus.length+')</div>'+skus.map(function(s){return '<span class="review-chip sku">'+esc(s.sku)+' x'+s.qty+'</span>'}).join('');
+      if(se)se.innerHTML='<div class="review-label">+Ïtems ('+skus.length+')</div>'+skus.map(function(s){return '<span class="review-chip sku">'+esc(s.sku)+' x'+s.qty+'</span>'}).join('');
       var pa=Array.from(provSet);
       if(pe)pe.innerHTML='<div class="review-label">Proveedores ('+pa.length+')</div>'+pa.map(function(n){return '<span class="review-chip prov">'+esc(n)+'</span>'}).join('');
-      if(su)su.textContent='Se crear√°n '+(skus.length*pa.length)+' solicitudes ('+skus.length+' √≠tems √ó '+pa.length+' proveedores)';
+      if(su)su.textContent='Se crear+Ìn '+(skus.length*pa.length)+' solicitudes ('+skus.length+' +°tems +˘ '+pa.length+' proveedores)';
     }
 
     // === SAVE & EMAIL ===
     window.wizSave=function(sendEmail){
       var name=(document.getElementById('wz-name')||{}).value||'';
-      if(!name.trim()){toast('Dale un nombre a la cotizaci√≥n.','error');document.getElementById('wz-name').focus();return}
-      if(!skus.length||!provSet.size){toast('Faltan √≠tems o proveedores.','error');return}
+      if(!name.trim()){toast('Dale un nombre a la cotizaci+¶n.','error');document.getElementById('wz-name').focus();return}
+      if(!skus.length||!provSet.size){toast('Faltan +°tems o proveedores.','error');return}
       var fecha=new Date().toISOString().slice(0,10),city=(document.getElementById('wz-city')||{}).value||'',dt=(document.getElementById('wz-date')||{}).value||'',notes=(document.getElementById('wz-notes')||{}).value||'';
+      var extra;try{extra=JSON.parse(localStorage.getItem('extraQuotes')||'[]')}catch(e){extra=[]}
+      if(!Array.isArray(extra))extra=[];
       var pa=Array.from(provSet),ct=0,batch='COT-'+Date.now().toString(36).toUpperCase();
-      var sbList = [];
-      pa.forEach(function(emp){skus.forEach(function(s){
-        sbList.push({
-          empresa:emp,fecha:fecha,descripcion:s.sku,und:s.qty||1,
-          pu_sin_iva:0,pu_con_iva:0,ciudad_entrega:city,fecha_entrega:dt,
-          observaciones:notes,cotizacion_nombre:name.trim(),cotizacion_batch:batch
-        });
-        ct++;
-      })});
-      
-      if(sendEmail){
-        var skuTable=skus.map(function(s,i){return (i+1)+'. '+s.sku+' ‚Äî Cant: '+s.qty}).join('\n');
-        var emailContainer = document.getElementById('emailLinksContainer');
-        if(emailContainer) emailContainer.innerHTML = '';
-        var validEmails = 0;
+      pa.forEach(function(emp){skus.forEach(function(s){extra.push({it:Date.now().toString()+Math.random().toString(36).slice(2,8),empresa:emp,fecha:fecha,descripcion:s.sku,und:s.qty||1,pu_sin_iva:0,pu_con_iva:0,ciudad_entrega:city,fecha_entrega:dt,observaciones:notes,cotizacion_nombre:name.trim(),cotizacion_batch:batch});ct++})});
+      if(typeof setExtraQuotes==='function')setExtraQuotes(extra);else localStorage.setItem('extraQuotes',JSON.stringify(extra));
 
+      if(sendEmail){
+        var skuTable=skus.map(function(s,i){return (i+1)+'. '+s.sku+' ‘«ˆ Cant: '+s.qty}).join('\n');
+        var delay=0;
         pa.forEach(function(emp){
           var prov=allProvs.find(function(p){return p.empresa===emp});
           var email=prov?(prov.correo||prov.correo_electronico||''):'';
           if(!email){toast(emp+' no tiene correo.','error');return}
-          
           var skuIds=skus.map(function(s){return s.id+':'+s.qty}).join(',');
-          var formLink=baseUrl+'respuesta.html#p='+encodeURIComponent(emp)+'&n='+encodeURIComponent(name.trim())+'&b='+encodeURIComponent(batch)+'&s='+encodeURIComponent(skuIds)+'&c='+encodeURIComponent(city)+'&d='+encodeURIComponent(dt);
-          var sub=encodeURIComponent('Solicitud de cotizaci√≥n: '+name.trim()+' ‚Äî BIA Energy');
-          var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nReciban un cordial saludo de BIA Energy.\n\nSolicitamos cotizaci√≥n formal:\n\n'+skuTable+'\n\nCiudad: '+(city||'Por confirmar')+'\nFecha: '+(dt||'Por confirmar')+(notes?'\nNotas: '+notes:'')+'\n\n‚îÅ‚îÅ RESPONDER ‚îÅ‚îÅ\nIngrese precios aqu√≠:\n'+formLink+'\n\nO responda este correo con precios unitarios sin IVA, tiempo de entrega, garant√≠a y condiciones de pago.\n\nCordialmente,\nOperaciones ‚Äî BIA Energy');
-          
-          var gmailUrl = 'https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body;
-          
-          var a = document.createElement('a');
-          a.href = gmailUrl;
-          a.target = '_blank';
-          a.style.cssText = 'display:flex; align-items:center; justify-content:center; padding:12px; background:#00e5c8; color:#0a0d1a; border-radius:10px; font-weight:700; text-decoration:none; font-size:14px; transition:opacity 0.2s;';
-          a.innerHTML = 'üì© Enviar a <span style="margin-left:4px;font-weight:800;">' + esc(emp) + '</span>';
-          a.onclick = function() { this.style.opacity = '0.5'; this.innerHTML = '‚úì Enviado a <span style="margin-left:4px;font-weight:800;">' + esc(emp) + '</span>'; };
-          if(emailContainer) emailContainer.appendChild(a);
-          validEmails++;
+          var formLink=baseUrl+'respuesta.html#p='+encodeURIComponent(emp)+'&n='+encodeURIComponent(name.trim())+'&b='+encodeURIComponent(batch)+'&s='+skuIds+'&c='+encodeURIComponent(city)+'&d='+encodeURIComponent(dt);
+          setTimeout(function(){
+            var sub=encodeURIComponent('Solicitud de cotizaci+¶n: '+name.trim()+' ‘«ˆ BIA Energy');
+            var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nReciban un cordial saludo de BIA Energy.\n\nSolicitamos cotizaci+¶n formal:\n\n'+skuTable+'\n\nCiudad: '+(city||'Por confirmar')+'\nFecha: '+(dt||'Por confirmar')+(notes?'\nNotas: '+notes:'')+'\n\n‘ˆ¸‘ˆ¸ RESPONDER ‘ˆ¸‘ˆ¸\nIngrese precios aqu+°:\n'+formLink+'\n\nO responda este correo con precios unitarios sin IVA, tiempo de entrega, garant+°a y condiciones de pago.\n\nCordialmente,\nOperaciones ‘«ˆ BIA Energy');
+            window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body,'_blank');
+          },delay);delay+=1000;
         });
-
-        if(validEmails > 0) {
-          document.getElementById('emailModal').style.display = 'flex';
-          toast(ct+' solicitudes preparadas. Revisa la ventana emergente.','success');
-        } else {
-          toast('No hay correos v√°lidos para los proveedores seleccionados.','error');
-        }
-      }else{toast(ct+' solicitudes preparadas como "'+name.trim()+'". Guardando...','success')}
-      
-      var btnSave1 = document.getElementById('wzBtnSave1'), btnSave2 = document.getElementById('wzBtnSave2');
-      if (btnSave1) { btnSave1.disabled = true; btnSave1.textContent = "Guardando..."; }
-      if (btnSave2) { btnSave2.disabled = true; btnSave2.textContent = "Guardando..."; }
-
-      // Now save to Supabase and render steps AFTER successful save
-      sbInsertQuotes(sbList).then(function(ok) {
-        if (btnSave1) { btnSave1.disabled = false; btnSave1.innerHTML = 'Crear cotizaciones'; }
-        if (btnSave2) { btnSave2.disabled = false; btnSave2.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Crear y enviar correos'; }
-
-        if (!ok) {
-          toast('Error guardando cotizaciones en Supabase. Verifica la consola.', 'error');
-        } else {
-          skus=[];provSet=new Set();renderSkuList();
-          ['wz-name','wz-city','wz-date','wz-notes'].forEach(function(id){var e=document.getElementById(id);if(e)e.value=''});
-          if(!sendEmail) wizGo(4); // Only go to Step 4 if not showing modal
-        }
-      });
+        toast(ct+' solicitudes guardadas. Abriendo Gmail...','success');
+      }else{toast(ct+' solicitudes guardadas como "'+name.trim()+'".','success')}
+      skus=[];provSet=new Set();renderSkuList();
+      ['wz-name','wz-city','wz-date','wz-notes'].forEach(function(id){var e=document.getElementById(id);if(e)e.value=''});
+      wizGo(4);
     };
 
     // === STEP 4: Tracking ===
@@ -352,30 +303,30 @@
         var g=groups[name],ps={},ss={};
         g.items.forEach(function(q){ps[q.empresa||'?']=1;ss[q.descripcion||'?']=1});
         var resp=g.items.filter(function(q){return Number(q.pu_sin_iva)>0}).length;
-        return '<div class="track-group"><div class="track-head" onclick="var d=this.nextElementSibling;d.style.display=d.style.display===\'none\'?\'block\':\'none\'"><div style="flex:1;"><div style="font-weight:600;font-size:14px;">'+esc(name)+'</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">'+esc(g.fecha)+' ‚Äî '+Object.keys(ps).length+' prov. ‚Äî '+Object.keys(ss).length+' √≠tem(s)</div></div><div style="display:flex;gap:8px;align-items:center;">'+(resp?'<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:700;background:rgba(40,200,100,.15);color:#28c864;">'+resp+'/'+g.items.length+' resp.</span>':'<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:700;background:rgba(255,180,0,.18);color:#f5a623;">Pendiente</span>')+'<button class="btn btn-danger" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();window._delGroup(\''+esc(name).replace(/'/g,"\\'")+'\')">Eliminar</button></div></div>'+
+        return '<div class="track-group"><div class="track-head" onclick="var d=this.nextElementSibling;d.style.display=d.style.display===\'none\'?\'block\':\'none\'"><div style="flex:1;"><div style="font-weight:600;font-size:14px;">'+esc(name)+'</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">'+esc(g.fecha)+' ‘«ˆ '+Object.keys(ps).length+' prov. ‘«ˆ '+Object.keys(ss).length+' +°tem(s)</div></div><div style="display:flex;gap:8px;align-items:center;">'+(resp?'<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:700;background:rgba(40,200,100,.15);color:#28c864;">'+resp+'/'+g.items.length+' resp.</span>':'<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:700;background:rgba(255,180,0,.18);color:#f5a623;">Pendiente</span>')+'<button class="btn btn-danger" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();window._delGroup(\''+esc(name).replace(/'/g,"\\'")+'\')">Eliminar</button></div></div>'+
           '<div style="display:none;padding:12px 18px;">'+
             '<div style="overflow-x:auto;"><table style="width:100%;font-size:13px;"><thead><tr><th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:11px;">Proveedor</th><th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:11px;">SKU</th><th style="text-align:center;padding:6px 8px;color:var(--muted);font-size:11px;">Cant.</th><th style="text-align:right;padding:6px 8px;color:var(--muted);font-size:11px;">Precio</th><th style="text-align:center;padding:6px 8px;color:var(--muted);font-size:11px;">Estado</th></tr></thead><tbody>'+
             g.items.map(function(q){var hp=Number(q.pu_sin_iva)>0;return '<tr style="border-top:1px solid rgba(255,255,255,0.04);"><td style="padding:8px;">'+esc(q.empresa)+'</td><td style="padding:8px;font-size:12px;">'+esc(q.descripcion)+'</td><td style="padding:8px;text-align:center;">'+esc(q.und||1)+'</td><td style="padding:8px;text-align:right;'+(hp?'color:var(--accent);font-weight:600;':'color:var(--muted);')+'">'+(hp?(typeof formatCOP==='function'?formatCOP(q.pu_sin_iva):'$'+Number(q.pu_sin_iva).toLocaleString()):'Pendiente')+'</td><td style="padding:8px;text-align:center;">'+(hp?'<span style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700;background:rgba(40,200,100,.15);color:#28c864;">Respondida</span>':'<span style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700;background:rgba(255,180,0,.18);color:#f5a623;">Enviada</span>')+'</td></tr>'}).join('')+
             '</tbody></table></div></div></div>';
       }).join('');
     }
-    window._delGroup=async function(name){
-      if(!confirm('¬øEliminar todas las solicitudes de "'+name+'"?'))return;
-      var ok = await sbDeleteQuotesByName(name);
-      if (!ok) { toast('Error eliminando en Supabase','error'); return; }
-      toast('Cotizaci√≥n "'+name+'" eliminada.','success');
-      renderTrack();
+    window._delGroup=function(name){
+      if(!confirm('-+Eliminar todas las solicitudes de "'+name+'"?'))return;
+      var extra;try{extra=JSON.parse(localStorage.getItem('extraQuotes')||'[]')}catch(e){extra=[]}
+      extra=extra.filter(function(q){return(q.cotizacion_nombre||'Sin nombre')!==name});
+      if(typeof setExtraQuotes==='function')setExtraQuotes(extra);else localStorage.setItem('extraQuotes',JSON.stringify(extra));
+      toast('Cotizaci+¶n "'+name+'" eliminada.','success');renderTrack();
     };
     var ts=document.getElementById('trackSearch');if(ts)ts.addEventListener('input',renderTrack);
 
     // === IMPORT RESPONSE ===
     window.importResponse=function(){
       var code=(document.getElementById('importCode')||{}).value||'';
-      if(!code.trim()){toast('Pega el c√≥digo del proveedor.','error');return}
+      if(!code.trim()){toast('Pega el c+¶digo del proveedor.','error');return}
       try{
         var json=decodeURIComponent(escape(atob(code.trim())));
         var resp=JSON.parse(json);
-        if(!resp.items||!resp.provider){toast('C√≥digo inv√°lido.','error');return}
+        if(!resp.items||!resp.provider){toast('C+¶digo inv+Ìlido.','error');return}
         var extra;try{extra=JSON.parse(localStorage.getItem('extraQuotes')||'[]')}catch(e){extra=[]}
         if(!Array.isArray(extra))extra=[];
         var updated=0;
@@ -400,20 +351,7 @@
     };
 
     // === INIT ===
-    wizGo(1);renderSkuList();
-    
-    // Wait for Supabase to finish loading asynchronously, then repaint only if user is on Step 4
-    var sbCheckInterval = setInterval(function() {
-      if (window._sbData && window._sbData.loaded) {
-        clearInterval(sbCheckInterval);
-        if (step === 4) {
-          wizGo(4); // User is already on tracking, refresh it
-        } else {
-          renderTrack(); // Just silently refresh tracking data in background
-        }
-      }
-    }, 100);
-
+    wizGo(4);renderSkuList();
     // Auto-fill today's date
     var dateEl=document.getElementById('wz-date');
     if(dateEl)dateEl.value=new Date().toISOString().slice(0,10);
@@ -458,7 +396,7 @@
           if(typeof setExtraQuotes==='function')setExtraQuotes(extra);
           else localStorage.setItem('extraQuotes',JSON.stringify(extra));
           localStorage.removeItem('pendingProviderResponses');
-          toast(totalUpdated+' respuesta(s) de proveedor importada(s) autom√°ticamente.','success');
+          toast(totalUpdated+' respuesta(s) de proveedor importada(s) autom+Ìticamente.','success');
           renderTrack();
         }
       }catch(e){console.error('Auto-import error:',e)}
