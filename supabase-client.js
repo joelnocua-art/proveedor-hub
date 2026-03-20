@@ -267,9 +267,12 @@ async function sbGetAdjudications() {
 
 async function sbUpsertOffer(skuId, provider, price_sin_iva) {
   const sb = getSupabase();
-  if (!sb) return false;
+  if (!sb) return { success: false, errorMsg: 'Supabase no inicializado' };
   const { error } = await sb.from('sku_offers').upsert({ sku_id: skuId, provider, price_sin_iva }, { onConflict: 'sku_id,provider' });
-  if (error) { console.error('[Supabase] Offer upsert error:', error); return false; }
+  if (error) {
+    console.error('[Supabase] Offer upsert error:', error);
+    return { success: false, errorMsg: error.message || JSON.stringify(error) };
+  }
   // Update cache
   if (!window._sbData.skuOffers) window._sbData.skuOffers = {};
   if (!window._sbData.skuOffers[skuId]) window._sbData.skuOffers[skuId] = [];
@@ -277,19 +280,19 @@ async function sbUpsertOffer(skuId, provider, price_sin_iva) {
   const idx = list.findIndex(o => o.provider === provider);
   if (idx >= 0) list[idx].price_sin_iva = price_sin_iva;
   else list.push({ provider, price_sin_iva });
-  return true;
+  return { success: true };
 }
 
 async function sbDeleteOffer(skuId, provider) {
   const sb = getSupabase();
-  if (!sb) return false;
+  if (!sb) return { success: false };
   const { error } = await sb.from('sku_offers').delete().eq('sku_id', skuId).eq('provider', provider);
-  if (error) { console.error('[Supabase] Offer delete error:', error); return false; }
+  if (error) { console.error('[Supabase] Offer delete error:', error); return { success: false }; }
   // Update cache
   if (window._sbData.skuOffers && window._sbData.skuOffers[skuId]) {
     window._sbData.skuOffers[skuId] = window._sbData.skuOffers[skuId].filter(o => o.provider !== provider);
   }
-  return true;
+  return { success: true };
 }
 
 // ═══ AUTH ═══

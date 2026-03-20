@@ -1842,8 +1842,9 @@ async function setupSkuPage() {
     if (!provider || !(price > 0)) return { ok: false };
     
     if (window._sbData && window._sbData.loaded) {
-      const ok = await sbUpsertOffer(skuId, provider, price);
-      return { ok: ok === true };
+      const resp = await sbUpsertOffer(skuId, provider, price);
+      if (!resp.success) return { ok: false, errorMsg: resp.errorMsg };
+      return { ok: true };
     }
 
     const store = loadOffersStore();
@@ -1860,8 +1861,8 @@ async function setupSkuPage() {
   async function deleteOffer(skuId, providerName) {
     const provider = String(providerName||'').trim();
     if (window._sbData && window._sbData.loaded) {
-      const ok = await sbDeleteOffer(skuId, provider);
-      return { ok: ok === true };
+      const resp = await sbDeleteOffer(skuId, provider);
+      return { ok: resp.success };
     }
     const pNorm = normalizeText(provider);
     const store = loadOffersStore();
@@ -2090,8 +2091,14 @@ async function setupSkuPage() {
       e.preventDefault();
       const prov  = document.getElementById('skuOfferProvider')?.value||'';
       const price = document.getElementById('skuOfferPrice')?.value||'';
+      if (!prov.trim() || !(Number(price) > 0)) { showToast('Ingresa proveedor y un precio mayor a 0', 'error'); return; }
       const res = await upsertOffer(match.id, prov, price);
-      if (!res.ok) { alert('Completa proveedor y precio (> 0).'); return; }
+      if (!res.ok) {
+        const msg = res.errorMsg || 'Error al guardar en base de datos';
+        showToast('Error al guardar precio: ' + msg, 'error');
+        return;
+      }
+      showToast('Precio guardado correctamente', 'success');
       renderSelectedSku(match.id);
     });
   }
