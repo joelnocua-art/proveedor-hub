@@ -62,11 +62,12 @@ async function sbLoadAll() {
     // Load offers
     const { data: offers, error: e3 } = await sb.from('sku_offers').select('*');
     if (e3) throw e3;
-    // Group by sku_id
+    // Group by sku_id (always use String keys to match catalog IDs)
     const offerMap = {};
     (offers || []).forEach(o => {
-      if (!offerMap[o.sku_id]) offerMap[o.sku_id] = [];
-      offerMap[o.sku_id].push({ provider: o.provider, price_sin_iva: Number(o.price_sin_iva) || 0 });
+      const key = String(o.sku_id);
+      if (!offerMap[key]) offerMap[key] = [];
+      offerMap[key].push({ provider: o.provider, price_sin_iva: Number(o.price_sin_iva) || 0 });
     });
     window._sbData.skuOffers = offerMap;
 
@@ -279,10 +280,11 @@ async function sbUpsertOffer(skuId, provider, price_sin_iva) {
     console.error('[Supabase] Offer NOT found after upsert — likely RLS blocking write. skuId:', skuId, 'provider:', provider);
     return { success: false, errorMsg: 'El precio no se guardó (permisos de base de datos bloqueando escritura). Ejecuta el SQL de permisos.' };
   }
-  // Update cache
+  // Update cache (use String keys to match catalog IDs)
+  const cacheKey = String(skuId);
   if (!window._sbData.skuOffers) window._sbData.skuOffers = {};
-  if (!window._sbData.skuOffers[skuId]) window._sbData.skuOffers[skuId] = [];
-  const list = window._sbData.skuOffers[skuId];
+  if (!window._sbData.skuOffers[cacheKey]) window._sbData.skuOffers[cacheKey] = [];
+  const list = window._sbData.skuOffers[cacheKey];
   const idx = list.findIndex(o => o.provider === provider);
   if (idx >= 0) list[idx].price_sin_iva = price_sin_iva;
   else list.push({ provider, price_sin_iva });
@@ -294,9 +296,10 @@ async function sbDeleteOffer(skuId, provider) {
   if (!sb) return { success: false };
   const { error } = await sb.from('sku_offers').delete().eq('sku_id', skuId).eq('provider', provider);
   if (error) { console.error('[Supabase] Offer delete error:', error); return { success: false }; }
-  // Update cache
-  if (window._sbData.skuOffers && window._sbData.skuOffers[skuId]) {
-    window._sbData.skuOffers[skuId] = window._sbData.skuOffers[skuId].filter(o => o.provider !== provider);
+  // Update cache (use String keys)
+  const cacheKey = String(skuId);
+  if (window._sbData.skuOffers && window._sbData.skuOffers[cacheKey]) {
+    window._sbData.skuOffers[cacheKey] = window._sbData.skuOffers[cacheKey].filter(o => o.provider !== provider);
   }
   return { success: true };
 }
