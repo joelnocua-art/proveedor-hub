@@ -371,12 +371,15 @@ function getAllQuotes() {
     
     // Merge responses into the quote objects
     return quotes.map(q => {
+      const cleanStr = str => String(str||'').trim().toLowerCase();
       // Find a matching response for this specific request
-      const match = resps.find(r => 
-        r.batch === q.cotizacion_batch && 
-        r.provider === q.empresa && 
-        r.sku === q.descripcion
-      );
+      const match = resps.find(r => {
+        const bMatch = r.batch === q.cotizacion_batch;
+        const pMatch = cleanStr(r.provider) === cleanStr(q.empresa);
+        const sMatch = cleanStr(r.sku) === cleanStr(q.descripcion);
+        // Match strictly by batch+provider+skus OR loosely by provider+sku if batch fails
+        return (bMatch && pMatch && sMatch) || (pMatch && sMatch && r.price_sin_iva > 0);
+      });
       
       if (match) {
         return {
