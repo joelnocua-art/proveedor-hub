@@ -273,6 +273,12 @@ async function sbUpsertOffer(skuId, provider, price_sin_iva) {
     console.error('[Supabase] Offer upsert error:', error);
     return { success: false, errorMsg: error.message || JSON.stringify(error) };
   }
+  // Verify the row actually persisted (RLS can silently block writes with no error)
+  const { data: check } = await sb.from('sku_offers').select('sku_id').eq('sku_id', skuId).eq('provider', provider).limit(1);
+  if (!check || check.length === 0) {
+    console.error('[Supabase] Offer NOT found after upsert — likely RLS blocking write. skuId:', skuId, 'provider:', provider);
+    return { success: false, errorMsg: 'El precio no se guardó (permisos de base de datos bloqueando escritura). Ejecuta el SQL de permisos.' };
+  }
   // Update cache
   if (!window._sbData.skuOffers) window._sbData.skuOffers = {};
   if (!window._sbData.skuOffers[skuId]) window._sbData.skuOffers[skuId] = [];
