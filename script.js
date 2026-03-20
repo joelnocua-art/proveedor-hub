@@ -373,7 +373,7 @@ function getAllQuotes() {
     return quotes.map(q => {
       // Find a matching response for this specific request
       const match = resps.find(r => 
-        r.cotizacion_batch === q.cotizacion_batch && 
+        r.batch === q.cotizacion_batch && 
         r.provider === q.empresa && 
         r.sku === q.descripcion
       );
