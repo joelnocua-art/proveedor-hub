@@ -2652,10 +2652,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.skuCatalogData = window._sbData.skuCatalog;
   }
 
-  // Re-render Quotes step 4 if data changed asynchronously
-  if (page === 'quotes' && typeof window.wizGo === 'function') {
-    window.wizGo(4);
-  }
+  // Quotes page always starts at Step 1
+  // (The user can navigate to Step 4 manually via the "Seguimiento" tab)
 
   // Providers page
   if (page === 'providers') {
