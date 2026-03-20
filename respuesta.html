@@ -182,14 +182,16 @@
       responded_at:new Date().toISOString()
     };
 
-    var success = false;
+    var result = { ok: false, lastError: 'Función no disponible' };
     if (typeof sbSubmitProviderResponse === 'function') {
-      success = await sbSubmitProviderResponse(D.batch, D.prov, items, conds);
+      result = await sbSubmitProviderResponse(D.batch, D.prov, items, conds);
+      if (result === true) result = { ok: true, lastError: null };
+      if (result === false) result = { ok: false, lastError: 'Error desconocido' };
     }
 
     document.getElementById('vForm').style.display='none';
 
-    if (success) {
+    if (result.ok) {
       document.getElementById('vOk').style.display='';
       var count=4;var cdEl=document.getElementById('cdNum');
       var timer=setInterval(function(){
@@ -201,10 +203,11 @@
       },1000);
     } else {
       var vErr = document.getElementById('vErr');
+      var errMsg = result.lastError ? ('<br><small style="font-size:11px;font-family:monospace;word-break:break-all;">⚠ ' + result.lastError + '</small>') : '';
       vErr.innerHTML = '<div style="text-align:center;padding:40px 20px;">' +
         '<div style="font-size:50px;margin-bottom:16px;">⚠️</div>' +
         '<h2 style="color:#f5a623;font-size:20px;">No se pudo guardar la respuesta</h2>' +
-        '<p style="color:#8088b0;margin-top:10px;margin-bottom:24px;font-size:14px;line-height:1.6;">Ha ocurrido un error al conectar con el servidor. Por favor verifica tu conexión a internet e inténtalo de nuevo.</p>' +
+        '<p style="color:#8088b0;margin-top:10px;margin-bottom:24px;font-size:14px;line-height:1.6;">Ha ocurrido un error al guardar en el servidor. Por favor inténtalo de nuevo o contacta a BIA Energy.' + errMsg + '</p>' +
         '<button onclick="window.location.reload()" style="background:#00e5c8;color:#0a0d1a;border:none;padding:13px 30px;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;">Volver a intentar</button>' +
       '</div>';
       vErr.style.display = '';

@@ -288,8 +288,9 @@ async function sbDeleteOffer(skuId, provider) {
 // ═══ AUTH ═══
 async function sbSubmitProviderResponse(batch, providerName, itemsData, conds) {
   const sb = getSupabase();
-  if (!sb) return false;
+  if (!sb) return { ok: false, lastError: 'Supabase client no inicializado. La librería de base de datos no cargó.' };
   let ok = true;
+  let lastError = null;
   for (let i = 0; i < itemsData.length; i++) {
     const it = itemsData[i];
     const { error } = await sb.from('quotes')
@@ -308,10 +309,11 @@ async function sbSubmitProviderResponse(batch, providerName, itemsData, conds) {
       .eq('descripcion', it.sku);
     if (error) {
       console.error('[Supabase] Response update error:', error);
+      lastError = error.message || JSON.stringify(error);
       ok = false;
     }
   }
-  return ok;
+  return { ok, lastError };
 }
 
 // ═══ AUTH ═══
