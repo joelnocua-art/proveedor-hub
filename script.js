@@ -306,31 +306,36 @@ function clearProviderOverride(id) {
 }
 
 function getAllProviders() {
-  // Use Supabase data if loaded
-  if (window._sbData && window._sbData.loaded && window._sbData.providers) {
-    return window._sbData.providers.map(p => {
-      const perf = normalizeProviderPerf(p);
-      return { correo: p.correo_electronico || p.correo || '', celular: p.celular_telefono || p.celular || '', ...p, ...perf };
-    });
-  }
-  // Fallback to static files + localStorage
   const base = (typeof providersData !== 'undefined' && Array.isArray(providersData))
     ? providersData
     : (Array.isArray(window.providersData) ? window.providersData : []);
   const extra = getExtraProviders();
   const hidden = new Set(getHiddenProviderIds().map(String));
-  return [...base, ...extra]
+  
+  let providers = [...base, ...extra]
     .filter((p) => !hidden.has(String(p.it)))
     .map((p) => {
       const merged = applyProviderOverride(p);
       const perf = normalizeProviderPerf(merged);
-      return {
-        correo: merged.correo_electronico || merged.correo || '',
-        celular: merged.celular_telefono || merged.celular || '',
-        ...merged,
-        ...perf
-      };
+      return { ...merged, ...perf };
     });
+
+  // Merge with Supabase data if loaded
+  if (window._sbData && window._sbData.loaded && Array.isArray(window._sbData.providers) && window._sbData.providers.length > 0) {
+    const supaProvs = window._sbData.providers.map(p => {
+      const perf = normalizeProviderPerf(p);
+      return { correo: p.correo_electronico || p.correo || '', celular: p.celular_telefono || p.celular || '', ...p, ...perf };
+    });
+    
+    // Simple merge: if Empresa matches, prefer Supabase version
+    const supaNames = new Set(supaProvs.map(p => (p.empresa || '').toLowerCase().trim()));
+    providers = [
+      ...providers.filter(p => !supaNames.has((p.empresa || '').toLowerCase().trim())),
+      ...supaProvs
+    ];
+  }
+
+  return providers;
 }
 
 async function deleteProvider(id) {
@@ -364,21 +369,30 @@ function ensureQuoteId(q, idx = 0) {
 }
 
 function getAllQuotes() {
-  // Use Supabase data if loaded
-  if (window._sbData && window._sbData.loaded && window._sbData.quotes) {
-    const quotes = window._sbData.quotes;
+  const baseRaw = (typeof quotesData !== 'undefined' && Array.isArray(quotesData))
+    ? quotesData
+    : (Array.isArray(window.quotesData) ? window.quotesData : []);
+  const base = baseRaw.map((q, i) => ensureQuoteId(q, i));
+  const extra = safeJsonParse(localStorage.getItem('extraQuotes'));
+  const extraList = Array.isArray(extra) ? extra : [];
+  const hidden = new Set(getHiddenQuoteIds().map(String));
+  
+  let quotes = [...base, ...extraList]
+    .map((q, i) => ensureQuoteId(q, base.length + i))
+    .filter((q) => !hidden.has(String(q.it)));
+
+  // Merge with Supabase data if loaded
+  if (window._sbData && window._sbData.loaded && Array.isArray(window._sbData.quotes)) {
+    const supaQuotes = window._sbData.quotes;
     const resps = window._sbData.providerResponses || [];
     
-    // Merge responses into the quote objects
-    return quotes.map(q => {
-      const cleanStr = str => String(str||'').trim().toLowerCase();
-      // Find a matching response for this specific request
+    // Convert Supabase quotes with responses
+    const supaQuotesMerged = supaQuotes.map(q => {
       const match = resps.find(r => 
         r.batch === q.cotizacion_batch && 
         r.provider === q.empresa && 
         r.sku === q.descripcion
       );
-      
       if (match) {
         return {
           ...q,
@@ -394,16 +408,16 @@ function getAllQuotes() {
       }
       return q;
     });
+
+    // Merge: prefer Supabase if `it` matches or if it's a new Supabase-only quote
+    const supaIds = new Set(supaQuotesMerged.map(q => String(q.it)));
+    quotes = [
+      ...quotes.filter(q => !supaIds.has(String(q.it))),
+      ...supaQuotesMerged
+    ];
   }
-  // Fallback to static files + localStorage
-  const baseRaw = (typeof quotesData !== 'undefined' && Array.isArray(quotesData))
-    ? quotesData
-    : (Array.isArray(window.quotesData) ? window.quotesData : []);
-  const base = baseRaw.map((q, i) => ensureQuoteId(q, i));
-  const extra = safeJsonParse(localStorage.getItem('extraQuotes'));
-  const extraList = Array.isArray(extra) ? extra : [];
-  const hidden = new Set(getHiddenQuoteIds().map(String));
-  return [...base, ...extraList].map((q, i) => ensureQuoteId(q, base.length + i)).filter((q) => !hidden.has(String(q.it)));
+
+  return quotes;
 }
 
 function setExtraQuotes(quotes) {
@@ -1811,20 +1825,43 @@ async function setupSkuPage() {
   }
 
   function loadOffersStore() {
-    // Use Supabase data if available
-    if (window._sbData && window._sbData.loaded && window._sbData.skuOffers) {
-      return window._sbData.skuOffers;
-    }
     var store = {};
-    try { var r = localStorage.getItem(OFFERS_KEY); store = r ? JSON.parse(r) : {}; if (typeof store !== 'object' || store === null) store = {}; } catch(e) { store = {}; }
-    // Fallback: merge from window.skuOffersData (JS variable from sku_offers.js)
-    if (Array.isArray(window.skuOffersData)) {
+
+    // 1. Start with static/local storage as baseline
+    try {
+      var r = localStorage.getItem(OFFERS_KEY);
+      store = r ? JSON.parse(r) : {};
+      if (typeof store !== 'object' || store === null) store = {};
+    } catch(e) { store = {}; }
+
+    // 2. Merge from window.skuOffersData (JS variable from sku_offers.js - the 855 prices)
+    if (typeof window.skuOffersData !== 'undefined' && Array.isArray(window.skuOffersData)) {
       for (var i = 0; i < window.skuOffersData.length; i++) {
         var entry = window.skuOffersData[i];
         var skuId = String(entry[0]);
-        var offers = entry[1];
+        var offers = entry[1]; // static offers use {provider, price_sin_iva}
         if (!store[skuId] || !Array.isArray(store[skuId]) || store[skuId].length === 0) {
           store[skuId] = offers;
+        }
+      }
+    }
+
+    // 3. Merge with Supabase data if available
+    if (window._sbData && window._sbData.loaded && window._sbData.skuOffers) {
+      const supaOffers = window._sbData.skuOffers;
+      for (const skuId in supaOffers) {
+        const sId = String(skuId);
+        if (!store[sId]) {
+          store[sId] = supaOffers[skuId];
+        } else {
+          // Merge individual offers by provider name to avoid duplicates
+          const existing = store[sId];
+          const supaList = supaOffers[skuId];
+          supaList.forEach(so => {
+            const idx = existing.findIndex(o => (o.provider||'').toLowerCase().trim() === (so.provider||'').toLowerCase().trim());
+            if (idx >= 0) existing[idx] = so; // Prefer Supabase
+            else existing.push(so);
+          });
         }
       }
     }

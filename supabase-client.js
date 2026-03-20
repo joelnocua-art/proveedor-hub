@@ -29,8 +29,10 @@ async function sbLoadAll() {
   const sb = getSupabase();
   if (!sb) { console.warn('[Supabase] Client not ready'); return false; }
 
+  let errors = [];
+
+  // Load providers
   try {
-    // Load providers
     const { data: provs, error: e1 } = await sb.from('providers').select('*').order('empresa');
     if (e1) throw e1;
     window._sbData.providers = (provs || []).map(p => ({
@@ -53,13 +55,17 @@ async function sbLoadAll() {
       observaciones: p.observaciones || '',
       _supaId: p.id
     }));
+  } catch(err) { console.warn('[Supabase] Providers load error (non-fatal):', err); errors.push('providers'); }
 
-    // Load SKU catalog
+  // Load SKU catalog
+  try {
     const { data: skus, error: e2 } = await sb.from('sku_catalog').select('*').order('sku');
     if (e2) throw e2;
     window._sbData.skuCatalog = skus || [];
+  } catch(err) { console.warn('[Supabase] SKU catalog load error (non-fatal):', err); errors.push('sku_catalog'); }
 
-    // Load offers
+  // Load offers
+  try {
     const { data: offers, error: e3 } = await sb.from('sku_offers').select('*');
     if (e3) throw e3;
     // Group by sku_id (always use String keys to match catalog IDs)
@@ -70,8 +76,10 @@ async function sbLoadAll() {
       offerMap[key].push({ provider: o.provider, price_sin_iva: Number(o.price_sin_iva) || 0 });
     });
     window._sbData.skuOffers = offerMap;
+  } catch(err) { console.warn('[Supabase] Offers load error (non-fatal):', err); errors.push('sku_offers'); }
 
-    // Load quotes
+  // Load quotes
+  try {
     const { data: quotes, error: e4 } = await sb.from('quotes').select('*').order('created_at', { ascending: false });
     if (e4) throw e4;
     window._sbData.quotes = (quotes || []).map(q => ({
@@ -95,27 +103,29 @@ async function sbLoadAll() {
       estado_respuesta: q.estado_respuesta || 'pendiente',
       _supaId: q.id
     }));
+  } catch(err) { console.warn('[Supabase] Quotes load error (non-fatal):', err); errors.push('quotes'); }
 
-    // Load Adjudications
+  // Load Adjudications
+  try {
     const { data: adjs, error: e5 } = await sb.from('adjudications').select('*');
     if (e5) throw e5;
-
-    // Load Provider Responses (New Table)
-    const { data: responses, error: e6 } = await sb.from('provider_responses').select('*').order('responded_at', { ascending: false });
-    if (e6) throw e6;
-    window._sbData.providerResponses = responses || [];
-
     const adjMap = {};
     (adjs || []).forEach(a => { adjMap[a.cotizacion_nombre + '::' + a.sku] = a.provider; });
     window._sbData.adjudications = adjMap;
+  } catch(err) { console.warn('[Supabase] Adjudications load error (non-fatal):', err); errors.push('adjudications'); }
 
-    window._sbData.loaded = true;
-    console.log('[Supabase] Data loaded:', window._sbData.providers.length, 'providers,', window._sbData.skuCatalog.length, 'SKUs,', Object.keys(window._sbData.skuOffers).length, 'SKUs with prices,', window._sbData.quotes.length, 'quotes,', Object.keys(window._sbData.adjudications).length, 'adjudications');
-    return true;
-  } catch(err) {
-    console.error('[Supabase] Load error:', err);
-    return false;
-  }
+  // Load Provider Responses
+  try {
+    const { data: responses, error: e6 } = await sb.from('provider_responses').select('*').order('responded_at', { ascending: false });
+    if (e6) throw e6;
+    window._sbData.providerResponses = responses || [];
+  } catch(err) { console.warn('[Supabase] Provider responses load error (non-fatal):', err); errors.push('provider_responses'); }
+
+  // Always mark as loaded so the app uses whatever Supabase data succeeded
+  window._sbData.loaded = true;
+  console.log('[Supabase] Data loaded:', window._sbData.providers.length, 'providers,', (window._sbData.skuCatalog||[]).length, 'SKUs,', Object.keys(window._sbData.skuOffers||{}).length, 'SKUs with prices,', (window._sbData.quotes||[]).length, 'quotes,', Object.keys(window._sbData.adjudications||{}).length, 'adjudications');
+  if (errors.length) console.warn('[Supabase] Tables that failed to load:', errors.join(', '));
+  return true;
 }
 
 // ═══ WRITE FUNCTIONS ═══
