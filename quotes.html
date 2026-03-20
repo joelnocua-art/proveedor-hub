@@ -295,7 +295,7 @@
           if(!email){toast(emp+' no tiene correo.','error');return}
           
           var skuIds=skus.map(function(s){return s.id+':'+s.qty}).join(',');
-          var formLink=baseUrl+'respuesta.html#p='+encodeURIComponent(emp)+'&n='+encodeURIComponent(name.trim())+'&b='+encodeURIComponent(batch)+'&s='+skuIds+'&c='+encodeURIComponent(city)+'&d='+encodeURIComponent(dt);
+          var formLink=baseUrl+'respuesta.html#p='+encodeURIComponent(emp)+'&n='+encodeURIComponent(name.trim())+'&b='+encodeURIComponent(batch)+'&s='+encodeURIComponent(skuIds)+'&c='+encodeURIComponent(city)+'&d='+encodeURIComponent(dt);
           var sub=encodeURIComponent('Solicitud de cotización: '+name.trim()+' — BIA Energy');
           var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nReciban un cordial saludo de BIA Energy.\n\nSolicitamos cotización formal:\n\n'+skuTable+'\n\nCiudad: '+(city||'Por confirmar')+'\nFecha: '+(dt||'Por confirmar')+(notes?'\nNotas: '+notes:'')+'\n\n━━ RESPONDER ━━\nIngrese precios aquí:\n'+formLink+'\n\nO responda este correo con precios unitarios sin IVA, tiempo de entrega, garantía y condiciones de pago.\n\nCordialmente,\nOperaciones — BIA Energy');
           

@@ -113,9 +113,10 @@
     h.split('&').forEach(function(p){var kv=p.split('=');if(kv.length===2)params[kv[0]]=decodeURIComponent(kv[1])});
     if(params.p&&params.s){
       var catalog=Array.isArray(window.skuCatalogData)?window.skuCatalogData:[];
-      var items=params.s.split(',').map(function(x){
+      var rawS = decodeURIComponent(params.s);
+      var items=rawS.split(',').map(function(x){
         var parts=x.split(':');var id=parts[0],qty=parseInt(parts[1])||1;
-        var found=catalog.find(function(c){return c.id===id});
+        var found=catalog.find(function(c){return c.id == id}); // loose == to handle string/number type mismatch
         return{id:id,sku:found?found.sku:('SKU #'+id),category:found?(found.category||''):'',qty:qty};
       }).filter(function(x){return x.sku});
       D={prov:params.p,name:params.n||'',batch:params.b||'',city:params.c||'',date:params.d||'',items:items};
