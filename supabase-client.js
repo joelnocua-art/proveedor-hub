@@ -20,6 +20,7 @@ window._sbData = {
   skuCatalog: null,
   skuOffers: null,
   quotes: null,
+  providerResponses: null,
   adjudications: null,
   loaded: false
 };
@@ -97,6 +98,12 @@ async function sbLoadAll() {
     // Load Adjudications
     const { data: adjs, error: e5 } = await sb.from('adjudications').select('*');
     if (e5) throw e5;
+
+    // Load Provider Responses (New Table)
+    const { data: responses, error: e6 } = await sb.from('provider_responses').select('*').order('responded_at', { ascending: false });
+    if (e6) throw e6;
+    window._sbData.providerResponses = responses || [];
+
     const adjMap = {};
     (adjs || []).forEach(a => { adjMap[a.cotizacion_nombre + '::' + a.sku] = a.provider; });
     window._sbData.adjudications = adjMap;
@@ -289,31 +296,28 @@ async function sbDeleteOffer(skuId, provider) {
 async function sbSubmitProviderResponse(batch, providerName, itemsData, conds) {
   const sb = getSupabase();
   if (!sb) return { ok: false, lastError: 'Supabase client no inicializado. La librería de base de datos no cargó.' };
-  let ok = true;
-  let lastError = null;
-  for (let i = 0; i < itemsData.length; i++) {
-    const it = itemsData[i];
-    const { error } = await sb.from('quotes')
-      .update({
-        pu_sin_iva: it.price_sin_iva,
-        pu_con_iva: it.price_con_iva,
-        tiempo_entrega_dias: it.delivery_days || conds.delivery_days || 0,
-        garantia_meses: conds.warranty_months,
-        condiciones_pago: conds.payment_terms,
-        observaciones_prov: conds.notes,
-        estado_respuesta: 'respondida',
-        fecha_respuesta: conds.responded_at
-      })
-      .eq('cotizacion_batch', batch)
-      .eq('empresa', providerName)
-      .eq('descripcion', it.sku);
-    if (error) {
-      console.error('[Supabase] Response update error:', error);
-      lastError = error.message || JSON.stringify(error);
-      ok = false;
-    }
+  
+  const insertList = itemsData.map(it => ({
+    batch: batch,
+    provider: providerName,
+    sku: it.sku,
+    price_sin_iva: it.price_sin_iva,
+    price_con_iva: it.price_con_iva,
+    delivery_days: it.delivery_days || conds.delivery_days || 0,
+    warranty_months: conds.warranty_months,
+    payment_terms: conds.payment_terms,
+    notes: conds.notes,
+    responded_at: conds.responded_at
+  }));
+
+  const { error } = await sb.from('provider_responses').insert(insertList);
+  
+  if (error) {
+    console.error('[Supabase] provider_responses insert error:', error);
+    return { ok: false, lastError: error.message || JSON.stringify(error) };
   }
-  return { ok, lastError };
+  
+  return { ok: true, lastError: null };
 }
 
 // ═══ AUTH ═══

@@ -366,7 +366,33 @@ function ensureQuoteId(q, idx = 0) {
 function getAllQuotes() {
   // Use Supabase data if loaded
   if (window._sbData && window._sbData.loaded && window._sbData.quotes) {
-    return window._sbData.quotes;
+    const quotes = window._sbData.quotes;
+    const resps = window._sbData.providerResponses || [];
+    
+    // Merge responses into the quote objects
+    return quotes.map(q => {
+      // Find a matching response for this specific request
+      const match = resps.find(r => 
+        r.cotizacion_batch === q.cotizacion_batch && 
+        r.provider === q.empresa && 
+        r.sku === q.descripcion
+      );
+      
+      if (match) {
+        return {
+          ...q,
+          pu_sin_iva: Number(match.price_sin_iva) || 0,
+          pu_con_iva: Number(match.price_con_iva) || 0,
+          tiempo_entrega_dias: match.delivery_days || 0,
+          garantia_meses: match.warranty_months || 0,
+          condiciones_pago: match.payment_terms || '',
+          observaciones_prov: match.notes || '',
+          fecha_respuesta: match.responded_at || '',
+          estado_respuesta: 'respondida'
+        };
+      }
+      return q;
+    });
   }
   // Fallback to static files + localStorage
   const baseRaw = (typeof quotesData !== 'undefined' && Array.isArray(quotesData))
