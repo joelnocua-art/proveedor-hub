@@ -305,8 +305,8 @@
           a.href = gmailUrl;
           a.target = '_blank';
           a.style.cssText = 'display:flex; align-items:center; justify-content:center; padding:12px; background:#00e5c8; color:#0a0d1a; border-radius:10px; font-weight:700; text-decoration:none; font-size:14px; transition:opacity 0.2s;';
-          a.innerHTML = '📩 Enviar a <strong>' + esc(emp) + '</strong>';
-          a.onclick = function() { this.style.opacity = '0.5'; this.innerHTML = '✓ Enviado a ' + esc(emp); };
+          a.innerHTML = '📩 Enviar a <span style="margin-left:4px;font-weight:800;">' + esc(emp) + '</span>';
+          a.onclick = function() { this.style.opacity = '0.5'; this.innerHTML = '✓ Enviado a <span style="margin-left:4px;font-weight:800;">' + esc(emp) + '</span>'; };
           if(emailContainer) emailContainer.appendChild(a);
           validEmails++;
         });
