@@ -226,7 +226,7 @@
                    var pr = Number(offer.price);
                    if(sId && pr > 0 && typeof sbUpsertOffer === 'function') {
                       const ok = await sbUpsertOffer(sId, provName, pr);
-                      if (ok === true) successCount++;
+                      if (ok && ok.success) successCount++;
                    }
                }
                
