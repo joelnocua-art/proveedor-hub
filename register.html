@@ -47,8 +47,13 @@
     this.disabled=true;this.textContent='Creando cuenta...';
     var r=await sb.auth.signUp({email:email,password:pass,options:{data:{full_name:name}}});
     if(r.error){showMsg(r.error.message,false);this.disabled=false;this.textContent='Crear cuenta';return}
-    showMsg('Cuenta creada. Redirigiendo...',true);
-    setTimeout(function(){window.location.href='index.html'},1500);
+    if (r.data && r.data.user && !r.data.session) {
+      showMsg('Cuenta creada con éxito. Revisa tu correo y haz clic en el enlace para verificar tu cuenta antes de iniciar sesión.',true);
+      setTimeout(function(){window.location.href='index.html'},5000);
+    } else {
+      showMsg('Cuenta creada. Redirigiendo...',true);
+      setTimeout(function(){window.location.href='index.html'},1500);
+    }
   };
   </script>
 </body>
