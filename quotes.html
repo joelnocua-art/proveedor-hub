@@ -400,14 +400,16 @@
     };
 
     // === INIT ===
-    wizGo(4);renderSkuList();
+    wizGo(1);renderSkuList();
     
-    // Wait for Supabase to finish loading asynchronously, then repaint Step 4
+    // Wait for Supabase to finish loading asynchronously, then repaint only if user is on Step 4
     var sbCheckInterval = setInterval(function() {
       if (window._sbData && window._sbData.loaded) {
         clearInterval(sbCheckInterval);
         if (step === 4) {
-          wizGo(4);
+          wizGo(4); // User is already on tracking, refresh it
+        } else {
+          renderTrack(); // Just silently refresh tracking data in background
         }
       }
     }, 100);
