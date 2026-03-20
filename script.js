@@ -313,7 +313,6 @@ function getAllProviders() {
   const hidden = new Set(getHiddenProviderIds().map(String));
   
   let providers = [...base, ...extra]
-    .filter((p) => !hidden.has(String(p.it)))
     .map((p) => {
       const merged = applyProviderOverride(p);
       const perf = normalizeProviderPerf(merged);
@@ -335,13 +334,25 @@ function getAllProviders() {
     ];
   }
 
-  return providers;
+  return providers.filter((p) => !hidden.has(String(p.it)));
 }
 
 async function deleteProvider(id) {
   const pid = String(id);
-  const ok = await sbDeleteProvider(pid);
-  if (!ok) { showToast('Error al eliminar en Supabase', 'error'); return; }
+  
+  // Attempt to delete from Supabase (may fail if pid is a static ID and not a UUID)
+  if (typeof sbDeleteProvider === 'function') {
+    await sbDeleteProvider(pid);
+  }
+
+  // Always hide it from the UI locally
+  const hidden = getHiddenProviderIds();
+  if (!hidden.includes(pid)) {
+    hidden.push(pid);
+    setHiddenProviderIds(hidden);
+  }
+
+  showToast('Proveedor eliminado de la vista', 'success');
 
   if (typeof renderProvidersTable === 'function') renderProvidersTable();
   if (typeof updateHomeKpis === 'function') updateHomeKpis();
