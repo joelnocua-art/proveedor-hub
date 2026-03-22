@@ -107,25 +107,32 @@
 
   <script>
   var D=null;
-  try{
+
+  // Parse URL params (we'll resolve SKU names after catalog loads)
+  function parseParams() {
     var h=window.location.hash.substring(1);
     var params={};
-    h.split('&').forEach(function(p){var kv=p.split('=');if(kv.length===2)params[kv[0]]=decodeURIComponent(kv[1])});
-    if(params.p&&params.s){
-      var catalog=Array.isArray(window.skuCatalogData)?window.skuCatalogData:[];
-      var rawS = decodeURIComponent(params.s);
-      var items=rawS.split(',').map(function(x){
-        var parts=x.split(':');var id=parts[0],qty=parseInt(parts[1])||1;
-        var found=catalog.find(function(c){return c.id == id}); // loose == to handle string/number type mismatch
-        return{id:id,sku:found?found.sku:('SKU #'+id),category:found?(found.category||''):'',qty:qty};
-      }).filter(function(x){return x.sku});
-      D={prov:params.p,name:params.n||'',batch:params.b||'',city:params.c||'',date:params.d||'',items:items};
+    h.split('&').forEach(function(p){var kv=p.split('=');if(kv.length>=2)params[kv[0]]=decodeURIComponent(kv[1])});
+    return params;
+  }
+
+  function buildForm(catalog) {
+    var params = parseParams();
+    if (!params.p || !params.s) {
+      document.getElementById('vForm').style.display='none';
+      document.getElementById('vErr').style.display='';
+      return;
     }
-  }catch(e){console.error(e)}
+    var rawS = decodeURIComponent(params.s);
+    var items = rawS.split(',').map(function(x){
+      var parts=x.split(':'); var id=parts[0], qty=parseInt(parts[1])||1;
+      var found = catalog.find(function(c){ return String(c.id) === String(id) || String(c.sku_id) === String(id); });
+      var skuName = found ? (found.sku || found.name || ('SKU #'+id)) : ('SKU #'+id);
+      var catName = found ? (found.category || '') : '';
+      return {id:id, sku:skuName, category:catName, qty:qty};
+    }).filter(function(x){return x.sku});
+    D = {prov:params.p, name:params.n||'', batch:params.b||'', city:params.c||'', date:params.d||'', items:items};
 
-  function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
-
-  if(D&&D.items.length){
     document.getElementById('qSub').textContent='Complete los precios y tiempos para cada ítem.';
     ['cInfo','cItems','cCond'].forEach(function(id){document.getElementById(id).style.display=''});
     document.getElementById('btnSubmit').style.display='';
@@ -136,10 +143,22 @@
     document.getElementById('rBody').innerHTML=D.items.map(function(it,i){
       return '<tr><td><div style="font-weight:600;">'+esc(it.sku)+'</div><div style="font-size:11px;color:#8088b0;">'+esc(it.category)+'</div></td><td style="text-align:center;font-weight:600;">'+it.qty+'</td><td><input type="number" id="pr_'+i+'" min="0" step="any" placeholder="$ 0" /></td><td><input type="number" id="dy_'+i+'" min="0" placeholder="15" /></td></tr>';
     }).join('');
-  }else{
-    document.getElementById('vForm').style.display='none';
-    document.getElementById('vErr').style.display='';
   }
+
+  function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+  // Load catalog from Supabase first, THEN build the form with real names
+  var sb = getSupabase();
+  (async function() {
+    var catalog = [];
+    try {
+      var r = await sb.from('sku_catalog').select('id, name, category');
+      if (!r.error && r.data) {
+        catalog = r.data.map(function(s){ return {id:s.id, sku:s.name, name:s.name, category:s.category}; });
+      }
+    } catch(e) { console.warn('Could not load catalog:', e); }
+    buildForm(catalog);
+  })();
 
   async function doSubmit(){
     var items=[],ok=true;

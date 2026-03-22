@@ -218,13 +218,21 @@
 
     // === STEP 2: Providers with PROPER matching ===
     function offersStore(){
-      var st={};try{var r=localStorage.getItem('skuOffersById');st=r?JSON.parse(r):{}}catch(e){st={}}
-      if(Array.isArray(window.skuOffersData))window.skuOffersData.forEach(function(e){var sid=String(e[0]);if(!st[sid]||!st[sid].length)st[sid]=e[1]});
+      // Use Supabase-loaded offers (skuOffersData static file was removed)
+      var st = {};
+      if (window._sbData && window._sbData.skuOffers) {
+        var sbOffers = window._sbData.skuOffers;
+        for (var skuId in sbOffers) {
+          st[String(skuId)] = sbOffers[skuId];
+        }
+      }
+      // Also merge any manually saved localStorage offers
+      try { var r = localStorage.getItem('skuOffersById'); var local = r ? JSON.parse(r) : {}; for (var k in local) { if (!st[k]) st[k] = local[k]; } } catch(e) {}
       return st;
     }
     function matchedEmpresas(){
       var st=offersStore(),names=new Set();
-      skus.forEach(function(s){(st[s.id]||[]).forEach(function(o){
+      skus.forEach(function(s){(st[String(s.id)]||[]).forEach(function(o){
         var pn=(o.provider||'').trim().toLowerCase();
         var mapped=PMAP[pn];
         if(mapped){names.add(mapped);return}

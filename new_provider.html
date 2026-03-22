@@ -251,11 +251,26 @@
 
 
 
-  <script src="script.js?v=13"></script>
+  <script src="script.js?v=16"></script>
   <script src="components.js"></script>
   <script>
     let selectedSkus = new Map(); // id -> sku object
     let activeCatFilter = null;
+    let _pickerInited = false;
+
+    function tryInitSkuPicker() {
+      if (_pickerInited) return;
+      if (window.skuCatalogData && window.skuCatalogData.length > 0) {
+        _pickerInited = true;
+        initSkuPicker();
+      }
+    }
+    // Try immediately (in case already loaded), then poll
+    tryInitSkuPicker();
+    var _initInterval = setInterval(function(){
+      tryInitSkuPicker();
+      if (_pickerInited) clearInterval(_initInterval);
+    }, 150);
 
     function initSkuPicker() {
       if (!window.skuCatalogData) return;
