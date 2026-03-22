@@ -2,69 +2,36 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Migración a Supabase</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Migración a Supabase — v2</title>
   <style>
     body { padding: 40px; font-family: 'Inter', sans-serif; background: #0a0d1a; color: #fff; }
     .card { background: #151a2e; border: 1px solid #232a45; padding: 24px; border-radius: 14px; max-width: 800px; margin: 0 auto; }
     .btn { padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; background: #00e5c8; color: #0a0d1a; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .log { background: #000; color: #00e5c8; padding: 12px; font-family: monospace; border-radius: 8px; margin-top: 20px; white-space: pre-wrap; height: 300px; overflow-y: auto; font-size: 12px; }
-    .step { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #232a45; }
+    .log { background: #000; color: #00e5c8; padding: 12px; font-family: monospace; border-radius: 8px; margin-top: 20px; white-space: pre-wrap; height: 400px; overflow-y: auto; font-size: 12px; }
   </style>
 </head>
 <body>
 
 <div class="card">
-  <h2>🚢 Asistente de Migración de Datos</h2>
-  <p class="muted" style="margin-bottom: 24px;">Este script tomará los archivos locales antiguos (proveedores, skus, precios, cotizaciones) y los subirá de forma segura a Supabase. Si una fila ya existe, se evitará el duplicado.</p>
+  <h2>🚢 Migración de Precios Legacy → Supabase (v2)</h2>
+  <p style="color:#8088b0; margin-bottom: 24px;">
+    Este script sube los 855 precios del archivo local antiguo (<code>sku_offers_legacy.js</code>) a la tabla <code>sku_offers</code> de Supabase.<br>
+    <strong>No toca los proveedores ni el catálogo SKU</strong> (ya están correctos en Supabase).
+  </p>
 
-  <div class="step">
-    <div><strong>1. Proveedores</strong><br><span class="muted" style="font-size:12px">Migra la información de empresas y contactos.</span></div>
-    <span id="st-prov" style="color:#ffb400">Pendiente</span>
-  </div>
-  <div class="step">
-    <div><strong>2. Catálogo SKU</strong><br><span class="muted" style="font-size:12px">Migra los nombres y categorías de los SKUs.</span></div>
-    <span id="st-cat" style="color:#ffb400">Pendiente</span>
-  </div>
-  <div class="step">
-    <div><strong>3. Base de Precios (Ofertas)</strong><br><span class="muted" style="font-size:12px">Cruza los IDs numéricos antiguos con los nuevos UUIDs y sube los 855 precios y tiempos de entrega.</span></div>
-    <span id="st-off" style="color:#ffb400">Pendiente</span>
-  </div>
-  <div class="step">
-    <div><strong>4. Cotizaciones e Historial</strong><br><span class="muted" style="font-size:12px">Sube el historial de solicitudes enviadas y seguimientos.</span></div>
-    <span id="st-quo" style="color:#ffb400">Pendiente</span>
-  </div>
-
-  <div style="margin-top: 30px; display:flex; gap:10px;">
-    <button class="btn" id="btnStart">▶ Iniciar Migración Completa</button>
-  </div>
-
+  <button class="btn" id="btnStart">▶ Iniciar Migración de Precios</button>
   <div class="log" id="logger">Esperando para iniciar...\n</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="supabase-client.js?v=999"></script>
-
-<!-- Legacy Data Files -->
-<script src="providers_legacy.js"></script>
-<script src="sku_catalog_legacy.js"></script>
 <script src="sku_offers_legacy.js"></script>
-<script src="quotes_legacy.js"></script>
 
 <script>
   const logger = document.getElementById('logger');
   function log(msg) { logger.textContent += msg + '\n'; logger.scrollTop = logger.scrollHeight; }
-  
-  function updateStatus(id, txt, color) {
-    const el = document.getElementById(id);
-    el.textContent = txt; el.style.color = color;
-  }
-
-  // Sleep utility to respect rate limits
   const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-  // Chunk array utility
   const chunk = (arr, size) => Array.from({ length: Math.ceil(arr.length / size) }, (v, i) => arr.slice(i * size, i * size + size));
 
   document.getElementById('btnStart').onclick = async function() {
@@ -74,130 +41,128 @@
     if (!sb) { log('[ERROR] Cliente Supabase no disponible.'); return; }
 
     try {
-      // 1. Providers
-      updateStatus('st-prov', 'Migrando...', '#00e5c8');
-      log('--- Iniciando PROVEEDORES ---');
-      const provs = window.providersData || [];
-      const { data: extProvs } = await sb.from('providers').select('empresa');
-      const extProvSet = new Set((extProvs || []).map(p => p.empresa.trim().toLowerCase()));
+      // ── STEP 1: Get current providers from Supabase to map names → IDs ──
+      log('--- Paso 1: Cargando proveedores de Supabase ---');
+      const { data: provRows, error: provErr } = await sb.from('providers').select('id, nombre_empresa');
+      if (provErr) throw new Error('Error cargando proveedores: ' + provErr.message);
       
-      const newProvs = provs.filter(p => !extProvSet.has((p.empresa||'').trim().toLowerCase())).map(p => ({
-        empresa: p.empresa||'', rut: p.rut||'', direccion: p.direccion||'', categoria: p.categoria||'',
-        estado: p.estado||'Aprobado', representante: p.representante||'', celular_telefono: String(p.telefono||p.celular||''),
-        ciudad: p.ciudad||'', correo_electronico: p.correo||p.correo_electronico||'', pagina_web: p.pagina_web||'', catalogo: p.catalogo||''
-      }));
+      // Build a map: lowercase provider name → provider id
+      const provMap = {};
+      (provRows || []).forEach(p => {
+        if (p.nombre_empresa) provMap[p.nombre_empresa.trim().toLowerCase()] = p.id;
+      });
+      log('Proveedores en Supabase: ' + Object.keys(provMap).length);
+      log('Nombres: ' + Object.keys(provMap).join(', '));
 
-      log(`Se encontraron ${newProvs.length} proveedores nuevos para insertar (de ${provs.length} legacy).`);
-      if (newProvs.length > 0) {
-        for (const c of chunk(newProvs, 50)) {
-          const { error } = await sb.from('providers').insert(c);
-          if (error) throw error;
-          await sleep(200);
+      // ── STEP 2: Get current SKU catalog to validate sku_ids ──
+      log('\n--- Paso 2: Cargando catálogo SKU de Supabase ---');
+      const { data: skuRows, error: skuErr } = await sb.from('sku_catalog').select('id');
+      if (skuErr) throw new Error('Error cargando SKUs: ' + skuErr.message);
+      const validSkuIds = new Set((skuRows || []).map(s => String(s.id)));
+      log('SKUs en Supabase: ' + validSkuIds.size);
+
+      // ── STEP 3: Get existing offers to avoid duplicates ──
+      log('\n--- Paso 3: Cargando ofertas existentes en Supabase ---');
+      const { data: existOffers, error: offErr } = await sb.from('sku_offers').select('sku_id, provider_id');
+      if (offErr) throw new Error('Error cargando ofertas: ' + offErr.message);
+      const existSet = new Set((existOffers || []).map(o => o.sku_id + '::' + o.provider_id));
+      log('Ofertas ya existentes: ' + existSet.size);
+
+      // ── STEP 4: Read legacy offers from localStorage seed ──
+      log('\n--- Paso 4: Procesando ofertas legacy ---');
+      // The legacy file seeds localStorage with an IIFE. We read it back.
+      let legacyStore = {};
+      try {
+        const raw = localStorage.getItem('skuOffersById');
+        legacyStore = raw ? JSON.parse(raw) : {};
+      } catch(e) { log('[AVISO] No se pudo leer localStorage: ' + e.message); }
+
+      // Count total legacy offers
+      let totalLegacy = 0;
+      for (const skuId in legacyStore) {
+        if (Array.isArray(legacyStore[skuId])) totalLegacy += legacyStore[skuId].length;
+      }
+      log('Total ofertas legacy en localStorage: ' + totalLegacy);
+
+      // ── STEP 5: Map and prepare inserts ──
+      log('\n--- Paso 5: Mapeando ofertas al schema de Supabase ---');
+      const toInsert = [];
+      let skipped = 0, noProvider = 0, noSku = 0, duplicate = 0;
+
+      for (const skuId in legacyStore) {
+        const textSkuId = String(skuId);
+        if (!validSkuIds.has(textSkuId)) { noSku++; continue; }
+
+        const offers = legacyStore[skuId];
+        if (!Array.isArray(offers)) continue;
+
+        for (const off of offers) {
+          const provName = (off.provider || '').trim().toLowerCase();
+          const providerId = provMap[provName];
+          if (!providerId) {
+            // Try partial match
+            let found = null;
+            for (const key in provMap) {
+              if (key.indexOf(provName) !== -1 || provName.indexOf(key.split(' ')[0]) !== -1) {
+                found = provMap[key]; break;
+              }
+            }
+            if (!found) { noProvider++; skipped++; continue; }
+            // Use partial match
+            var pid = found;
+          } else {
+            var pid = providerId;
+          }
+
+          const dedupKey = textSkuId + '::' + pid;
+          if (existSet.has(dedupKey)) { duplicate++; continue; }
+
+          toInsert.push({
+            sku_id: textSkuId,
+            provider_id: pid,
+            price: parseFloat(off.price_sin_iva) || 0,
+            currency: 'COP',
+            vat_included: false
+          });
+          existSet.add(dedupKey); // prevent further dupes from same batch
         }
       }
-      updateStatus('st-prov', '✔ Listo', '#28c864');
-      log('Proveedores migrados correctamente.\n');
 
-      // 2. SKU Catalog
-      updateStatus('st-cat', 'Migrando...', '#00e5c8');
-      log('--- Iniciando CATÁLOGO SKU ---');
-      const skus = Array.isArray(window.skuCatalogData) ? window.skuCatalogData : Object.values((window.skuCatalogData || {}));
-      const { data: extSkus } = await sb.from('sku_catalog').select('sku');
-      const extSkuSet = new Set((extSkus || []).map(s => String(s.sku).trim().toLowerCase()));
+      log('\nResultado del mapeo:');
+      log('  → Para insertar: ' + toInsert.length);
+      log('  → Ya existentes (omitidos): ' + duplicate);
+      log('  → SKU no encontrado en Supabase: ' + noSku);
+      log('  → Proveedor no encontrado: ' + noProvider);
 
-      const newSkus = skus.filter(s => !extSkuSet.has(String(s.sku).trim().toLowerCase())).map(s => ({
-        id: s.id, sku: s.sku, category: s.category||''
-      }));
-
-      log(`Se encontraron ${newSkus.length} SKUs nuevos para insertar (de ${skus.length} legacy).`);
-      if (newSkus.length > 0) {
-        for (const c of chunk(newSkus, 50)) {
-          const { error } = await sb.from('sku_catalog').insert(c);
-          if (error) throw error;
-          await sleep(200);
-        }
-      }
-      updateStatus('st-cat', '✔ Listo', '#28c864');
-      log('SKUs migrados correctamente.\n');
-
-      // 3. SKU Offers
-      updateStatus('st-off', 'Migrando...', '#00e5c8');
-      log('--- Iniciando PRECIOS E HISTÓRICO ---');
-      // Fetch NEW catalog to get UUIDs
-      const { data: currentCat } = await sb.from('sku_catalog').select('id, sku');
-      const skuMap = {}; // name -> UUID
-      const idToNameMap = {}; // old_id -> name
-      
-      (currentCat || []).forEach(c => skuMap[String(c.sku).trim().toLowerCase()] = c.id);
-      skus.forEach(s => idToNameMap[String(s.id)] = String(s.sku).trim().toLowerCase());
-
-      const offers = Array.isArray(window.skuOffersData) ? window.skuOffersData : [];
-      log(`Total ofertas legacy a procesar: ${offers.length}`);
-      
-      const parsedOffers = [];
-      let missingInCat = 0;
-
-      for (const off of offers) {
-        const skuName = idToNameMap[String(off.sku_id)];
-        if (!skuName || !skuMap[skuName]) { missingInCat++; continue; }
-        
-        parsedOffers.push({
-          sku_id: skuMap[skuName], // The UUID in Supabase
-          provider: off.provider,
-          price_sin_iva: parseFloat(off.price_sin_iva) || 0,
-          delivery_days: parseInt(off.delivery_days) || 0,
-          warranty_months: parseInt(off.warranty_months) || 0,
-          updated_at: off.updated_at || new Date().toISOString()
-        });
-      }
-
-      log(`${parsedOffers.length} ofertas mapeadas exitosamente. SKUs no encontrados: ${missingInCat}. Insertando (upsert)...`);
-      if (parsedOffers.length > 0) {
-        // We use insert(). Supabase will just add them. Since sku_offers allows multiple, we insert them or bulk delete first.
-        // Actually, to avoid dupes from previous attempts, let's delete all existing offers IN CHUNKS? No, let's just insert missing ones.
-        // For simplicity, we just insert all of them. The user wants the 855 prices back.
-        // If there's duplicate prices, the UI handles it by showing the cheapest or latest. But let's just insert.
-        for (const c of chunk(parsedOffers, 100)) {
-          const { error } = await sb.from('sku_offers').insert(c);
-          if (error) log(`[AVISO] Error al insertar chunk de ofertas: ${error.message}`);
+      // ── STEP 6: Bulk insert ──
+      if (toInsert.length > 0) {
+        log('\n--- Paso 6: Insertando ' + toInsert.length + ' ofertas en Supabase ---');
+        const chunks = chunk(toInsert, 100);
+        let inserted = 0;
+        for (let i = 0; i < chunks.length; i++) {
+          const { error } = await sb.from('sku_offers').insert(chunks[i]);
+          if (error) {
+            log('[ERROR] Chunk ' + (i+1) + '/' + chunks.length + ': ' + error.message);
+          } else {
+            inserted += chunks[i].length;
+            log('  Chunk ' + (i+1) + '/' + chunks.length + ': OK (' + inserted + ' insertadas)');
+          }
           await sleep(300);
         }
+        log('\nTotal insertadas: ' + inserted + ' de ' + toInsert.length);
+      } else {
+        log('\n--- No hay ofertas nuevas para insertar ---');
       }
-      updateStatus('st-off', '✔ Listo', '#28c864');
-      log('Ofertas migradas correctamente.\n');
-
-      // 4. Quotes (Cotizaciones)
-      updateStatus('st-quo', 'Migrando...', '#00e5c8');
-      log('--- Iniciando COTIZACIONES ---');
-      const quotes = Array.isArray(window.quotesData) ? window.quotesData : [];
-      log(`Total cotizaciones legacy a procesar: ${quotes.length}`);
-      
-      if (quotes.length > 0) {
-        for (const c of chunk(quotes, 50)) {
-          const mappedC = c.map(q => ({
-            cotizacion_nombre: q.cotizacion_nombre||'', cotizacion_batch: q.cotizacion_batch||'',
-            empresa: q.empresa||'', descripcion: q.descripcion||'',
-            fecha: q.fecha||'', und: q.und||1, pu_sin_iva: q.pu_sin_iva||0, pu_con_iva: q.pu_con_iva||0,
-            ciudad_entrega: q.ciudad_entrega||'', fecha_entrega: q.dt||q.fecha_entrega||'', observaciones: q.observaciones||''
-          }));
-          const { error } = await sb.from('quotes').insert(mappedC);
-          if (error) log(`[AVISO] Error al insertar chunk cotizaciones: ${error.message}`);
-          await sleep(300);
-        }
-      }
-      updateStatus('st-quo', '✔ Listo', '#28c864');
-      log('Cotizaciones migradas correctamente.\n');
 
       log('\n=============================================');
       log('✨ ¡MIGRACIÓN COMPLETADA EXITOSAMENTE!');
-      log('Ya puedes volver a Proveedor Hub. La data ya está en Supabase.');
       log('=============================================');
-      this.textContent = 'Migración finalizada con éxito';
+      this.textContent = '✔ Migración finalizada';
       this.style.background = '#28c864';
 
     } catch(err) {
       log('\n[ERROR CRÍTICO] ' + err.message);
-      this.textContent = 'Falló la migración';
+      this.textContent = 'Falló';
       this.style.background = '#ff4d6d';
       this.disabled = false;
     }
