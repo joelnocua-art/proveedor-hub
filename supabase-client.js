@@ -78,7 +78,7 @@ async function sbLoadAll() {
       (offers || []).forEach(o => {
         const key = String(o.sku_id);
         if (!offerMap[key]) offerMap[key] = [];
-        offerMap[key].push({ provider: o.provider, price_sin_iva: Number(o.price_sin_iva) || 0 });
+        offerMap[key].push({ provider: o.provider, price_sin_iva: Number(o.price || o.price_sin_iva) || 0 });
       });
       window._sbData.skuOffers = offerMap;
     }
@@ -272,7 +272,7 @@ async function sbGetAdjudications() {
 async function sbUpsertOffer(skuId, provider, price_sin_iva) {
   const sb = getSupabase();
   if (!sb) return { success: false, errorMsg: 'Supabase no inicializado' };
-  const { error } = await sb.from('sku_offers').upsert({ sku_id: skuId, provider, price_sin_iva }, { onConflict: 'sku_id,provider' });
+  const { error } = await sb.from('sku_offers').upsert({ sku_id: skuId, provider, price: price_sin_iva }, { onConflict: 'sku_id,provider' });
   if (error) {
     console.error('[Supabase] Offer upsert error:', error);
     return { success: false, errorMsg: error.message || JSON.stringify(error) };
