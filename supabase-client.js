@@ -31,95 +31,83 @@ async function sbLoadAll() {
 
   let errors = [];
 
-  // Load providers
+  // Fetch all tables concurrently
   try {
-    const { data: provs, error: e1 } = await sb.from('providers').select('*').order('empresa');
-    if (e1) throw e1;
-    window._sbData.providers = (provs || []).map(p => ({
-      it: String(p.id),
-      empresa: p.empresa || '',
-      rut: p.rut || '',
-      direccion: p.direccion || '',
-      categoria: p.categoria || '',
-      estado: p.estado || '',
-      representante: p.representante || '',
-      celular_telefono: p.celular_telefono || '',
-      celular: p.celular_telefono || '',
-      ciudad: p.ciudad || '',
-      correo_electronico: p.correo_electronico || '',
-      correo: p.correo_electronico || '',
-      pagina_web: p.pagina_web || '',
-      catalogo: p.catalogo || '',
-      tiempos_respuesta: p.tiempos_respuesta || '',
-      servicios_productos: p.servicios_productos || '',
-      observaciones: p.observaciones || '',
-      _supaId: p.id
-    }));
-  } catch(err) { console.warn('[Supabase] Providers load error (non-fatal):', err); errors.push('providers'); }
+    const [
+      { data: provs, error: e1 },
+      { data: skus, error: e2 },
+      { data: offers, error: e3 },
+      { data: quotes, error: e4 },
+      { data: adjs, error: e5 },
+      { data: responses, error: e6 }
+    ] = await Promise.all([
+      sb.from('providers').select('*').order('empresa'),
+      sb.from('sku_catalog').select('*').order('sku'),
+      sb.from('sku_offers').select('*'),
+      sb.from('quotes').select('*').order('created_at', { ascending: false }),
+      sb.from('adjudications').select('*'),
+      sb.from('provider_responses').select('*').order('responded_at', { ascending: false })
+    ]);
 
-  // Load SKU catalog
-  try {
-    const { data: skus, error: e2 } = await sb.from('sku_catalog').select('*').order('sku');
-    if (e2) throw e2;
-    window._sbData.skuCatalog = skus || [];
-  } catch(err) { console.warn('[Supabase] SKU catalog load error (non-fatal):', err); errors.push('sku_catalog'); }
+    // 1. Providers
+    if (e1) { console.warn('[Supabase] Providers error:', e1); errors.push('providers'); }
+    else {
+      window._sbData.providers = (provs || []).map(p => ({
+        it: String(p.id), empresa: p.empresa || '', rut: p.rut || '', direccion: p.direccion || '',
+        categoria: p.categoria || '', estado: p.estado || '', representante: p.representante || '',
+        celular_telefono: p.celular_telefono || '', celular: p.celular_telefono || '',
+        ciudad: p.ciudad || '', correo_electronico: p.correo_electronico || '', correo: p.correo_electronico || '',
+        pagina_web: p.pagina_web || '', catalogo: p.catalogo || '', tiempos_respuesta: p.tiempos_respuesta || '',
+        servicios_productos: p.servicios_productos || '', observaciones: p.observaciones || '', _supaId: p.id
+      }));
+    }
 
-  // Load offers
-  try {
-    const { data: offers, error: e3 } = await sb.from('sku_offers').select('*');
-    if (e3) throw e3;
-    // Group by sku_id (always use String keys to match catalog IDs)
-    const offerMap = {};
-    (offers || []).forEach(o => {
-      const key = String(o.sku_id);
-      if (!offerMap[key]) offerMap[key] = [];
-      offerMap[key].push({ provider: o.provider, price_sin_iva: Number(o.price_sin_iva) || 0 });
-    });
-    window._sbData.skuOffers = offerMap;
-  } catch(err) { console.warn('[Supabase] Offers load error (non-fatal):', err); errors.push('sku_offers'); }
+    // 2. SKUs
+    if (e2) { console.warn('[Supabase] SKU error:', e2); errors.push('sku_catalog'); }
+    else window._sbData.skuCatalog = skus || [];
 
-  // Load quotes
-  try {
-    const { data: quotes, error: e4 } = await sb.from('quotes').select('*').order('created_at', { ascending: false });
-    if (e4) throw e4;
-    window._sbData.quotes = (quotes || []).map(q => ({
-      it: String(q.id),
-      empresa: q.empresa || '',
-      fecha: q.fecha || '',
-      descripcion: q.descripcion || '',
-      und: q.und || 1,
-      pu_sin_iva: Number(q.pu_sin_iva) || 0,
-      pu_con_iva: Number(q.pu_con_iva) || 0,
-      ciudad_entrega: q.ciudad_entrega || '',
-      fecha_entrega: q.fecha_entrega || '',
-      observaciones: q.observaciones || '',
-      cotizacion_nombre: q.cotizacion_nombre || '',
-      cotizacion_batch: q.cotizacion_batch || '',
-      tiempo_entrega_dias: q.tiempo_entrega_dias || 0,
-      garantia_meses: q.garantia_meses || 0,
-      condiciones_pago: q.condiciones_pago || '',
-      observaciones_prov: q.observaciones_prov || '',
-      fecha_respuesta: q.fecha_respuesta || '',
-      estado_respuesta: q.estado_respuesta || 'pendiente',
-      _supaId: q.id
-    }));
-  } catch(err) { console.warn('[Supabase] Quotes load error (non-fatal):', err); errors.push('quotes'); }
+    // 3. Offers
+    if (e3) { console.warn('[Supabase] Offers error:', e3); errors.push('sku_offers'); }
+    else {
+      const offerMap = {};
+      (offers || []).forEach(o => {
+        const key = String(o.sku_id);
+        if (!offerMap[key]) offerMap[key] = [];
+        offerMap[key].push({ provider: o.provider, price_sin_iva: Number(o.price_sin_iva) || 0 });
+      });
+      window._sbData.skuOffers = offerMap;
+    }
 
-  // Load Adjudications
-  try {
-    const { data: adjs, error: e5 } = await sb.from('adjudications').select('*');
-    if (e5) throw e5;
-    const adjMap = {};
-    (adjs || []).forEach(a => { adjMap[a.cotizacion_nombre + '::' + a.sku] = a.provider; });
-    window._sbData.adjudications = adjMap;
-  } catch(err) { console.warn('[Supabase] Adjudications load error (non-fatal):', err); errors.push('adjudications'); }
+    // 4. Quotes
+    if (e4) { console.warn('[Supabase] Quotes error:', e4); errors.push('quotes'); }
+    else {
+      window._sbData.quotes = (quotes || []).map(q => ({
+        it: String(q.id), empresa: q.empresa || '', fecha: q.fecha || '', descripcion: q.descripcion || '',
+        und: q.und || 1, pu_sin_iva: Number(q.pu_sin_iva) || 0, pu_con_iva: Number(q.pu_con_iva) || 0,
+        ciudad_entrega: q.ciudad_entrega || '', fecha_entrega: q.fecha_entrega || '', observaciones: q.observaciones || '',
+        cotizacion_nombre: q.cotizacion_nombre || '', cotizacion_batch: q.cotizacion_batch || '',
+        tiempo_entrega_dias: q.tiempo_entrega_dias || 0, garantia_meses: q.garantia_meses || 0,
+        condiciones_pago: q.condiciones_pago || '', observaciones_prov: q.observaciones_prov || '',
+        fecha_respuesta: q.fecha_respuesta || '', estado_respuesta: q.estado_respuesta || 'pendiente', _supaId: q.id
+      }));
+    }
 
-  // Load Provider Responses
-  try {
-    const { data: responses, error: e6 } = await sb.from('provider_responses').select('*').order('responded_at', { ascending: false });
-    if (e6) throw e6;
-    window._sbData.providerResponses = responses || [];
-  } catch(err) { console.warn('[Supabase] Provider responses load error (non-fatal):', err); errors.push('provider_responses'); }
+    // 5. Adjudications
+    if (e5) { console.warn('[Supabase] Adjudications error:', e5); errors.push('adjudications'); }
+    else {
+      const adjMap = {};
+      (adjs || []).forEach(a => { adjMap[a.cotizacion_nombre + '::' + a.sku] = a.provider; });
+      window._sbData.adjudications = adjMap;
+    }
+
+    // 6. Provider Responses
+    if (e6) { console.warn('[Supabase] Responses error:', e6); errors.push('provider_responses'); }
+    else window._sbData.providerResponses = responses || [];
+
+  } catch (err) {
+    console.warn('[Supabase] Parallel load failed (fatal):', err);
+    return false;
+  }
 
   // Always mark as loaded so the app uses whatever Supabase data succeeded
   window._sbData.loaded = true;

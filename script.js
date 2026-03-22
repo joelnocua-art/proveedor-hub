@@ -35,57 +35,13 @@ function showToast(msg, durationOrType = 3000) {
 // Auth
 // ------------------------
 
-function registerUser() {
-  const name = document.getElementById('reg-name')?.value?.trim() || 'Usuario';
-  const email = document.getElementById('reg-email')?.value?.trim();
-  const password = document.getElementById('reg-password')?.value;
-
-  if (!email || !password) {
-    alert('Por favor completa el correo y la contraseña.');
-    return;
+async function logout() {
+  localStorage.removeItem('currentUser'); // Cleanup any legacy data
+  if (typeof getSupabase === 'function') {
+    const sb = getSupabase();
+    if (sb) await sb.auth.signOut();
   }
-
-  const emailLower = email.toLowerCase();
-  if (!emailLower.endsWith('@bia.app') && !emailLower.endsWith('@bia.com')) {
-    alert('Acceso restringido: Debes usar un correo corporativo de BIA Energy (@bia.app o @bia.com).');
-    return;
-  }
-
-  localStorage.setItem('registeredUser', JSON.stringify({ name, email, password }));
-  localStorage.setItem('currentUser', JSON.stringify({ name, email }));
-  window.location.href = 'home.html';
-}
-
-function logout() {
-  localStorage.removeItem('currentUser');
-  if (typeof sbSignOut === 'function') { sbSignOut(); return; }
   window.location.href = 'index.html';
-}
-
-function checkLogin() {
-  const user = localStorage.getItem('currentUser');
-  const page = document.body?.dataset?.page || '';
-  const pagePath = (window.location.pathname.split('/').pop() || '').toLowerCase();
-
-  // Auth pages: login and register (check both data-page and pathname for flexibility)
-  const isAuthPage = page === 'login' || page === 'register' 
-    || pagePath === '' || pagePath === 'index' || pagePath === 'index.html' 
-    || pagePath === 'register' || pagePath === 'register.html';
-
-  // Public page: respuesta.html (provider response form)
-  const isPublicPage = page === 'respuesta' || pagePath === 'respuesta' || pagePath === 'respuesta.html';
-
-  if (isPublicPage) return; // No auth required
-
-  if (!user && !isAuthPage) {
-    window.location.href = 'index.html';
-    return;
-  }
-
-  if (user && isAuthPage) {
-    window.location.href = 'home.html';
-    return;
-  }
 }
 
 // ------------------------
@@ -140,23 +96,27 @@ function setActiveNav() {
   });
 }
 
-function renderUserChip() {
+function renderUserChip(sbUser) {
   const el = document.getElementById('userChip');
   if (!el) return;
 
-  const user = safeJsonParse(localStorage.getItem('currentUser'));
-  if (!user) {
+  if (!sbUser) {
     el.innerHTML = '';
     return;
   }
 
-  const displayName = String(user.name || user.email || 'Usuario');
-  const displayEmail = String(user.email || '');
+  const displayName = String(sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || 'Usuario');
+  const displayEmail = String(sbUser.email || '');
   const initial = displayName.trim().charAt(0).toUpperCase() || 'U';
+  const avatar = sbUser.user_metadata?.avatar_url;
 
-  const avatarHtml = user.avatar
-    ? `<img src="${escapeHtml(String(user.avatar))}" style="width:28px;height:28px;border-radius:50%;margin-right:8px;vertical-align:-8px;object-fit:cover;" />`
-    : `<span style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;margin-right:8px;vertical-align:-8px;">${escapeHtml(initial)}</span>`;
+  function escapeHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  const avatarHtml = avatar
+    ? `<img src="${escapeHtml(avatar)}" style="width:28px;height:28px;border-radius:50%;margin-right:8px;vertical-align:-8px;object-fit:cover;" />`
+    : `<span style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;margin-right:8px;vertical-align:-8px;color:#0a0d1a;">${escapeHtml(initial)}</span>`;
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;">
@@ -1245,19 +1205,18 @@ function setupQuotesForm() {
     const body = encodeURIComponent(
       `Estimado proveedor,\n\n` +
       `Por medio del presente correo, BIA Energy solicita cotización para el siguiente ítem:\n\n` +
-      `${codigoBia ? '• Código BIA: ' + codigoBia + '\n' : ''}` +
-      `• Descripción / Referencia: ${desc}\n` +
-      `• Cantidad: ${und}\n` +
-      `${ciudadEnt ? '• Ciudad de entrega: ' + ciudadEnt + '\n' : ''}` +
-      `${fechaEnt ? '• Fecha de entrega requerida: ' + fechaEnt + '\n' : ''}` +
-      `\nPor favor incluir en su respuesta:\n` +
-      `  - Precio unitario (sin IVA y con IVA 19%)\n` +
-      `  - Total\n` +
-      `  - Fecha de entrega real\n` +
-      `  - Garantía ofrecida (meses)\n` +
-      `  - Ciudad / lugar de despacho\n` +
-      `  - Condiciones comerciales\n\n` +
-      `Muchas gracias,\nEquipo de Compras\nBIA Energy`
+      `==============================================================\n` +
+      `   CANTIDAD   |   SKU / DESCRIPCIÓN\n` +
+      `==============================================================\n` +
+      `   ${und.padEnd(8, ' ')}   |   ${codigoBia ? '[' + codigoBia + '] ' : ''}${desc}\n` +
+      `==============================================================\n\n` +
+      `${ciudadEnt ? '📍 Ciudad de entrega: ' + ciudadEnt + '\n' : ''}` +
+      `${fechaEnt ? '📅 Fecha límite requerida: ' + fechaEnt + '\n' : ''}` +
+      `\nPor favor, incluya en su cotización comercial:\n` +
+      `  - Precio unitario (sin IVA y con IVA)\n` +
+      `  - Tiempo de entrega estimado\n` +
+      `  - Garantía ofrecida (meses)\n\n` +
+      `Atentamente,\nEquipo de Compras\nBIA Energy`
     );
 
     // Get emails of selected providers
@@ -1845,17 +1804,7 @@ async function setupSkuPage() {
       if (typeof store !== 'object' || store === null) store = {};
     } catch(e) { store = {}; }
 
-    // 2. Merge from window.skuOffersData (JS variable from sku_offers.js - the 855 prices)
-    if (typeof window.skuOffersData !== 'undefined' && Array.isArray(window.skuOffersData)) {
-      for (var i = 0; i < window.skuOffersData.length; i++) {
-        var entry = window.skuOffersData[i];
-        var skuId = String(entry[0]);
-        var offers = entry[1]; // static offers use {provider, price_sin_iva}
-        if (!store[skuId] || !Array.isArray(store[skuId]) || store[skuId].length === 0) {
-          store[skuId] = offers;
-        }
-      }
-    }
+    // Note: The static sku_offers.js data was removed. We now rely on Supabase data.
 
     // 3. Merge with Supabase data if available
     if (window._sbData && window._sbData.loaded && window._sbData.skuOffers) {
@@ -2658,23 +2607,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Store user info for UI
-    if (sbUser) {
-      localStorage.setItem('currentUser', JSON.stringify({
-        name: sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || 'Usuario',
-        email: sbUser.email || ''
-      }));
-    }
   } else {
-    // Fallback: old localStorage check
-    if (!isPublicPage && !isAuthPage && !localStorage.getItem('currentUser')) {
+    // No Supabase fallback (we migrated completely to Supabase Auth)
+    if (!isPublicPage && !isAuthPage) {
       window.location.href = 'index.html';
       return;
     }
   }
 
   setActiveNav();
-  renderUserChip();
+  renderUserChip(sbUser);
 
   // Load Supabase data before rendering pages
   if (typeof sbLoadAll === 'function' && !['login','register','respuesta','404'].includes(page)) {

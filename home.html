@@ -128,16 +128,37 @@
         </div>
 
 
+        <div class="grid-2" style="margin-top: 16px;">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Cotizaciones por mes</div></div>
+            <div class="card-body"><div style="position:relative;height:240px;"><canvas id="chartQuotesByMonth"></canvas></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Proveedores por ciudad</div></div>
+            <div class="card-body"><div style="position:relative;height:240px;"><canvas id="chartProvidersByCity"></canvas></div></div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-top: 16px;">
+          <div class="card" style="grid-column: span 2;">
+            <div class="card-header">
+              <div class="card-title">Últimas 5 cotizaciones</div>
+              <div class="card-subtitle">Actividad de abastecimiento más reciente.</div>
+            </div>
+            <div class="card-body">
+              <div id="recentQuotes" class="muted">—</div>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="supabase-client.js?v=12"></script>
-  <script src="providers.js"></script>
-  <script src="quotes.js"></script>
-  <script src="providerProducts.js"></script>
-  <script src="script.js?v=14"></script>
+  <script src="script.js?v=15"></script>
   <script src="components.js"></script>
+  <script src="dashboard-charts.js?v=2"></script>
 </body>
 </html>

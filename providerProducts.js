@@ -1,2 +1,0 @@
-// Auto-generated data file
-const providerProductsData = [{"empresa": "AGENTE EXPERTO EN SERVICIOS PUBLICOS S.A.S. E.S.P. 900325920", "items": [{"descripcion": "Si", "avg_price": 89000.0, "min_price": 89000, "max_price": 89000}, {"descripcion": "234", "avg_price": 90000.0, "min_price": 90000, "max_price": 90000}, {"descripcion": "34234e", "avg_price": 39000.0, "min_price": 39000, "max_price": 39000}]}];

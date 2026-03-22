@@ -56,10 +56,10 @@ body {
 
 /* ─── Light Mode ───────────── */
 [data-theme="light"] {
-  --bg-base: #f4f5f7; --bg-depth: #ebedf1; --bg-raised: #ffffff;
-  --surface-0: rgba(0,0,0,0.03); --surface-1: rgba(0,0,0,0.05); --surface-2: rgba(0,0,0,0.08);
-  --border: rgba(0,0,0,0.1); --border-md: rgba(0,0,0,0.15); --border-hi: rgba(0,0,0,0.25);
-  --text: #1a1d2e; --text-2: #5a5f7a; --text-3: #7a7f99;
+  --bg-base: #f5f3ef; --bg-depth: #eee9e2; --bg-raised: #fcfcfc;
+  --surface-0: rgba(45,42,38,0.03); --surface-1: rgba(45,42,38,0.05); --surface-2: rgba(45,42,38,0.08);
+  --border: rgba(45,42,38,0.08); --border-md: rgba(45,42,38,0.12); --border-hi: rgba(45,42,38,0.20);
+  --text: #2d2a26; --text-2: #5c5852; --text-3: #8a857d;
   --primary: #4355e8; --primary-glow: rgba(67,85,232,0.2);
   --accent: #00b8a3; --accent-glow: rgba(0,184,163,0.18);
   --danger: #e8364e; --warning: #e6a000; --success: #00b36b;
@@ -206,7 +206,7 @@ label {
 .card {
   background: var(--surface-0); border: 1px solid var(--border);
   border-radius: var(--r-lg); box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px); min-width: 0; overflow: hidden;
   transition: border-color .22s ease, box-shadow .22s ease;
 }
 .card:hover { border-color: var(--border-md); box-shadow: var(--shadow-md); }

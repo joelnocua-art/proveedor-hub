@@ -58,7 +58,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="supabase-client.js?v=12"></script>
   <script>
-
   function showMsg(t,ok){var m=document.getElementById('loginMsg');m.style.display='block';m.style.background=ok?'rgba(0,229,200,0.1)':'rgba(255,77,109,0.1)';m.style.color=ok?'#00e5c8':'#ff4d6d';m.textContent=t}
 
   var sb=getSupabase();
@@ -70,16 +69,19 @@
     this.disabled=true;this.textContent='Iniciando sesión...';
     var r=await sb.auth.signInWithPassword({email:email,password:pass});
     if(r.error){showMsg(r.error.message,false);this.disabled=false;this.textContent='Iniciar sesión';return}
-    localStorage.setItem('currentUser',JSON.stringify({name:r.data.user.user_metadata?.full_name||email.split('@')[0],email:email}));
     window.location.href='home.html';
   };
 
-  // If already logged in, go to home
+  window.loginWithGoogle = async function() {
+    var r = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin + window.location.pathname.replace('index.html', 'home.html') } });
+    if(r.error) showMsg(r.error.message,false);
+  };
+
+  // If already logged in via active session, go to home
   (async function(){
     try{
       var r=await sb.auth.getUser();
       if(r.data&&r.data.user){
-        localStorage.setItem('currentUser',JSON.stringify({name:r.data.user.user_metadata?.full_name||r.data.user.email.split('@')[0],email:r.data.user.email}));
         window.location.href='home.html';
       }
     }catch(e){}

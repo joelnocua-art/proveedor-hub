@@ -147,11 +147,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="supabase-client.js?v=12"></script>
-  <script src="providers.js"></script>
-  <script src="quotes.js"></script>
-  <script src="providerProducts.js"></script>
-  <script src="sku_catalog.js"></script>
-  <script src="sku_offers.js"></script>
+
+
+
+
+
   <script src="script.js?v=13"></script>
   <script src="components.js"></script>
   <script>
@@ -284,7 +284,11 @@
       })});
       
       if(sendEmail){
-        var skuTable=skus.map(function(s,i){return (i+1)+'. '+s.sku+' — Cant: '+s.qty}).join('\n');
+        var skuTable = '==============================================================\n' + 
+                       '   CANT.   |   SKU / DESCRIPCIÓN\n' + 
+                       '==============================================================\n' +
+                       skus.map(function(s){return '   '+String(s.qty).padEnd(7, ' ')+' |   '+s.sku}).join('\n') +
+                       '\n==============================================================';
         var emailContainer = document.getElementById('emailLinksContainer');
         if(emailContainer) emailContainer.innerHTML = '';
         var validEmails = 0;
@@ -297,7 +301,7 @@
           var skuIds=skus.map(function(s){return s.id+':'+s.qty}).join(',');
           var formLink=baseUrl+'respuesta.html#p='+encodeURIComponent(emp)+'&n='+encodeURIComponent(name.trim())+'&b='+encodeURIComponent(batch)+'&s='+encodeURIComponent(skuIds)+'&c='+encodeURIComponent(city)+'&d='+encodeURIComponent(dt);
           var sub=encodeURIComponent('Solicitud de cotización: '+name.trim()+' — BIA Energy');
-          var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nReciban un cordial saludo de BIA Energy.\n\nSolicitamos cotización formal:\n\n'+skuTable+'\n\nCiudad: '+(city||'Por confirmar')+'\nFecha: '+(dt||'Por confirmar')+(notes?'\nNotas: '+notes:'')+'\n\n━━ RESPONDER ━━\nIngrese precios aquí:\n'+formLink+'\n\nO responda este correo con precios unitarios sin IVA, tiempo de entrega, garantía y condiciones de pago.\n\nCordialmente,\nOperaciones — BIA Energy');
+          var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nPor medio del presente correo, BIA Energy solicita cotización para los siguientes ítems:\n\n'+skuTable+'\n\n📍 Ciudad de entrega: '+(city||'Por confirmar')+'\n📅 Fecha límite requerida: '+(dt||'Por confirmar')+(notes?'\n📝 Notas adicionales: '+notes:'')+'\n\n━━ OPCIONES DE RESPUESTA ━━\nOpción 1: Ingrese sus precios rápidamente en nuestra plataforma a través del siguiente enlace seguro:\n'+formLink+'\n\nOpción 2: Responda este correo con su archivo de cotización comercial incluyendo:\n - Precio unitario (sin IVA y con IVA)\n - Tiempo estimado de entrega\n - Garantía mensual rotativa\n\nAtentamente,\nEquipo de Compras\nBIA Energy');
           
           var gmailUrl = 'https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body;
           
