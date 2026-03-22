@@ -120,9 +120,7 @@
           toInsert.push({
             sku_id: textSkuId,
             provider_id: pid,
-            price: parseFloat(off.price_sin_iva) || 0,
-            currency: 'COP',
-            vat_included: false
+            price: parseFloat(off.price_sin_iva) || 0
           });
           existSet.add(dedupKey); // prevent further dupes from same batch
         }
