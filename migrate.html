@@ -106,7 +106,7 @@
       const extSkuSet = new Set((extSkus || []).map(s => String(s.sku).trim().toLowerCase()));
 
       const newSkus = skus.filter(s => !extSkuSet.has(String(s.sku).trim().toLowerCase())).map(s => ({
-        sku: s.sku, category: s.category||'', status: 'Activo', critical: false
+        sku: s.sku, category: s.category||''
       }));
 
       log(`Se encontraron ${newSkus.length} SKUs nuevos para insertar (de ${skus.length} legacy).`);
