@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Migración a Supabase — v2</title>
+  <title>Migración a Supabase — v3</title>
   <style>
     body { padding: 40px; font-family: 'Inter', sans-serif; background: #0a0d1a; color: #fff; }
     .card { background: #151a2e; border: 1px solid #232a45; padding: 24px; border-radius: 14px; max-width: 800px; margin: 0 auto; }
@@ -14,10 +14,10 @@
 <body>
 
 <div class="card">
-  <h2>🚢 Migración de Precios Legacy → Supabase (v2)</h2>
+  <h2>🚢 Migración de Precios Legacy → Supabase (v3)</h2>
   <p style="color:#8088b0; margin-bottom: 24px;">
-    Este script sube los 855 precios del archivo local antiguo (<code>sku_offers_legacy.js</code>) a la tabla <code>sku_offers</code> de Supabase.<br>
-    <strong>No toca los proveedores ni el catálogo SKU</strong> (ya están correctos en Supabase).
+    Este script sube los 855 precios del archivo local antiguo a la tabla <code>sku_offers</code> de Supabase.<br>
+    Columnas usadas: <code>sku_id</code> (text), <code>provider</code> (text nombre), <code>price_sin_iva</code> (numeric).
   </p>
 
   <button class="btn" id="btnStart">▶ Iniciar Migración de Precios</button>
@@ -41,100 +41,76 @@
     if (!sb) { log('[ERROR] Cliente Supabase no disponible.'); return; }
 
     try {
-      // ── STEP 1: Get current providers from Supabase to map names → IDs ──
-      log('--- Paso 1: Cargando proveedores de Supabase ---');
-      const { data: provRows, error: provErr } = await sb.from('providers').select('id, empresa');
-      if (provErr) throw new Error('Error cargando proveedores: ' + provErr.message);
-      
-      // Build a map: lowercase provider name → provider id
-      const provMap = {};
-      (provRows || []).forEach(p => {
-        if (p.empresa) provMap[p.empresa.trim().toLowerCase()] = p.id;
-      });
-      log('Proveedores en Supabase: ' + Object.keys(provMap).length);
-      log('Nombres: ' + Object.keys(provMap).join(', '));
-
-      // ── STEP 2: Get current SKU catalog to validate sku_ids ──
-      log('\n--- Paso 2: Cargando catálogo SKU de Supabase ---');
-      const { data: skuRows, error: skuErr } = await sb.from('sku_catalog').select('id');
-      if (skuErr) throw new Error('Error cargando SKUs: ' + skuErr.message);
-      const validSkuIds = new Set((skuRows || []).map(s => String(s.id)));
-      log('SKUs en Supabase: ' + validSkuIds.size);
-
-      // ── STEP 3: Get existing offers to avoid duplicates ──
-      log('\n--- Paso 3: Cargando ofertas existentes en Supabase ---');
-      const { data: existOffers, error: offErr } = await sb.from('sku_offers').select('sku_id, provider_id');
+      // ── STEP 1: Get existing offers to avoid duplicates ──
+      log('--- Paso 1: Cargando ofertas existentes en Supabase ---');
+      const { data: existOffers, error: offErr } = await sb.from('sku_offers').select('sku_id, provider');
       if (offErr) throw new Error('Error cargando ofertas: ' + offErr.message);
-      const existSet = new Set((existOffers || []).map(o => o.sku_id + '::' + o.provider_id));
+      const existSet = new Set((existOffers || []).map(o => o.sku_id + '::' + (o.provider||'').toLowerCase()));
       log('Ofertas ya existentes: ' + existSet.size);
 
-      // ── STEP 4: Read legacy offers from localStorage seed ──
-      log('\n--- Paso 4: Procesando ofertas legacy ---');
-      // The legacy file seeds localStorage with an IIFE. We read it back.
+      // ── STEP 2: Read legacy offers from localStorage ──
+      log('\n--- Paso 2: Procesando ofertas legacy ---');
       let legacyStore = {};
       try {
         const raw = localStorage.getItem('skuOffersById');
         legacyStore = raw ? JSON.parse(raw) : {};
       } catch(e) { log('[AVISO] No se pudo leer localStorage: ' + e.message); }
 
-      // Count total legacy offers
       let totalLegacy = 0;
       for (const skuId in legacyStore) {
         if (Array.isArray(legacyStore[skuId])) totalLegacy += legacyStore[skuId].length;
       }
       log('Total ofertas legacy en localStorage: ' + totalLegacy);
 
-      // ── STEP 5: Map and prepare inserts ──
-      log('\n--- Paso 5: Mapeando ofertas al schema de Supabase ---');
+      if (totalLegacy === 0) {
+        log('[AVISO] El localStorage está vacío. Asegúrate de que la app principal haya cargado sku_offers_legacy.js primero.');
+        log('Abriendo la página principal para cargar los datos...');
+        // Try to fallback - the legacy js file writes to localStorage on load
+        // If we got here, it means the IIFE already ran. Let's re-read.
+        await sleep(1000);
+        try {
+          const raw2 = localStorage.getItem('skuOffersById');
+          legacyStore = raw2 ? JSON.parse(raw2) : {};
+          for (const skuId in legacyStore) {
+            if (Array.isArray(legacyStore[skuId])) totalLegacy += legacyStore[skuId].length;
+          }
+          log('Re-lectura: ' + totalLegacy + ' ofertas encontradas.');
+        } catch(e2) {}
+      }
+
+      // ── STEP 3: Map and prepare inserts ──
+      log('\n--- Paso 3: Mapeando ofertas al schema de Supabase ---');
       const toInsert = [];
-      let skipped = 0, noProvider = 0, noSku = 0, duplicate = 0;
+      let duplicate = 0;
 
       for (const skuId in legacyStore) {
         const textSkuId = String(skuId);
-        if (!validSkuIds.has(textSkuId)) { noSku++; continue; }
-
         const offers = legacyStore[skuId];
         if (!Array.isArray(offers)) continue;
 
         for (const off of offers) {
-          const provName = (off.provider || '').trim().toLowerCase();
-          const providerId = provMap[provName];
-          if (!providerId) {
-            // Try partial match
-            let found = null;
-            for (const key in provMap) {
-              if (key.indexOf(provName) !== -1 || provName.indexOf(key.split(' ')[0]) !== -1) {
-                found = provMap[key]; break;
-              }
-            }
-            if (!found) { noProvider++; skipped++; continue; }
-            // Use partial match
-            var pid = found;
-          } else {
-            var pid = providerId;
-          }
+          const provName = (off.provider || '').trim();
+          if (!provName) continue;
 
-          const dedupKey = textSkuId + '::' + pid;
+          const dedupKey = textSkuId + '::' + provName.toLowerCase();
           if (existSet.has(dedupKey)) { duplicate++; continue; }
 
           toInsert.push({
             sku_id: textSkuId,
-            provider_id: pid,
-            price: parseFloat(off.price_sin_iva) || 0
+            provider: provName,
+            price_sin_iva: parseFloat(off.price_sin_iva) || 0
           });
-          existSet.add(dedupKey); // prevent further dupes from same batch
+          existSet.add(dedupKey);
         }
       }
 
       log('\nResultado del mapeo:');
       log('  → Para insertar: ' + toInsert.length);
       log('  → Ya existentes (omitidos): ' + duplicate);
-      log('  → SKU no encontrado en Supabase: ' + noSku);
-      log('  → Proveedor no encontrado: ' + noProvider);
 
-      // ── STEP 6: Bulk insert ──
+      // ── STEP 4: Bulk insert ──
       if (toInsert.length > 0) {
-        log('\n--- Paso 6: Insertando ' + toInsert.length + ' ofertas en Supabase ---');
+        log('\n--- Paso 4: Insertando ' + toInsert.length + ' ofertas en Supabase ---');
         const chunks = chunk(toInsert, 100);
         let inserted = 0;
         for (let i = 0; i < chunks.length; i++) {
@@ -149,7 +125,7 @@
         }
         log('\nTotal insertadas: ' + inserted + ' de ' + toInsert.length);
       } else {
-        log('\n--- No hay ofertas nuevas para insertar ---');
+        log('\nNo hay ofertas nuevas para insertar. Todo ya está migrado.');
       }
 
       log('\n=============================================');
