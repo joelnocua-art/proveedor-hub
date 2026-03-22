@@ -221,14 +221,28 @@
 
     // === STEP 2: Providers with PROPER matching ===
     function offersStore(){
-      // Use Supabase-loaded offers (skuOffersData static file was removed)
       var st = {};
       if (window._sbData && window._sbData.skuOffers) {
         var sbOffers = window._sbData.skuOffers;
         for (var skuId in sbOffers) {
-          st[String(skuId)] = sbOffers[skuId];
+          st[String(skuId)] = Array.isArray(sbOffers[skuId]) ? sbOffers[skuId].slice() : [];
         }
       }
+      try {
+        var r = localStorage.getItem('skuOffersById');
+        var local = r ? JSON.parse(r) : {};
+        for (var k in local) {
+          if (!st[k]) st[k] = [];
+          if (Array.isArray(local[k])) {
+            local[k].forEach(function(lo) {
+              // Only add if provider isn't already in the list (Supabase overrides local)
+              if (!st[k].some(function(so) { return so.provider === lo.provider; })) {
+                st[k].push(lo);
+              }
+            });
+          }
+        }
+      } catch(e) {}
       return st;
     }
     function matchedEmpresas(){
