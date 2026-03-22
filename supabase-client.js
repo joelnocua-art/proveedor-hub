@@ -313,9 +313,9 @@ async function sbSubmitProviderResponse(batch, providerName, itemsData, conds) {
   if (!sb) return { ok: false, lastError: 'Supabase client no inicializado. La librería de base de datos no cargó.' };
   
   const insertList = itemsData.map(it => ({
-    batch: batch,
-    provider: providerName,
-    sku: it.sku,
+    batch: batch || 'LEGACY_BATCH',
+    provider: providerName || 'Desconocido',
+    sku: it.sku || 'SKU Desconocido',
     price_sin_iva: it.price_sin_iva,
     price_con_iva: it.price_con_iva,
     delivery_days: it.delivery_days || conds.delivery_days || 0,

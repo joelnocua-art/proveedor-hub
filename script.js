@@ -984,8 +984,7 @@ function setupNewProviderForm() {
   const form = document.getElementById('new-provider-form');
   if (!form) return;
 
-  // Initialize the SKU category dropdown now that Supabase is loaded safely
-  if (typeof initSkuPicker === 'function') initSkuPicker();
+  // initSkuPicker() is now handled by the polling interval in new_provider.html
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();

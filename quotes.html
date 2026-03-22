@@ -157,8 +157,10 @@
   <script>
   (function(){
     var step=4,skus=[],provSet=new Set();
-    var cat=Array.isArray(window.skuCatalogData)?window.skuCatalogData:[];
+    var cat=[]; // IMPORTANT: filled by sbCheckInterval after Supabase loads
+    function getCat(){ return Array.isArray(window.skuCatalogData) ? window.skuCatalogData : cat; }
     var allProvs=typeof getAllProviders==='function'?getAllProviders():[];
+
     var PMAP={'proelco':'PROELCO SAS','adler':'Adler TEC','laumayer':'Laumayer','selda':'SELDA 1 SAS','4s':'4S INGENIERIA S.A.S','bia technologies':'BIA TECHNOLOGIES'};
     var baseUrl=window.location.origin+window.location.pathname.replace(/quotes(\.html)?$/,'');
 
@@ -195,7 +197,8 @@
       sI.addEventListener('input',function(){
         var q=(sI.value||'').trim().toLowerCase();
         if(q.length<2){sD.style.display='none';return}
-        var m=cat.filter(function(x){return((x.sku||'')+' '+(x.category||'')).toLowerCase().indexOf(q)!==-1}).slice(0,12);
+        var liveCat=getCat();
+        var m=liveCat.filter(function(x){return((x.sku||'')+' '+(x.category||'')).toLowerCase().indexOf(q)!==-1}).slice(0,12);
         if(!m.length){sD.innerHTML='<div style="padding:14px 16px;color:var(--muted);font-size:13px;">Sin resultados</div>';sD.style.display='block';return}
         sD.innerHTML='';m.forEach(function(x){
           var has=skus.some(function(s){return s.id===x.id});
