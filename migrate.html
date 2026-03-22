@@ -43,13 +43,13 @@
     try {
       // ── STEP 1: Get current providers from Supabase to map names → IDs ──
       log('--- Paso 1: Cargando proveedores de Supabase ---');
-      const { data: provRows, error: provErr } = await sb.from('providers').select('id, nombre_empresa');
+      const { data: provRows, error: provErr } = await sb.from('providers').select('id, empresa');
       if (provErr) throw new Error('Error cargando proveedores: ' + provErr.message);
       
       // Build a map: lowercase provider name → provider id
       const provMap = {};
       (provRows || []).forEach(p => {
-        if (p.nombre_empresa) provMap[p.nombre_empresa.trim().toLowerCase()] = p.id;
+        if (p.empresa) provMap[p.empresa.trim().toLowerCase()] = p.id;
       });
       log('Proveedores en Supabase: ' + Object.keys(provMap).length);
       log('Nombres: ' + Object.keys(provMap).join(', '));
