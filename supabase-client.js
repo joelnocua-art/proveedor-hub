@@ -64,7 +64,12 @@ async function sbLoadAll() {
 
     // 2. SKUs
     if (e2) { console.warn('[Supabase] SKU error:', e2); errors.push('sku_catalog'); }
-    else window._sbData.skuCatalog = skus || [];
+    else {
+      window._sbData.skuCatalog = (skus || []).map(s => ({
+        ...s,
+        sku: s.name // Map legacy front-end expected property
+      }));
+    }
 
     // 3. Offers
     if (e3) { console.warn('[Supabase] Offers error:', e3); errors.push('sku_offers'); }

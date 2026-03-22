@@ -984,6 +984,9 @@ function setupNewProviderForm() {
   const form = document.getElementById('new-provider-form');
   if (!form) return;
 
+  // Initialize the SKU category dropdown now that Supabase is loaded safely
+  if (typeof initSkuPicker === 'function') initSkuPicker();
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
 

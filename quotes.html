@@ -405,16 +405,51 @@
 
     // === INIT ===
     wizGo(1);renderSkuList();
-    
-    // Wait for Supabase to finish loading asynchronously, then repaint only if user is on Step 4
+
+    // Wait for Supabase to finish loading asynchronously
     var sbCheckInterval = setInterval(function() {
       if (window._sbData && window._sbData.loaded) {
         clearInterval(sbCheckInterval);
-        if (step === 4) {
-          wizGo(4); // User is already on tracking, refresh it
-        } else {
-          renderTrack(); // Just silently refresh tracking data in background
-        }
+
+        // NOW safely load the catalog (fixes race condition where cat was empty)
+        cat = Array.isArray(window.skuCatalogData) ? window.skuCatalogData : [];
+        allProvs = typeof getAllProviders === 'function' ? getAllProviders() : [];
+
+        // Process quotePrefill AFTER data is ready
+        try {
+          var pf = JSON.parse(localStorage.getItem('quotePrefill') || 'null');
+          if (pf) {
+            localStorage.removeItem('quotePrefill');
+            // Format A: Cart style (from SKU page bulk add) — {skus:[...], providers:[...]}
+            if (pf.skus && pf.skus.length) {
+              pf.skus.forEach(function(s) {
+                skus.push({id: s.skuId||s.id||'', sku: s.sku||s.description||'', cat: s.category||'', qty: 1});
+              });
+              if (pf.providers && pf.providers.length) {
+                pf.providers.forEach(function(p) { provSet.add(p); });
+              }
+              renderSkuList();
+              // If we have both SKUs and providers, go straight to Step 3
+              if (provSet.size > 0) { wizGo(3); }
+              else { wizGo(1); }
+            }
+            // Format B: Single SKU style (from prefillQuoteFromSku) — {provider, description, pu_sin_iva}
+            else if (pf.description) {
+              var skuName = pf.description || '';
+              var provName = pf.provider || '';
+              var matchedSku = cat.find(function(x){ return (x.sku||'').toLowerCase() === skuName.toLowerCase(); });
+              skus.push({ id: matchedSku ? matchedSku.id : '', sku: skuName, cat: matchedSku ? (matchedSku.category||'') : '', qty: 1 });
+              if (provName) provSet.add(provName);
+              renderSkuList();
+              // Go straight to Step 3 (review) since we have all data
+              wizGo(3);
+            }
+          }
+        } catch(e) { console.warn('quotePrefill error:', e); }
+
+        // Refresh tracking in background
+        if (step === 4) { wizGo(4); }
+        else { renderTrack(); }
       }
     }, 100);
 
@@ -470,7 +505,6 @@
     checkProviderResponses();
     // Also check periodically (in case provider responds while page is open)
     setInterval(checkProviderResponses,5000);
-    try{var pf=JSON.parse(localStorage.getItem('quotePrefill')||'null');if(pf&&pf.skus&&pf.skus.length){pf.skus.forEach(function(s){skus.push({id:s.skuId||s.id||'',sku:s.sku||s.description||'',cat:s.category||'',qty:1})});localStorage.removeItem('quotePrefill');renderSkuList();wizGo(1)}}catch(e){}
   })();
   </script>
 </body>

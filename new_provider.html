@@ -452,7 +452,7 @@
       setTimeout(() => { window.location.href = 'providers.html'; }, 1200);
     }
 
-    document.addEventListener('DOMContentLoaded', initSkuPicker);
+    // initSkuPicker() is now safely called inside script.js -> setupNewProviderForm()
   </script>
 </body>
 </html>
