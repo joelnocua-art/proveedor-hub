@@ -67,7 +67,7 @@ async function sbLoadAll() {
     else {
       window._sbData.skuCatalog = (skus || []).map(s => ({
         ...s,
-        sku: s.name // Map legacy front-end expected property
+        sku: s.sku || s.name // Map legacy front-end expected property
       }));
     }
 
