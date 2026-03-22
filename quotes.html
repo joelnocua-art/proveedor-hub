@@ -229,8 +229,6 @@
           st[String(skuId)] = sbOffers[skuId];
         }
       }
-      // Also merge any manually saved localStorage offers
-      try { var r = localStorage.getItem('skuOffersById'); var local = r ? JSON.parse(r) : {}; for (var k in local) { if (!st[k]) st[k] = local[k]; } } catch(e) {}
       return st;
     }
     function matchedEmpresas(){
@@ -312,7 +310,7 @@
           var skuIds=skus.map(function(s){return s.id+':'+s.qty}).join(',');
           var formLink=baseUrl+'respuesta.html#p='+encodeURIComponent(emp)+'&n='+encodeURIComponent(name.trim())+'&b='+encodeURIComponent(batch)+'&s='+encodeURIComponent(skuIds)+'&c='+encodeURIComponent(city)+'&d='+encodeURIComponent(dt);
           var sub=encodeURIComponent('Solicitud de cotización: '+name.trim()+' — BIA Energy');
-          var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nPor medio del presente correo, BIA Energy solicita cotización para los siguientes ítems:\n\n'+skuTable+'\n\n📍 Ciudad de entrega: '+(city||'Por confirmar')+'\n📅 Fecha límite requerida: '+(dt||'Por confirmar')+(notes?'\n📝 Notas adicionales: '+notes:'')+'\n\n━━ OPCIONES DE RESPUESTA ━━\nOpción 1: Ingrese sus precios rápidamente en nuestra plataforma a través del siguiente enlace seguro:\n'+formLink+'\n\nOpción 2: Responda este correo con su archivo de cotización comercial incluyendo:\n - Precio unitario (sin IVA y con IVA)\n - Tiempo estimado de entrega\n - Garantía mensual rotativa\n\nAtentamente,\nEquipo de Compras\nBIA Energy');
+          var body=encodeURIComponent('Estimado(a) equipo de '+emp+',\n\nPor medio del presente correo, BIA Energy solicita cotización para los siguientes ítems:\n\n'+skuTable+'\n\n📍 Ciudad de entrega: '+(city||'Por confirmar')+'\n📅 Fecha límite requerida: '+(dt||'Por confirmar')+(notes?'\n📝 Notas adicionales: '+notes:'')+'\n\n━━ OPCIONES DE RESPUESTA ━━\nOpción 1: Ingrese sus precios rápidamente en nuestra plataforma a través del siguiente enlace seguro:\n'+formLink+'\n\nOpción 2: Responda este correo con su archivo de cotización comercial incluyendo:\n - Precio unitario (sin IVA y con IVA)\n - Tiempo estimado de entrega\n - Garantía (meses)\n\nAtentamente,\nEquipo de Operaciones\nBIA Energy');
           
           var gmailUrl = 'https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email)+'&su='+sub+'&body='+body;
           

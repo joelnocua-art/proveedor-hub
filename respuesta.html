@@ -152,9 +152,9 @@
   (async function() {
     var catalog = [];
     try {
-      var r = await sb.from('sku_catalog').select('id, name, category');
+      var r = await sb.from('sku_catalog').select('id, sku, category');
       if (!r.error && r.data) {
-        catalog = r.data.map(function(s){ return {id:s.id, sku:s.name, name:s.name, category:s.category}; });
+        catalog = r.data.map(function(s){ return {id:s.id, sku:s.sku, name:s.sku, category:s.category}; });
       }
     } catch(e) { console.warn('Could not load catalog:', e); }
     buildForm(catalog);
