@@ -611,7 +611,7 @@ function renderProvidersCards(list) {
             ${(tags || more) ? `<div class="tag-list">${tags}${more}</div>` : `<div class="muted" style="font-size:12px; margin-top: 10px;">Sin catálogo/servicios cargados.</div>`}
 
             <div class="card-actions">
-              <a class="chip" href="provider_detail.html?it=${encodeURIComponent(String(p.it))}">Ficha</a>
+              <a class="chip" href="provider_detail.html?it=${encodeURIComponent(String(p.it))}">Abrir</a>
               <button class="chip" onclick="openProviderModal('${escapeHtml(p.it)}')">Vista rápida</button>
               <button class="chip" onclick="toggleProviderInlineEdit('${escapeHtml(p.it)}')">Editar</button>
               <button class="chip danger" onclick="confirmDeleteProvider('${escapeHtml(p.it)}')">Eliminar</button>
@@ -635,7 +635,7 @@ function renderProvidersCards(list) {
                 <div class="col-6">
                   <label>Categoría</label>
                   <select class="input" id="ie-categoria-${escapeHtml(p.it)}">
-                    <option value="NUEVO" ${String(p.categoria||'').toUpperCase()==='NUEVO'?'selected':''}>NUEVO</option>
+                    <option value="PENDIENTE DE CREACION" ${String(p.categoria||'').toUpperCase()==='PENDIENTE DE CREACION'?'selected':''}>PENDIENTE DE CREACIÓN</option>
                     <option value="DISPONIBLE" ${String(p.categoria||'').toUpperCase()==='DISPONIBLE'?'selected':''}>DISPONIBLE</option>
                   </select>
                 </div>
@@ -839,7 +839,7 @@ function openProviderModal(id) {
 
     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 14px;">
       ${canEdit ? `<button class="btn" onclick="openProviderEdit('${escapeHtml(id)}')">Editar</button>` : ''}
-      <a class="btn" href="provider_detail.html?it=${encodeURIComponent(String(id))}">Abrir ficha</a>
+      <a class="btn" href="provider_detail.html?it=${encodeURIComponent(String(id))}">Ver proveedor</a>
       <a class="btn" href="quotes.html?provider=${encodeURIComponent(String(p.empresa||''))}">Crear cotización</a>
       <button class="btn btn-danger" onclick="confirmDeleteProvider('${escapeHtml(id)}')">${deleteLabel}</button>
       <button class="btn" onclick="closeProviderModal()">Cerrar</button>
@@ -894,7 +894,7 @@ function openProviderEdit(id) {
           <div class="col-6">
             <label>Categoría</label>
             <select class="input" id="ep-categoria">
-              <option value="NUEVO" ${String(p.categoria||'').toUpperCase()==='NUEVO'?'selected':''}>NUEVO</option>
+              <option value="PENDIENTE DE CREACION" ${String(p.categoria||'').toUpperCase()==='PENDIENTE DE CREACION'?'selected':''}>PENDIENTE DE CREACIÓN</option>
               <option value="DISPONIBLE" ${String(p.categoria||'').toUpperCase()==='DISPONIBLE'?'selected':''}>DISPONIBLE</option>
             </select>
           </div>
@@ -1449,7 +1449,7 @@ function setupQuoteDetailPage() {
           <div>
             <div class="muted" style="font-size:12px;">Proveedor</div>
             <div style="font-weight:800;font-size:16px;">${escapeHtml(q.empresa||'')}</div>
-            <div style="margin-top:8px;">${providerLink ? `<a class="chip" href="${providerLink}">Ver ficha del proveedor</a>` : '<span class="muted" style="font-size:12px;">Sin ficha</span>'}</div>
+            <div style="margin-top:8px;">${providerLink ? `<a class="chip" href="${providerLink}">Ver proveedor</a>` : '<span class="muted" style="font-size:12px;">Sin registro</span>'}</div>
           </div>
           <div>
             <div class="muted" style="font-size:12px;">Descripción / Referencia</div>
@@ -2391,7 +2391,7 @@ function setupProviderDetailPage() {
             <div class="col-6">
               <label>Categoría</label>
               <select class="input" id="ie-categoria-${escapeHtml(p.it)}">
-                <option value="NUEVO" ${String(p.categoria||'').toUpperCase()==='NUEVO'?'selected':''}>NUEVO</option>
+                <option value="PENDIENTE DE CREACION" ${String(p.categoria||'').toUpperCase()==='PENDIENTE DE CREACION'?'selected':''}>PENDIENTE DE CREACIÓN</option>
                 <option value="DISPONIBLE" ${String(p.categoria||'').toUpperCase()==='DISPONIBLE'?'selected':''}>DISPONIBLE</option>
               </select>
             </div>
