@@ -1,3 +1,4 @@
+/* Build: v15-hotfix 2026-03-24 */
 /*
   Proveedor Hub (static prototype)
   - Auth simulation via localStorage
