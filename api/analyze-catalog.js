@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   const userPrompt = `Valid SKUs:\n${JSON.stringify(skus)}\n\nSupplier Catalog Text:\n${typeof text === 'string' ? text.substring(0, 150000) : text}`;
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
