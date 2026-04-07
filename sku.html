@@ -202,37 +202,52 @@
                document.getElementById('pdfStatus').innerText = 'ChatGPT analizando precios... (puede tardar hasta 60s)';
                var skuNames = (window.skuCatalogData || []).map(s => s.sku);
                
-               // Timeout de 90 segundos para no quedarse colgado
-               var controller = new AbortController();
-               var timeoutId = setTimeout(function() { controller.abort(); }, 90000);
+               // Obtenemos la llave de forma segura desde el backend
+               var keyReq = await fetch('/api/get-key');
+               if (!keyReq.ok) throw new Error('Error al obtener la clave de API gratuita.');
+               var keyRes = await keyReq.json();
+               if (!keyRes.key) throw new Error('Clave de Gemini no configurada.');
+               var apiKey = keyRes.key;
                
                var req;
                try {
-                   req = await fetch('/api/analyze-catalog', {
+                   var systemInstruction = `You are a professional procurement and logistics AI for BIA Energy. I will provide a list of valid SKUs and raw text extracted from a supplier's catalog PDF. Find the pricing and delivery details for the exact SKUs in the catalog. Return ONLY a valid JSON array of objects with keys: "sku" (string, EXACTLY matching one of my SKUs), "price" (number, NO currency symbols, just float or integer. For example, if it says $250.000, parse as 250000), "delivery_days" (string or number, e.g. "5", null if not found), "warranty" (string, e.g. "12 meses", null if not found). Output strictly pure JSON.`;
+                   var userPrompt = `Valid SKUs:\n${JSON.stringify(skuNames)}\n\nSupplier Catalog Text:\n${typeof fullText === 'string' ? fullText.substring(0, 150000) : fullText}`;
+                   
+                   req = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey, {
                        method: 'POST',
-                       headers: {'Content-Type': 'application/json'},
-                       body: JSON.stringify({ text: fullText, skus: skuNames }),
-                       signal: controller.signal
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({
+                         system_instruction: { parts: [{ text: systemInstruction }] },
+                         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+                         generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
+                       })
                    });
                } catch(fetchErr) {
-                   clearTimeout(timeoutId);
-                   if (fetchErr.name === 'AbortError') {
-                       throw new Error('La solicitud tardó más de 90 segundos. El PDF puede ser demasiado grande. Intenta con un documento más corto.');
-                   }
                    throw fetchErr;
                }
-               clearTimeout(timeoutId);
                
                if (!req.ok) {
                    var errText = '';
-                   try { var errJson = await req.json(); errText = errJson.error || errJson.details || JSON.stringify(errJson); } catch(e) { errText = 'Error HTTP ' + req.status; }
+                   try { 
+                      var errJson = await req.json(); 
+                      errText = (errJson.error && errJson.error.message) ? errJson.error.message : JSON.stringify(errJson); 
+                   } catch(e) { errText = 'Error HTTP ' + req.status; }
                    throw new Error(errText);
                }
                
-               var res = await req.json();
-               if(res.error) throw new Error(res.error + (res.details ? ' ' + res.details : ''));
+               var geminiData = await req.json();
+               if (!geminiData.candidates || geminiData.candidates.length === 0 || !geminiData.candidates[0].content) {
+                   throw new Error("Gemini devolvió una respuesta vacía o bloqueada por seguridad.");
+               }
+               
+               let contentStr = geminiData.candidates[0].content.parts[0].text.trim();
+               if (contentStr.startsWith('```json')) contentStr = contentStr.replace(/```json/g, '').replace(/```$/g, '').trim();
+               if (contentStr.startsWith('```')) contentStr = contentStr.replace(/```/g, '').trim();
+               
+               var res = JSON.parse(contentStr);
                if(!Array.isArray(res)) throw new Error('Respuesta inválida de IA: no es un arreglo.');
-               if(res.length === 0) throw new Error('ChatGPT no encontró ningún SKU de tu catálogo o formato ilegible.');
+               if(res.length === 0) throw new Error('Gemini no encontró ningún SKU de tu catálogo o formato ilegible.');
                
                document.getElementById('pdfStatus').innerText = 'Guardando ' + res.length + ' precios...';
                
