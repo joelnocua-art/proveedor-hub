@@ -171,8 +171,8 @@
     window.processPdf = async function() {
       var pSelect = document.getElementById('pdfProviderSelect');
       var fInput = document.getElementById('pdfFileInput');
-      if(!pSelect.value) return toast('Selecciona un proveedor','error');
-      if(!fInput.files.length) return toast('Sube un archivo PDF','error');
+      if(!pSelect.value) return showToast('Selecciona un proveedor','error');
+      if(!fInput.files.length) return showToast('Sube un archivo PDF','error');
       
       document.getElementById('btnProcessPdf').disabled = true;
       document.getElementById('btnCancelPdf').disabled = true;
@@ -251,13 +251,13 @@
                    }
                }
                
-               toast('Se extrajeron y actualizaron ' + successCount + ' precios con éxito.','success');
+               showToast('Se extrajeron y actualizaron ' + successCount + ' precios con éxito.','success');
                document.getElementById('pdfModal').style.display='none';
                // Reload page to visually show the newly extracted SKUs
                setTimeout(function() { window.location.reload(); }, 1500);
            } catch (innerErr) {
                console.error(innerErr);
-               toast('Error: ' + innerErr.message, 'error');
+               showToast('Error: ' + innerErr.message, 'error');
                document.getElementById('btnProcessPdf').disabled = false;
                document.getElementById('btnCancelPdf').disabled = false;
                document.getElementById('pdfStatus').innerText = 'Error en el proceso.';
@@ -266,7 +266,7 @@
         fileReader.readAsArrayBuffer(file);
       } catch(err) {
         console.error(err);
-        toast('Error general: ' + err.message, 'error');
+        showToast('Error general: ' + err.message, 'error');
         document.getElementById('btnProcessPdf').disabled = false;
         document.getElementById('btnCancelPdf').disabled = false;
       }
