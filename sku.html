@@ -199,14 +199,35 @@
                }
                var fullText = textParts.join('\n');
                
-               document.getElementById('pdfStatus').innerText = 'ChatGPT analizando precios...';
+               document.getElementById('pdfStatus').innerText = 'ChatGPT analizando precios... (puede tardar hasta 60s)';
                var skuNames = (window.skuCatalogData || []).map(s => s.sku);
                
-               var req = await fetch('/api/analyze-catalog', {
-                   method: 'POST',
-                   headers: {'Content-Type': 'application/json'},
-                   body: JSON.stringify({ text: fullText, skus: skuNames })
-               });
+               // Timeout de 90 segundos para no quedarse colgado
+               var controller = new AbortController();
+               var timeoutId = setTimeout(function() { controller.abort(); }, 90000);
+               
+               var req;
+               try {
+                   req = await fetch('/api/analyze-catalog', {
+                       method: 'POST',
+                       headers: {'Content-Type': 'application/json'},
+                       body: JSON.stringify({ text: fullText, skus: skuNames }),
+                       signal: controller.signal
+                   });
+               } catch(fetchErr) {
+                   clearTimeout(timeoutId);
+                   if (fetchErr.name === 'AbortError') {
+                       throw new Error('La solicitud tardó más de 90 segundos. El PDF puede ser demasiado grande. Intenta con un documento más corto.');
+                   }
+                   throw fetchErr;
+               }
+               clearTimeout(timeoutId);
+               
+               if (!req.ok) {
+                   var errText = '';
+                   try { var errJson = await req.json(); errText = errJson.error || errJson.details || JSON.stringify(errJson); } catch(e) { errText = 'Error HTTP ' + req.status; }
+                   throw new Error(errText);
+               }
                
                var res = await req.json();
                if(res.error) throw new Error(res.error + (res.details ? ' ' + res.details : ''));
