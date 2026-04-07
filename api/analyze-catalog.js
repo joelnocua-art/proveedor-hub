@@ -8,37 +8,42 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing text or skus array in request body' });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the Vercel server. Please add it in your project Settings -> Environment Variables.' });
+    return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the Vercel server. Please add it in your project Settings -> Environment Variables.' });
   }
 
+  // Define the prompt identical to OpenAI to preserve quality
+  const systemInstruction = `You are a professional procurement and logistics AI for BIA Energy. I will provide a list of valid SKUs and raw text extracted from a supplier's catalog PDF. Find the pricing and delivery details for the exact SKUs in the catalog. Return ONLY a valid JSON array of objects with keys: "sku" (string, EXACTLY matching one of my SKUs), "price" (number, NO currency symbols, just float or integer. For example, if it says $250.000, parse as 250000), "delivery_days" (string or number, e.g. "5", null if not found), "warranty" (string, e.g. "12 meses", null if not found). Output strictly pure JSON.`;
+  
+  const userPrompt = `Valid SKUs:\n${JSON.stringify(skus)}\n\nSupplier Catalog Text:\n${typeof text === 'string' ? text.substring(0, 150000) : text}`;
+
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
+        system_instruction: {
+          parts: [{ text: systemInstruction }]
+        },
+        contents: [
           {
-            role: 'system',
-            content: `You are a professional procurement and logistics AI for BIA Energy. I will provide raw text extracted from a supplier's catalog PDF, and a list of my company's valid SKUs. Find the pricing and delivery details for the exact SKUs in the catalog. Return ONLY a valid JSON array of objects with keys: "sku" (string, EXACTLY matching one of my SKUs), "price" (number, NO currency symbols, just float or integer. For example, if it says $250.000, parse as 250000), "delivery_days" (string or number, e.g. "5", null if not found), "warranty" (string, e.g. "12 meses", null if not found). Output strictly pure JSON, no markdown blocks like \`\`\`json.`
-          },
-          {
-            role: 'user',
-            content: `Valid SKUs:\n${JSON.stringify(skus)}\n\nSupplier Catalog Text:\n${typeof text === 'string' ? text.substring(0, 80000) : text}`
+            role: "user",
+            parts: [{ text: userPrompt }]
           }
         ],
-        temperature: 0.1
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: "application/json"
+        }
       })
     });
 
     if (!response.ok) {
       const err = await response.text();
-      let errMsg = 'OpenAI API Error';
+      let errMsg = 'Gemini API Error';
       try {
         const parsed = JSON.parse(err);
         if (parsed.error && parsed.error.message) errMsg += ': ' + parsed.error.message;
@@ -50,7 +55,12 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    let content = data.choices[0].message.content.trim();
+    
+    if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content) {
+       return res.status(500).json({ error: "Gemini devolvió una respuesta vacía o bloqueada por seguridad." });
+    }
+
+    let content = data.candidates[0].content.parts[0].text.trim();
     if (content.startsWith('```json')) content = content.replace(/```json/g, '').replace(/```$/g, '').trim();
     if (content.startsWith('```')) content = content.replace(/```/g, '').trim();
     
