@@ -245,7 +245,28 @@
                if (contentStr.startsWith('```json')) contentStr = contentStr.replace(/```json/g, '').replace(/```$/g, '').trim();
                if (contentStr.startsWith('```')) contentStr = contentStr.replace(/```/g, '').trim();
                
-               var res = JSON.parse(contentStr);
+               var res = [];
+               try {
+                   res = JSON.parse(contentStr);
+               } catch (parseErr) {
+                   // Fallback: If Gemini hits the max output token limit, the JSON string gets cut off.
+                   // We salvage it by finding the last closed object '}' and closing the array.
+                   console.warn("JSON parcial detectado. Recuperando objetos extraídos...");
+                   var lastBrace = contentStr.lastIndexOf('}');
+                   if (lastBrace !== -1) {
+                       var truncatedStr = contentStr.substring(0, lastBrace + 1);
+                       if (!truncatedStr.trim().startsWith('[')) truncatedStr = '[' + truncatedStr;
+                       truncatedStr += ']';
+                       try {
+                           res = JSON.parse(truncatedStr);
+                       } catch(err2) {
+                           throw new Error('La IA se quedó sin memoria y tampoco se pudo recuperar el texto parcial.');
+                       }
+                   } else {
+                       throw new Error('Respuesta ilegible de IA.');
+                   }
+               }
+               
                if(!Array.isArray(res)) throw new Error('Respuesta inválida de IA: no es un arreglo.');
                if(res.length === 0) throw new Error('Gemini no encontró ningún SKU de tu catálogo o formato ilegible.');
                
