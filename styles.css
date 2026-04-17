@@ -515,3 +515,41 @@ tbody tr:last-child td { border-bottom: none; }
 [data-theme="light"] .page-title { color: var(--text); }
 [data-theme="light"] .card-title { color: var(--text); }
 [data-theme="light"] .card-subtitle { color: var(--text-2); }
+
+/* ─── Sales Module — Status Chips ─── */
+.sales-status { display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:999px; font-size:11.5px; font-weight:600; border:1px solid; white-space:nowrap; }
+.sales-status.s-nueva           { background:rgba(157,163,199,.12); color:#9da3c7; border-color:rgba(157,163,199,.25); }
+.sales-status.s-cotizacion      { background:rgba(91,107,255,.1);   color:var(--primary); border-color:rgba(91,107,255,.25); }
+.sales-status.s-enviada         { background:rgba(255,190,61,.1);   color:var(--warning); border-color:rgba(255,190,61,.25); }
+.sales-status.s-firmada         { background:rgba(255,152,56,.1);   color:#ff9838; border-color:rgba(255,152,56,.25); }
+.sales-status.s-factura         { background:rgba(168,85,247,.1);   color:#a855f7; border-color:rgba(168,85,247,.25); }
+.sales-status.s-cerrada         { background:rgba(0,212,138,.1);    color:var(--success); border-color:rgba(0,212,138,.25); }
+.sales-status.s-cancelada       { background:rgba(255,77,109,.08);  color:var(--danger); border-color:rgba(255,77,109,.25); }
+.sales-status .status-dot { width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+
+/* ─── Sales Timeline ─── */
+.sales-timeline { position:relative; padding-left:28px; }
+.sales-timeline::before { content:''; position:absolute; left:8px; top:4px; bottom:4px; width:2px; background:var(--border); border-radius:2px; }
+.timeline-item { position:relative; padding-bottom:20px; }
+.timeline-item:last-child { padding-bottom:0; }
+.timeline-dot { position:absolute; left:-24px; top:3px; width:12px; height:12px; border-radius:50%; border:2px solid var(--accent); background:var(--bg-base); z-index:1; }
+.timeline-dot.active { background:var(--accent); box-shadow:0 0 0 4px rgba(0,229,200,.15); }
+.timeline-dot.future { border-color:var(--border); }
+.timeline-content { font-size:13px; }
+.timeline-date { font-size:11px; color:var(--text-3); margin-top:2px; }
+
+/* ─── Sales Table ─── */
+.sales-table tr { cursor:pointer; transition:background .15s; }
+.sales-table tr:hover td { background:rgba(91,107,255,.04); }
+.sales-valor { font-family:'Syne',sans-serif; font-weight:700; letter-spacing:-.01em; }
+
+/* Light mode for sales */
+[data-theme="light"] .sales-status.s-nueva      { background:rgba(100,110,150,.08); color:#6b7280; border-color:rgba(100,110,150,.2); }
+[data-theme="light"] .sales-status.s-cotizacion  { background:rgba(67,85,232,.08); color:#4355e8; border-color:rgba(67,85,232,.2); }
+[data-theme="light"] .sales-status.s-enviada     { background:rgba(200,150,0,.08); color:#b8860b; border-color:rgba(200,150,0,.2); }
+[data-theme="light"] .sales-status.s-firmada     { background:rgba(220,120,30,.08); color:#c87518; border-color:rgba(220,120,30,.2); }
+[data-theme="light"] .sales-status.s-factura     { background:rgba(140,60,220,.08); color:#7c3aed; border-color:rgba(140,60,220,.2); }
+[data-theme="light"] .sales-status.s-cerrada     { background:rgba(0,160,100,.08); color:#059669; border-color:rgba(0,160,100,.2); }
+[data-theme="light"] .sales-status.s-cancelada   { background:rgba(220,40,60,.06); color:#dc2626; border-color:rgba(220,40,60,.18); }
+[data-theme="light"] .timeline-dot { background:#f5f3ef; }
+[data-theme="light"] .timeline-dot.active { background:var(--accent); }

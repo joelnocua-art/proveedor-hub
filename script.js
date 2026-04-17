@@ -2691,4 +2691,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (page === 'sku') {
     setupSkuPage();
   }
+
+  // Sales page (visual prototype — no setup needed yet)
+  if (page === 'sales') {
+    // Future: setupSalesPage();
+  }
 });

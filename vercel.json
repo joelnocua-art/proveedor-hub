@@ -36,6 +36,7 @@
     { "source": "/cotizaciones", "destination": "/quotes.html" },
     { "source": "/comparativo", "destination": "/compare.html" },
     { "source": "/sku", "destination": "/sku.html" },
-    { "source": "/respuesta", "destination": "/respuesta.html" }
+    { "source": "/respuesta", "destination": "/respuesta.html" },
+    { "source": "/ventas", "destination": "/sales.html" }
   ]
 }

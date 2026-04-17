@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Venta de Activos - Proveedor Hub</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+  <style>
+    /* ─── Wizard Stepper (reused from quotes) ─── */
+    .wizard-stepper{display:flex;align-items:center;gap:0;margin-bottom:20px;padding:16px 20px;background:rgba(255,255,255,0.03);border-radius:var(--r-lg);border:1px solid var(--border)}
+    .wz-step{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;padding:8px 12px;border-radius:var(--r-md);transition:background .15s}
+    .wz-step:hover{background:rgba(255,255,255,0.04)}
+    .wz-num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid var(--border);color:var(--text-3);transition:all .25s;flex-shrink:0}
+    .wz-step.active .wz-num{background:var(--accent);border-color:var(--accent);color:#fff}
+    .wz-step.done .wz-num{background:rgba(0,229,200,0.15);border-color:var(--accent);color:var(--accent)}
+    .wz-label{font-size:13px;font-weight:600;color:var(--text-3)}.wz-step.active .wz-label{color:var(--text)}.wz-step.done .wz-label{color:var(--accent)}
+    .wz-sub{font-size:11px;color:var(--text-3);margin-top:1px}
+    .wz-line{width:24px;height:2px;background:var(--border);flex-shrink:0}.wz-line.done{background:var(--accent)}
+    .wz-panel{display:none}.wz-panel.active{display:block;animation:fade-up .3s ease both}
+    .wz-footer{display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}.wz-footer .btn{min-width:130px}
+    /* ─── Sales-specific ─── */
+    .sales-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+    @media(max-width:1100px){.sales-kpi-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:600px){.sales-kpi-grid{grid-template-columns:1fr}}
+    .sales-kpi .kpi-value{font-size:26px}
+    .filter-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+    .filter-bar .input{max-width:220px}
+    .filter-bar select.input{max-width:200px}
+    .client-card{padding:16px;border:1px solid var(--border);border-radius:var(--r-md);background:rgba(0,229,200,.04);border-color:rgba(0,229,200,.2)}
+    .client-card .client-name{font-family:'Syne',sans-serif;font-weight:700;font-size:15px}
+    .item-row{display:grid;grid-template-columns:2fr 80px 120px 80px 120px 120px 40px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+    .item-row:last-child{border-bottom:none}
+    .item-header{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)}
+    .detail-grid{display:grid;grid-template-columns:1fr 320px;gap:20px}
+    @media(max-width:900px){.detail-grid{grid-template-columns:1fr}.item-row{grid-template-columns:1fr 1fr;gap:6px}}
+    .action-card{padding:16px;border:1px solid;border-radius:var(--r-md);text-align:center}
+    .action-card.primary{border-color:rgba(91,107,255,.3);background:rgba(91,107,255,.06)}
+    .action-card.danger{border-color:rgba(255,77,109,.2);background:rgba(255,77,109,.04)}
+    .attach-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:6px;background:rgba(255,255,255,.02)}
+    .attach-item .attach-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+    @media(max-width:768px){.wizard-stepper{flex-direction:column;align-items:stretch}.wz-line{width:2px;height:16px;margin:0 auto}}
+  </style>
+</head>
+<body data-page="sales">
+  <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar(false)"></div>
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand"><img src="https://i.ibb.co/BfCjKQt/logo-bia-blanco.png" alt="BIA" loading="lazy" /><div class="brand-text"><div class="brand-title">Proveedor Hub</div><div class="brand-sub">BIA Energy - Operaciones</div></div></div>
+      <nav class="nav">
+        <a href="home.html" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>Inicio</a>
+        <a href="providers.html" data-nav="providers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M9 21v-8h6v8"/><path d="M8 9h8"/></svg>Proveedores</a>
+        <a href="new_provider.html" data-nav="new_provider"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Nuevo proveedor</a>
+        <a href="quotes.html" data-nav="quotes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8l4 4v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M8 11h8"/><path d="M8 15h8"/><path d="M8 19h6"/></svg>Cotizaciones</a>
+        <a href="compare.html" data-nav="compare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 16V9"/><path d="M12 16V7"/><path d="M17 16V11"/></svg>Comparativo</a>
+        <a href="sku.html" data-nav="sku"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>SKU</a>
+        <a href="sales.html" data-nav="sales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/></svg>Venta de Activos</a>
+      </nav>
+      <div class="sidebar-footer"><div id="userChip" class="muted" style="margin-bottom:10px;"></div><button class="btn btn-danger" style="width:100%;" onclick="logout()">Cerrar sesión</button></div>
+    </aside>
+
+    <div class="content">
+      <header class="topbar">
+        <div class="title">
+          <button class="icon-btn" onclick="toggleSidebar()" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button>
+          <div><div class="page-title">Venta de Activos</div><div class="muted">Gestiona solicitudes de venta de equipos a clientes.</div></div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-accent" onclick="showWizard()">+ Nueva solicitud</button>
+          <button class="btn" onclick="showList()" id="btnBackList" style="display:none;">← Volver a lista</button>
+        </div>
+      </header>
+
+      <main class="main" id="main-content">
+
+        <!-- ═══ LIST VIEW ═══ -->
+        <div id="salesListView">
+          <!-- KPI Cards -->
+          <div class="sales-kpi-grid">
+            <div class="card sales-kpi"><div class="card-body"><div class="muted">Total solicitudes</div><div class="kpi-value">7</div><div class="kpi-tag"><span class="dot"></span><span class="muted">Este mes</span></div></div></div>
+            <div class="card sales-kpi"><div class="card-body"><div class="muted">Valor en pipeline</div><div class="kpi-value" style="font-size:22px;">$48.2M</div><div class="kpi-tag"><span class="dot" style="background:var(--primary);box-shadow:0 0 0 5px rgba(91,107,255,.12);"></span><span class="muted">Cotizaciones activas</span></div></div></div>
+            <div class="card sales-kpi"><div class="card-body"><div class="muted">Cerradas</div><div class="kpi-value" style="background:linear-gradient(135deg,var(--success),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">2</div><div class="kpi-tag"><span class="dot" style="background:var(--success);box-shadow:0 0 0 5px rgba(0,212,138,.12);"></span><span class="muted">Pagadas</span></div></div></div>
+            <div class="card sales-kpi"><div class="card-body"><div class="muted">Pendientes firma</div><div class="kpi-value" style="background:linear-gradient(135deg,var(--warning),#ff9838);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">2</div><div class="kpi-tag"><span class="dot" style="background:var(--warning);box-shadow:0 0 0 5px rgba(255,190,61,.12);"></span><span class="muted">Requieren acción</span></div></div></div>
+          </div>
+
+          <!-- Filters -->
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-body" style="padding:14px 20px;">
+              <div class="filter-bar">
+                <input type="text" class="input" placeholder="Buscar por cliente, NIT..." id="salesSearch" oninput="filterSales()" style="flex:1;min-width:200px;" />
+                <select class="input" id="salesStatusFilter" onchange="filterSales()">
+                  <option value="">Todos los estados</option>
+                  <option value="nueva">Nueva</option>
+                  <option value="cotizacion_generada">Cotización generada</option>
+                  <option value="enviada">Enviada</option>
+                  <option value="firmada">Firmada</option>
+                  <option value="factura_emitida">Factura emitida</option>
+                  <option value="cerrada">Cerrada</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+                <input type="date" class="input" id="salesDateFrom" onchange="filterSales()" title="Desde" style="max-width:160px;" />
+                <input type="date" class="input" id="salesDateTo" onchange="filterSales()" title="Hasta" style="max-width:160px;" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="card">
+            <div class="card-body" style="padding:0;">
+              <div class="table-container">
+                <table class="sales-table">
+                  <thead><tr>
+                    <th>#Número</th>
+                    <th>Cliente</th>
+                    <th style="text-align:center;">Equipos</th>
+                    <th style="text-align:right;">Valor total</th>
+                    <th style="text-align:center;">Estado</th>
+                    <th>Fecha</th>
+                    <th style="text-align:center;">Acciones</th>
+                  </tr></thead>
+                  <tbody id="salesTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ WIZARD VIEW ═══ -->
+        <div id="salesWizardView" style="display:none;">
+          <div class="wizard-stepper" id="wzStepper">
+            <div class="wz-step active" data-step="1" onclick="salesWizGo(1)"><div class="wz-num">1</div><div class="wz-info"><div class="wz-label">Cliente</div><div class="wz-sub">Datos del comprador</div></div></div>
+            <div class="wz-line" id="swzL1"></div>
+            <div class="wz-step" data-step="2" onclick="salesWizGo(2)"><div class="wz-num">2</div><div class="wz-info"><div class="wz-label">Equipos</div><div class="wz-sub">SKUs y precios</div></div></div>
+            <div class="wz-line" id="swzL2"></div>
+            <div class="wz-step" data-step="3" onclick="salesWizGo(3)"><div class="wz-num">3</div><div class="wz-info"><div class="wz-label">Revisión</div><div class="wz-sub">Confirmar cotización</div></div></div>
+            <div class="wz-line" id="swzL3"></div>
+            <div class="wz-step" data-step="4" onclick="salesWizGo(4)"><div class="wz-num">4</div><div class="wz-info"><div class="wz-label">Seguimiento</div><div class="wz-sub">Estado y documentos</div></div></div>
+          </div>
+
+          <!-- STEP 1: Client -->
+          <div class="wz-panel active" id="swzP1">
+            <div class="card"><div class="card-header"><div class="card-title">¿A quién le vendes?</div><div class="card-subtitle">Busca un cliente existente o registra uno nuevo.</div></div>
+              <div class="card-body">
+                <div style="position:relative;margin-bottom:16px;">
+                  <input type="text" class="input" id="clientSearch" placeholder="Buscar por NIT o Razón Social..." style="font-size:14px;padding:12px 16px;" autocomplete="off" />
+                  <div id="clientDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;border:1px solid var(--border-md);border-radius:var(--r-md);background:var(--bg-raised);margin-top:4px;box-shadow:0 12px 32px rgba(0,0,0,0.5);z-index:20;"></div>
+                </div>
+                <div id="clientNewToggle" style="margin-bottom:16px;">
+                  <button class="btn" onclick="document.getElementById('clientForm').style.display='block';this.style.display='none';" style="font-size:12px;">+ Registrar cliente nuevo</button>
+                </div>
+                <div id="clientForm" style="display:none;">
+                  <div class="form-grid">
+                    <div class="col-6"><label>Razón Social *</label><input class="input" id="sClientName" value="Energía Solar Colombia S.A.S" /></div>
+                    <div class="col-6"><label>NIT *</label><input class="input" id="sClientNit" value="901.234.567-8" /></div>
+                    <div class="col-6"><label>Representante Legal</label><input class="input" id="sClientRep" value="María Elena Rodríguez" /></div>
+                    <div class="col-6"><label>Tipo de contrato *</label><select class="input" id="sClientTipo"><option value="renting" selected>Renting</option><option value="comodato">Comodato</option><option value="otro">Otro</option></select></div>
+                    <div class="col-6"><label>Email contacto *</label><input class="input" id="sClientEmail" value="compras@energiasolar.co" /></div>
+                    <div class="col-6"><label>Teléfono</label><input class="input" id="sClientTel" value="310 456 7890" /></div>
+                  </div>
+                  <div class="client-card" style="margin-top:16px;">
+                    <div class="client-name">Energía Solar Colombia S.A.S</div>
+                    <div style="font-size:12px;color:var(--text-2);margin-top:4px;">NIT: 901.234.567-8 • Renting • compras@energiasolar.co</div>
+                  </div>
+                </div>
+              </div></div>
+            <div class="wz-footer"><div></div><button class="btn btn-primary" onclick="salesWizGo(2)">Siguiente: Equipos →</button></div>
+          </div>
+
+          <!-- STEP 2: Equipment -->
+          <div class="wz-panel" id="swzP2">
+            <div class="card"><div class="card-header"><div class="card-title">Equipos a vender</div><div class="card-subtitle">Selecciona SKUs del catálogo y configura precios con margen.</div></div>
+              <div class="card-body">
+                <div style="position:relative;margin-bottom:16px;">
+                  <input type="text" class="input" id="salesSkuSearch" placeholder="Buscar SKU: TC, Medidor, Condensador..." style="font-size:14px;padding:12px 16px;" autocomplete="off" />
+                </div>
+                <!-- Mock items already added -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                  <span class="muted" style="font-size:13px;">Ítems agregados</span>
+                  <span style="background:rgba(91,107,255,0.15);color:var(--primary);padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;">3</span>
+                </div>
+                <div style="overflow-x:auto;">
+                  <div class="item-row item-header">
+                    <div>SKU / Descripción</div><div style="text-align:center;">Cant.</div><div style="text-align:right;">Precio base</div><div style="text-align:center;">Margen %</div><div style="text-align:right;">Precio final</div><div style="text-align:right;">Subtotal</div><div></div>
+                  </div>
+                  <div class="item-row">
+                    <div><div style="font-weight:600;font-size:13px;">TC MONOF. 15KVA 13200/120-240V</div><div style="font-size:11px;color:var(--text-3);">Transformadores</div></div>
+                    <div style="text-align:center;"><input type="number" class="input" value="2" style="width:60px;text-align:center;padding:6px;" /></div>
+                    <div style="text-align:right;color:var(--text-2);font-size:13px;">$1.200.000</div>
+                    <div style="text-align:center;"><input type="number" class="input" value="15" style="width:60px;text-align:center;padding:6px;" />%</div>
+                    <div style="text-align:right;font-weight:600;color:var(--accent);">$1.380.000</div>
+                    <div style="text-align:right;font-weight:600;">$2.760.000</div>
+                    <div><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;">×</button></div>
+                  </div>
+                  <div class="item-row">
+                    <div><div style="font-weight:600;font-size:13px;">MEDIDOR TRIFÁSICO 4H CL 0.2S</div><div style="font-size:11px;color:var(--text-3);">Medidores</div></div>
+                    <div style="text-align:center;"><input type="number" class="input" value="3" style="width:60px;text-align:center;padding:6px;" /></div>
+                    <div style="text-align:right;color:var(--text-2);font-size:13px;">$850.000</div>
+                    <div style="text-align:center;"><input type="number" class="input" value="12" style="width:60px;text-align:center;padding:6px;" />%</div>
+                    <div style="text-align:right;font-weight:600;color:var(--accent);">$952.000</div>
+                    <div style="text-align:right;font-weight:600;">$2.856.000</div>
+                    <div><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;">×</button></div>
+                  </div>
+                  <div class="item-row">
+                    <div><div style="font-weight:600;font-size:13px;">CANALETA PLÁST. 40×25mm (2m)</div><div style="font-size:11px;color:var(--text-3);">Canalización</div></div>
+                    <div style="text-align:center;"><input type="number" class="input" value="50" style="width:60px;text-align:center;padding:6px;" /></div>
+                    <div style="text-align:right;color:var(--text-2);font-size:13px;">$8.500</div>
+                    <div style="text-align:center;"><input type="number" class="input" value="20" style="width:60px;text-align:center;padding:6px;" />%</div>
+                    <div style="text-align:right;font-weight:600;color:var(--accent);">$10.200</div>
+                    <div style="text-align:right;font-weight:600;">$510.000</div>
+                    <div><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;">×</button></div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:14px;">
+                  <button class="btn" style="font-size:12px;">+ Agregar otro ítem</button>
+                  <button class="btn" style="font-size:12px;border-color:rgba(0,229,200,.3);color:var(--accent);">+ Crear nuevo SKU</button>
+                </div>
+                <div style="margin-top:16px;padding:14px 16px;background:rgba(91,107,255,.06);border:1px solid rgba(91,107,255,.2);border-radius:var(--r-md);display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:13px;color:var(--text-2);">Total cotización (3 ítems, 55 unidades)</span>
+                  <span class="sales-valor" style="font-size:20px;color:var(--primary);">$6.126.000</span>
+                </div>
+              </div></div>
+            <div class="wz-footer"><button class="btn" onclick="salesWizGo(1)">← Volver</button><button class="btn btn-primary" onclick="salesWizGo(3)">Siguiente: Revisión →</button></div>
+          </div>
+
+          <!-- STEP 3: Review -->
+          <div class="wz-panel" id="swzP3">
+            <div class="card"><div class="card-header"><div class="card-title">Revisar y confirmar</div><div class="card-subtitle">Verifica los datos antes de generar la cotización.</div></div>
+              <div class="card-body">
+                <div style="padding:16px;border:1px solid rgba(0,229,200,.2);border-radius:var(--r-md);background:rgba(0,229,200,.04);margin-bottom:16px;">
+                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:8px;">Cliente</div>
+                  <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;">Energía Solar Colombia S.A.S</div>
+                  <div style="font-size:12px;color:var(--text-2);margin-top:4px;">NIT: 901.234.567-8 • Rep: María Elena Rodríguez • Renting</div>
+                  <div style="font-size:12px;color:var(--text-2);margin-top:2px;">compras@energiasolar.co • 310 456 7890</div>
+                </div>
+                <div style="padding:16px;border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:16px;">
+                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:10px;">Equipos (3 ítems)</div>
+                  <table style="width:100%;font-size:13px;">
+                    <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;font-weight:600;">TC MONOF. 15KVA</td><td style="text-align:center;">×2</td><td style="text-align:right;">15%</td><td style="text-align:right;font-weight:600;">$2.760.000</td></tr>
+                    <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;font-weight:600;">MEDIDOR TRIFÁSICO 4H</td><td style="text-align:center;">×3</td><td style="text-align:right;">12%</td><td style="text-align:right;font-weight:600;">$2.856.000</td></tr>
+                    <tr><td style="padding:8px 0;font-weight:600;">CANALETA PLÁST. 40×25mm</td><td style="text-align:center;">×50</td><td style="text-align:right;">20%</td><td style="text-align:right;font-weight:600;">$510.000</td></tr>
+                  </table>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:2px solid var(--border);">
+                    <span style="font-weight:700;font-size:14px;">Total</span>
+                    <span class="sales-valor" style="font-size:20px;background:linear-gradient(135deg,var(--text),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">$6.126.000</span>
+                  </div>
+                </div>
+                <div class="form-grid" style="margin:0;">
+                  <div class="col-12"><label>Observaciones / Condiciones</label><textarea class="input" rows="2" placeholder="Incluye IVA, condiciones de pago, garantías...">Precios incluyen IVA. Pago a 30 días. Garantía de 12 meses en transformadores.</textarea></div>
+                  <div class="col-6"><label>Vigencia de cotización (días)</label><input type="number" class="input" value="30" /></div>
+                  <div class="col-6"><label>Fecha</label><input type="date" class="input" value="2026-04-16" /></div>
+                </div>
+                <div style="margin-top:16px;padding:14px 16px;background:rgba(0,229,200,.06);border:1px solid rgba(0,229,200,.2);border-radius:var(--r-md);">
+                  <div style="font-size:13px;color:var(--accent);font-weight:600;">✓ Se generará la solicitud VTA-2026-008 con 3 ítems por $6.126.000</div>
+                  <div style="font-size:12px;color:var(--text-3);margin-top:4px;">El estado cambiará a "Cotización generada".</div>
+                </div>
+              </div></div>
+            <div class="wz-footer"><button class="btn" onclick="salesWizGo(2)">← Volver</button><button class="btn btn-accent" onclick="salesWizGo(4)">Confirmar y generar cotización</button></div>
+          </div>
+
+          <!-- STEP 4: Tracking -->
+          <div class="wz-panel" id="swzP4">
+            <div class="detail-grid">
+              <div>
+                <!-- Header -->
+                <div class="card" style="margin-bottom:16px;">
+                  <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+                    <div>
+                      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px;">VTA-2026-003</div>
+                      <div style="font-size:13px;color:var(--text-2);margin-top:2px;">Distribuidora Nacional de Equipos Ltda.</div>
+                    </div>
+                    <span class="sales-status s-enviada"><span class="status-dot"></span>Enviada al cliente</span>
+                  </div>
+                </div>
+                <!-- Timeline -->
+                <div class="card" style="margin-bottom:16px;">
+                  <div class="card-header"><div class="card-title">Historial de estados</div></div>
+                  <div class="card-body">
+                    <div class="sales-timeline">
+                      <div class="timeline-item"><div class="timeline-dot active"></div><div class="timeline-content"><div style="font-weight:600;color:var(--accent);">Enviada al cliente</div><div style="font-size:12px;color:var(--text-2);">Se envió la cotización por email al contacto.</div><div class="timeline-date">16 abr 2026, 14:30 — joel.nocua@bia.app</div></div></div>
+                      <div class="timeline-item"><div class="timeline-dot active"></div><div class="timeline-content"><div style="font-weight:600;">Cotización generada</div><div style="font-size:12px;color:var(--text-2);">Se creó la solicitud con 5 equipos por $18.500.000</div><div class="timeline-date">15 abr 2026, 09:15 — joel.nocua@bia.app</div></div></div>
+                      <div class="timeline-item"><div class="timeline-dot active"></div><div class="timeline-content"><div style="font-weight:600;">Nueva</div><div style="font-size:12px;color:var(--text-2);">Solicitud creada por el equipo CX.</div><div class="timeline-date">15 abr 2026, 09:00 — joel.nocua@bia.app</div></div></div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Action -->
+                <div class="card" style="margin-bottom:16px;">
+                  <div class="card-header"><div class="card-title">Siguiente acción</div></div>
+                  <div class="card-body">
+                    <div class="action-card primary">
+                      <div style="font-size:28px;margin-bottom:8px;">📎</div>
+                      <div style="font-weight:700;font-size:14px;margin-bottom:4px;">Adjuntar firma del cliente</div>
+                      <div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Sube el documento firmado para avanzar al siguiente paso.</div>
+                      <button class="btn btn-primary" onclick="showToast('Demo: Se subiría el archivo firmado','info')">Subir documento firmado</button>
+                    </div>
+                    <div class="action-card danger" style="margin-top:10px;">
+                      <button class="btn btn-danger" style="font-size:12px;padding:6px 14px;" onclick="showToast('Demo: La solicitud sería cancelada','info')">❌ Cancelar solicitud</button>
+                    </div>
+                  </div>
+                </div>
+                <!-- Attachments -->
+                <div class="card">
+                  <div class="card-header"><div class="card-title">Documentos adjuntos</div></div>
+                  <div class="card-body">
+                    <div class="attach-item">
+                      <div class="attach-icon" style="background:rgba(91,107,255,.12);color:var(--primary);">📄</div>
+                      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">Cotización_VTA-2026-003.pdf</div><div style="font-size:11px;color:var(--text-3);">Cotización generada • 15 abr 2026</div></div>
+                      <button class="btn" style="font-size:11px;padding:4px 10px;">Descargar</button>
+                    </div>
+                    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                      <select class="input" style="max-width:200px;font-size:12px;padding:7px 10px;">
+                        <option>Cotización firmada</option><option>Factura</option><option>Soporte de pago</option><option>Otro</option>
+                      </select>
+                      <button class="btn" style="font-size:12px;padding:6px 14px;">📎 Subir archivo</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Side Panel -->
+              <div>
+                <div class="card" style="position:sticky;top:80px;">
+                  <div class="card-header"><div class="card-title">Resumen</div></div>
+                  <div class="card-body">
+                    <div style="display:grid;gap:12px;font-size:13px;">
+                      <div><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Número</div><div style="font-weight:700;font-family:'Syne',sans-serif;">VTA-2026-003</div></div>
+                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Cliente</div><div style="font-weight:600;">Distribuidora Nacional de Equipos Ltda.</div><div style="font-size:11px;color:var(--text-2);">NIT: 800.321.654-2</div></div>
+                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Contacto</div><div style="font-size:12px;color:var(--text-2);">Carlos Mendoza</div><div style="font-size:12px;color:var(--accent);">cmendoza@distequipos.co</div></div>
+                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Equipos</div><div style="font-weight:600;">5 ítems</div></div>
+                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Valor total</div><div class="sales-valor" style="font-size:22px;background:linear-gradient(135deg,var(--text),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">$18.500.000</div></div>
+                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Vigencia</div><div style="font-size:12px;color:var(--text-2);">30 días (vence 16 may 2026)</div></div>
+                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Creada por</div><div style="font-size:12px;color:var(--text-2);">joel.nocua@bia.app</div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="wz-footer" style="margin-top:20px;"><button class="btn" onclick="showList()">← Volver a lista</button><div></div></div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="supabase-client.js?v=15"></script>
+  <script src="script.js?v=15"></script>
+  <script src="components.js"></script>
+  <script>
+  (function(){
+    // ═══ MOCK DATA ═══
+    var MOCK_SALES = [
+      { num:'VTA-2026-001', cliente:'Energía Solar Colombia S.A.S', nit:'901.234.567-8', equipos:3, valor:6126000, status:'cerrada', fecha:'2026-03-10', margen:15 },
+      { num:'VTA-2026-002', cliente:'Constructora Andina S.A.', nit:'860.123.456-1', equipos:8, valor:24800000, status:'cerrada', fecha:'2026-03-22', margen:12 },
+      { num:'VTA-2026-003', cliente:'Distribuidora Nacional de Equipos Ltda.', nit:'800.321.654-2', equipos:5, valor:18500000, status:'enviada', fecha:'2026-04-15', margen:18 },
+      { num:'VTA-2026-004', cliente:'Minera del Pacífico S.A.S', nit:'900.876.543-9', equipos:12, valor:45200000, status:'firmada', fecha:'2026-04-08', margen:10 },
+      { num:'VTA-2026-005', cliente:'Hospital Central de Bogotá', nit:'830.111.222-3', equipos:2, valor:3200000, status:'cotizacion_generada', fecha:'2026-04-14', margen:8 },
+      { num:'VTA-2026-006', cliente:'Universidad Nacional', nit:'899.999.063-3', equipos:1, valor:1500000, status:'cancelada', fecha:'2026-04-01', margen:0 },
+      { num:'VTA-2026-007', cliente:'Petrotech Colombia S.A.S', nit:'900.555.666-7', equipos:7, valor:32000000, status:'factura_emitida', fecha:'2026-04-12', margen:14 },
+    ];
+
+    var STATUS_MAP = {
+      'nueva':              { label:'Nueva',               css:'s-nueva',       icon:'○' },
+      'cotizacion_generada':{ label:'Cotización generada',  css:'s-cotizacion',  icon:'◐' },
+      'enviada':            { label:'Enviada al cliente',   css:'s-enviada',     icon:'◑' },
+      'firmada':            { label:'Firmada',              css:'s-firmada',     icon:'◕' },
+      'factura_emitida':    { label:'Factura emitida',      css:'s-factura',     icon:'●' },
+      'cerrada':            { label:'Cerrada',              css:'s-cerrada',     icon:'✓' },
+      'cancelada':          { label:'Cancelada',            css:'s-cancelada',   icon:'✕' },
+    };
+
+    function esc(s){ return typeof escapeHtml==='function'? escapeHtml(s) : String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function fmtCOP(n){ return n.toLocaleString('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}); }
+    function fmtDate(d){ if(!d) return '-'; var p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+
+    // ═══ LIST VIEW ═══
+    function renderSalesTable(data){
+      var tb = document.getElementById('salesTableBody');
+      if(!tb) return;
+      var list = data || MOCK_SALES;
+      if(!list.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-3);">Sin solicitudes con los filtros actuales.</td></tr>'; return; }
+      tb.innerHTML = list.map(function(s){
+        var st = STATUS_MAP[s.status] || STATUS_MAP['nueva'];
+        return '<tr onclick="openSaleDetail(\''+esc(s.num)+'\')">'+
+          '<td style="font-weight:700;font-family:\'Syne\',sans-serif;font-size:13px;color:var(--accent);">'+esc(s.num)+'</td>'+
+          '<td><div style="font-weight:600;font-size:13px;">'+esc(s.cliente)+'</div><div style="font-size:11px;color:var(--text-3);">NIT: '+esc(s.nit)+'</div></td>'+
+          '<td style="text-align:center;"><span style="background:rgba(91,107,255,.12);color:var(--primary);padding:2px 10px;border-radius:10px;font-size:12px;font-weight:700;">'+s.equipos+'</span></td>'+
+          '<td style="text-align:right;"><span class="sales-valor" style="font-size:14px;">'+fmtCOP(s.valor)+'</span></td>'+
+          '<td style="text-align:center;"><span class="sales-status '+st.css+'"><span class="status-dot"></span>'+esc(st.label)+'</span></td>'+
+          '<td style="font-size:13px;color:var(--text-2);">'+fmtDate(s.fecha)+'</td>'+
+          '<td style="text-align:center;"><button class="btn" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();openSaleDetail(\''+esc(s.num)+'\')">Ver</button></td>'+
+          '</tr>';
+      }).join('');
+    }
+
+    window.filterSales = function(){
+      var q = (document.getElementById('salesSearch').value||'').toLowerCase();
+      var st = document.getElementById('salesStatusFilter').value;
+      var from = document.getElementById('salesDateFrom').value;
+      var to = document.getElementById('salesDateTo').value;
+      var filtered = MOCK_SALES.filter(function(s){
+        if(q && (s.cliente+' '+s.nit+' '+s.num).toLowerCase().indexOf(q)===-1) return false;
+        if(st && s.status!==st) return false;
+        if(from && s.fecha < from) return false;
+        if(to && s.fecha > to) return false;
+        return true;
+      });
+      renderSalesTable(filtered);
+    };
+
+    window.openSaleDetail = function(num){
+      showWizard();
+      salesWizGo(4);
+      if(typeof showToast==='function') showToast('Detalle de '+num,'info');
+    };
+
+    // ═══ WIZARD NAV ═══
+    var wizStep = 1;
+    window.salesWizGo = function(s){
+      if(s<1||s>4) return;
+      wizStep = s;
+      for(var i=1;i<=4;i++){
+        var el=document.querySelector('#salesWizardView .wz-step[data-step="'+i+'"]');
+        if(el){ el.classList.remove('active','done'); if(i===s) el.classList.add('active'); else if(i<s) el.classList.add('done'); }
+      }
+      for(var j=1;j<=3;j++){var l=document.getElementById('swzL'+j);if(l) l.classList.toggle('done',j<s);}
+      document.querySelectorAll('#salesWizardView .wz-panel').forEach(function(p){p.classList.remove('active');});
+      var pn=document.getElementById('swzP'+s);if(pn) pn.classList.add('active');
+      window.scrollTo({top:0,behavior:'smooth'});
+    };
+
+    window.showWizard = function(){
+      document.getElementById('salesListView').style.display='none';
+      document.getElementById('salesWizardView').style.display='block';
+      document.getElementById('btnBackList').style.display='';
+      salesWizGo(1);
+    };
+
+    window.showList = function(){
+      document.getElementById('salesListView').style.display='block';
+      document.getElementById('salesWizardView').style.display='none';
+      document.getElementById('btnBackList').style.display='none';
+      renderSalesTable();
+    };
+
+    // ═══ CLIENT SEARCH MOCK ═══
+    var MOCK_CLIENTS = [
+      { name:'Energía Solar Colombia S.A.S', nit:'901.234.567-8' },
+      { name:'Constructora Andina S.A.', nit:'860.123.456-1' },
+      { name:'Distribuidora Nacional de Equipos Ltda.', nit:'800.321.654-2' },
+      { name:'Minera del Pacífico S.A.S', nit:'900.876.543-9' },
+      { name:'Hospital Central de Bogotá', nit:'830.111.222-3' },
+    ];
+    var cInput = document.getElementById('clientSearch');
+    var cDrop = document.getElementById('clientDropdown');
+    if(cInput && cDrop){
+      cInput.addEventListener('input', function(){
+        var q = (cInput.value||'').trim().toLowerCase();
+        if(q.length<2){cDrop.style.display='none';return;}
+        var m = MOCK_CLIENTS.filter(function(c){return (c.name+' '+c.nit).toLowerCase().indexOf(q)!==-1;});
+        if(!m.length){cDrop.innerHTML='<div style="padding:12px 16px;color:var(--text-3);font-size:13px;">Sin resultados. Usa "+ Registrar cliente nuevo"</div>';cDrop.style.display='block';return;}
+        cDrop.innerHTML=m.map(function(c){
+          return '<div style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.04);transition:background .13s;" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'\'" onclick="selectMockClient(\''+esc(c.name).replace(/'/g,"\\'")+'\',\''+esc(c.nit)+'\')">'+
+            '<div><div style="font-weight:600;font-size:13px;">'+esc(c.name)+'</div><div style="font-size:11px;color:var(--text-3);">NIT: '+esc(c.nit)+'</div></div>'+
+            '<span style="font-size:11px;color:var(--accent);">Seleccionar</span></div>';
+        }).join('');
+        cDrop.style.display='block';
+      });
+      document.addEventListener('click',function(e){if(!e.target.closest('#clientSearch')&&!e.target.closest('#clientDropdown'))cDrop.style.display='none';});
+    }
+    window.selectMockClient = function(name, nit){
+      document.getElementById('clientSearch').value = name;
+      document.getElementById('clientDropdown').style.display='none';
+      document.getElementById('clientForm').style.display='block';
+      document.getElementById('clientNewToggle').style.display='none';
+      document.getElementById('sClientName').value=name;
+      document.getElementById('sClientNit').value=nit;
+      if(typeof showToast==='function') showToast('Cliente seleccionado: '+name,'success');
+    };
+
+    // ═══ INIT ═══
+    renderSalesTable();
+
+  })();
+  </script>
+</body>
+</html>
