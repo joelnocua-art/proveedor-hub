@@ -229,7 +229,7 @@
                   <div style="font-size:12px;color:var(--text-3);margin-top:4px;">El estado cambiará a "Cotización generada".</div>
                 </div>
               </div></div>
-            <div class="wz-footer"><button class="btn" onclick="salesWizGo(2)">← Volver</button><button class="btn btn-accent" onclick="salesWizGo(4)">Confirmar y generar cotización</button></div>
+            <div class="wz-footer"><button class="btn" onclick="salesWizGo(2)">← Volver</button><button class="btn btn-accent" id="btnConfirmSale" onclick="confirmAndSaveSale()">Confirmar y generar cotización</button></div>
           </div>
 
           <!-- STEP 4: Tracking -->
@@ -317,7 +317,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="supabase-client.js?v=15"></script>
+  <script src="supabase-client.js?v=16"></script>
   <script src="script.js?v=15"></script>
   <script src="components.js"></script>
   <script>
@@ -756,9 +756,100 @@
       loadEquipmentForClient();
     };
 
+    // ═══ CONFIRMAR Y GUARDAR EN SUPABASE ═══
+    window.confirmAndSaveSale = async function(){
+      var btn = document.getElementById('btnConfirmSale');
+
+      // Validaciones mínimas
+      var razonSocial = (document.getElementById('sClientName')||{}).value;
+      if(!razonSocial){
+        if(typeof showToast==='function') showToast('Falta la razón social del cliente (paso 1)','error');
+        return;
+      }
+      if(!equipmentItems.length){
+        if(typeof showToast==='function') showToast('Agrega al menos un equipo (paso 2)','error');
+        return;
+      }
+      if(typeof sbInsertSale !== 'function'){
+        if(typeof showToast==='function') showToast('Supabase no está cargado. Recarga la página.','error');
+        return;
+      }
+
+      // Calcular total
+      var totalFinal = equipmentItems.reduce(function(sum, it){
+        var pFinal = (Number(it.precio_base)||0) * (1 + (Number(it.margen_pct)||0)/100);
+        return sum + pFinal * (Number(it.cantidad)||0);
+      }, 0);
+
+      // Bloquear botón mientras guarda
+      var originalText = btn ? btn.textContent : '';
+      if(btn){ btn.disabled = true; btn.textContent = 'Guardando…'; }
+
+      var payload = {
+        codigo_bia:   selectedClient ? selectedClient.codigo_bia : null,
+        cliente:      razonSocial,
+        nit:          (document.getElementById('sClientNit')||{}).value || null,
+        rep:          (document.getElementById('sClientRep')||{}).value || null,
+        email:        (document.getElementById('sClientEmail')||{}).value || null,
+        telefono:     (document.getElementById('sClientTel')||{}).value || null,
+        operador_red: selectedClient ? selectedClient.operador_red : null,
+        tipo_contrato: (document.getElementById('sClientTipo')||{}).value || null,
+        valor:        totalFinal,
+        observaciones: null,
+        vigencia_dias: 30,
+        status:       'cotizacion_generada',
+        items: equipmentItems.map(function(it){
+          return {
+            nombre_sku:  it.nombre_sku,
+            serial:      it.serial,
+            marca:       it.marca,
+            modelo:      it.modelo,
+            precio_base: Number(it.precio_base)||0,
+            margen_pct:  Number(it.margen_pct)||0,
+            cantidad:    Number(it.cantidad)||1,
+            ciudad:      it.ciudad,
+            frontera:    it.frontera,
+            estado:      it.estado
+          };
+        })
+      };
+
+      try {
+        var result = await sbInsertSale(payload);
+        if(!result.ok){
+          if(typeof showToast==='function') showToast('Error al guardar: '+(result.error||'desconocido'),'error');
+          if(btn){ btn.disabled = false; btn.textContent = originalText; }
+          return;
+        }
+        if(typeof showToast==='function') showToast('Solicitud '+result.sale.numero+' creada','success');
+        // Recargar lista desde Supabase y avanzar al paso 4
+        await refreshSalesData();
+        salesWizGo(4);
+      } catch(err) {
+        console.error('[Sales] Save error:', err);
+        if(typeof showToast==='function') showToast('Error inesperado: '+err.message,'error');
+        if(btn){ btn.disabled = false; btn.textContent = originalText; }
+      }
+    };
+
+    // Refresca SALES_DATA desde Supabase y re-renderiza la lista
+    async function refreshSalesData(){
+      if(typeof sbLoadSales !== 'function') return;
+      try {
+        var data = await sbLoadSales();
+        SALES_DATA = data || [];
+        renderSalesKPIs();
+        renderSalesTable();
+      } catch(err){
+        console.warn('[Sales] Failed to refresh sales data:', err);
+      }
+    }
+
     // ═══ INIT ═══
     renderSalesKPIs();
     renderSalesTable();
+    // Cargar desde Supabase de forma asíncrona (no bloquea la UI)
+    refreshSalesData();
 
   })();
   </script>
