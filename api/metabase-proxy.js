@@ -98,9 +98,17 @@ function normalizeRow(r) {
   };
 }
 
-// ─── Fetch todas las filas usando el endpoint de exportación ───────────
-// query/json es el endpoint de export — NO tiene el límite de 2000 filas
-// que sí tiene /query normal. Devuelve un array de objetos {col_name: value}.
+// ─── Helper: normalizar fila desde formato cols+rows ──────────────────
+function normalizeRowFromCols(cols, rowArr) {
+  const obj = {};
+  cols.forEach((c, idx) => {
+    if (c.name) obj[c.name] = rowArr[idx];
+    if (c.display_name && obj[c.display_name] === undefined) obj[c.display_name] = rowArr[idx];
+  });
+  return normalizeRow(obj);
+}
+
+// ─── Fetch todas las filas. Intenta bypasear el límite de 2000 filas ───
 async function fetchAllRows(apiKey) {
   if (cachedRows && (Date.now() - cacheTime) < CACHE_TTL_MS) {
     return cachedRows;
@@ -108,24 +116,44 @@ async function fetchAllRows(apiKey) {
 
   const cardId = await discoverCardId(apiKey);
 
-  const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query/json`, {
+  // Intento 1: query con middleware disable-max-results (bypassa límite de 2000)
+  let resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
     method: 'POST',
     headers: {
       'x-api-key': apiKey,
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     },
-    body: JSON.stringify({})
+    body: JSON.stringify({
+      middleware: {
+        'disable-max-results?': true,
+        'add-default-userland-constraints?': false
+      }
+    })
   });
+
+  // Si falla por bad request del middleware, hacer query estándar
+  if (!resp.ok) {
+    resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+  }
 
   if (!resp.ok) {
     const errText = await resp.text();
-    throw new Error(`Card ${cardId} query/json failed (${resp.status}): ${errText.substring(0, 300)}`);
+    throw new Error(`Card ${cardId} query failed (${resp.status}): ${errText.substring(0, 300)}`);
   }
 
-  const data = await resp.json();
-  const rows = Array.isArray(data) ? data : (data.data?.rows || []);
-  cachedRows = rows.map(normalizeRow);
+  const result = await resp.json();
+  const cols = result.data?.cols || [];
+  const rows = result.data?.rows || [];
+  cachedRows = rows.map(rowArr => normalizeRowFromCols(cols, rowArr));
   cacheTime = Date.now();
   return cachedRows;
 }
