@@ -8,6 +8,7 @@
  * Endpoints:
  *   GET /api/metabase-proxy?type=clients&q=<búsqueda>
  *     → Devuelve lista de clientes únicos (razón social + código BIA)
+ *     → q puede ser código BIA parcial o razón social parcial
  *
  *   GET /api/metabase-proxy?type=equipment&codigo_bia=<código>
  *     → Devuelve todos los equipos asociados a ese cliente
@@ -25,9 +26,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 let cachedCardId = null;
 let cachedRows = null;
 let cacheTime = 0;
-let cachedCodigoFieldRef = null; // field_ref de codigo_bia para queries filtradas
+let cachedCodigoFieldRef = null; // field_ref numérico de codigo_bia
 
-// ─── Discovery del card ID ─────────────────────────────────────────────
+// ─── Discovery del card ID + field_ref para codigo_bia ─────────────────
 async function discoverCardId(apiKey) {
   if (cachedCardId) return cachedCardId;
 
@@ -43,26 +44,20 @@ async function discoverCardId(apiKey) {
   const dashboard = await resp.json();
   const dashcards = dashboard.dashcards || dashboard.ordered_cards || [];
 
-  // Filtrar solo cards del tab que nos interesa (o sin tab si no aplica)
   const tabCards = dashcards.filter(dc =>
     !dc.dashboard_tab_id || dc.dashboard_tab_id === TAB_ID
   );
 
-  // Preferir card cuyo nombre incluya "precios" o "data" (la tabla principal)
   let target = tabCards.find(dc => {
     const name = (dc.card?.name || '').toLowerCase();
     return name.includes('precios') || name.includes('data') || name.includes('sku');
   });
 
-  // Fallback: el card con más columnas (típicamente la tabla, no el KPI)
   if (!target) {
     let maxCols = 0;
     for (const dc of tabCards) {
       const numCols = (dc.card?.result_metadata || []).length;
-      if (numCols > maxCols) {
-        maxCols = numCols;
-        target = dc;
-      }
+      if (numCols > maxCols) { maxCols = numCols; target = dc; }
     }
   }
 
@@ -72,7 +67,7 @@ async function discoverCardId(apiKey) {
 
   cachedCardId = target.card.id;
 
-  // Intentar obtener field_ref desde result_metadata del dashboard
+  // Intentar obtener field_ref de codigo_bia desde el dashboard (result_metadata del card)
   const dashMeta = target.card.result_metadata || [];
   const dashCol = dashMeta.find(c =>
     c.name === 'codigo_bia' || (c.display_name || '').toLowerCase().includes('código bia')
@@ -85,7 +80,7 @@ async function discoverCardId(apiKey) {
     }
   }
 
-  // Si no se obtuvo del dashboard, fetchar el card directamente (más completo)
+  // Si no se obtuvo del dashboard, fetchar el card directamente (metadatos más completos)
   if (!cachedCodigoFieldRef) {
     try {
       const cardResp = await fetch(`${METABASE_URL}/api/card/${cachedCardId}`, {
@@ -111,7 +106,7 @@ async function discoverCardId(apiKey) {
   return cachedCardId;
 }
 
-// ─── Normalizar un array de [cols, rows] de la API de Metabase ────────
+// ─── Normalizar filas de la API de Metabase ───────────────────────────
 function normalizeRows(cols, rows) {
   const colIndex = {};
   cols.forEach((c, idx) => {
@@ -125,26 +120,26 @@ function normalizeRows(cols, rows) {
     return null;
   }
   return rows.map(row => ({
-    codigo_bia:       getCol(row, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
-    razon_social:     getCol(row, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
-    operador_red:     getCol(row, ['operador_de_red', 'Operador de Red', 'operador_red']),
-    nombre_sku:       getCol(row, ['nombre_sku', 'Nombre SKU', 'sku']),
-    serial:           getCol(row, ['serial', 'Serial']),
-    marca:            getCol(row, ['brand', 'Marca', 'marca']),
-    modelo:           getCol(row, ['model', 'Modelo', 'modelo']),
-    precio_unitario:  Number(getCol(row, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
-    estado:           getCol(row, ['state', 'Estado', 'estado', 'Estado Contrato']),
-    ciudad:           getCol(row, ['ciudad', 'Ciudad']),
-    frontera:         getCol(row, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
-    titulo:           getCol(row, ['titulo', 'Titulo']),
+    codigo_bia:        getCol(row, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
+    razon_social:      getCol(row, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
+    operador_red:      getCol(row, ['operador_de_red', 'Operador de Red', 'operador_red']),
+    nombre_sku:        getCol(row, ['nombre_sku', 'Nombre SKU', 'sku']),
+    serial:            getCol(row, ['serial', 'Serial']),
+    marca:             getCol(row, ['brand', 'Marca', 'marca']),
+    modelo:            getCol(row, ['model', 'Modelo', 'modelo']),
+    precio_unitario:   Number(getCol(row, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
+    estado:            getCol(row, ['state', 'Estado', 'estado', 'Estado Contrato']),
+    ciudad:            getCol(row, ['ciudad', 'Ciudad']),
+    frontera:          getCol(row, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
+    titulo:            getCol(row, ['titulo', 'Titulo']),
     propiedad_activos: getCol(row, ['Propiedad de Activos']),
     fecha_instalacion: getCol(row, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
-    fecha_ingreso:    getCol(row, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
-    fecha_retiro:     getCol(row, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
+    fecha_ingreso:     getCol(row, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
+    fecha_retiro:      getCol(row, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
   }));
 }
 
-// ─── Ejecutar query al card y normalizar resultado ─────────────────────
+// ─── Ejecutar query al card ────────────────────────────────────────────
 async function runCardQuery(apiKey, cardId, body) {
   const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
     method: 'POST',
@@ -163,11 +158,11 @@ async function runCardQuery(apiKey, cardId, body) {
   return normalizeRows(result.data?.cols || [], result.data?.rows || []);
 }
 
-// ─── Fetch filtrado por codigo_bia (todos los equipos del cliente) ─────
+// ─── Fetch todos los equipos de un cliente ────────────────────────────
 async function fetchEquipmentByClient(apiKey, codigoBia) {
   const cardId = await discoverCardId(apiKey);
 
-  // Intento 1: query con parámetro de filtro (devuelve TODOS los registros del cliente)
+  // Intento 1: query con parámetro de filtro server-side (devuelve TODOS los registros)
   if (cachedCodigoFieldRef) {
     const filtered = await runCardQuery(apiKey, cardId, {
       parameters: [{
@@ -177,21 +172,19 @@ async function fetchEquipmentByClient(apiKey, codigoBia) {
       }]
     });
     if (filtered.length > 0) return filtered;
-    // Si vino vacío, podría ser que el filtro no funcionó; continúa con fallback
+    // Si vino vacío podría ser que el filtro no aplicó; sigue con fallback
   }
 
   // Intento 2 (fallback): query sin filtro, filtrar en memoria
-  // Cubre el caso donde field_ref no está disponible o el filtro no aplicó
   const all = await runCardQuery(apiKey, cardId, {});
   return all.filter(r => (r.codigo_bia || '').trim() === codigoBia.trim());
 }
 
-// ─── Fetch + normalización de todas las filas (para búsqueda de clientes) ─
+// ─── Fetch todas las filas (para búsqueda de clientes, 2000 rows max) ─
 async function fetchAllRows(apiKey) {
   if (cachedRows && (Date.now() - cacheTime) < CACHE_TTL_MS) {
     return cachedRows;
   }
-
   const cardId = await discoverCardId(apiKey);
   cachedRows = await runCardQuery(apiKey, cardId, {});
   cacheTime = Date.now();
@@ -213,9 +206,8 @@ export default async function handler(req, res) {
   try {
     const rows = await fetchAllRows(apiKey);
 
-    // ── Modo debug: devuelve metadata para diagnosticar ──
+    // ── Modo debug ──
     if (debug === '1') {
-      // Re-fetch raw para ver los nombres exactos de columnas que manda Metabase
       const cardId = await discoverCardId(apiKey);
       const rawResp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
         method: 'POST',
@@ -235,7 +227,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── Clientes únicos ──
+    // ── Clientes únicos — busca por código BIA o razón social ──
     if (type === 'clients') {
       const searchQuery = (q || '').toLowerCase().trim();
       const seen = new Set();
@@ -252,7 +244,7 @@ export default async function handler(req, res) {
 
         seen.add(row.codigo_bia);
         clients.push({
-          codigo_bia: row.codigo_bia,
+          codigo_bia:   row.codigo_bia,
           razon_social: row.razon_social,
           operador_red: row.operador_red
         });
@@ -267,7 +259,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── Equipos por código BIA (llamada filtrada directa, sin límite de caché) ──
+    // ── Equipos por código BIA ──
     if (type === 'equipment') {
       if (!codigo_bia) {
         return res.status(400).json({
@@ -278,18 +270,18 @@ export default async function handler(req, res) {
 
       const allEquipment = await fetchEquipmentByClient(apiKey, codigo_bia);
       const equipment = allEquipment.map(r => ({
-        codigo_bia:       r.codigo_bia,
-        razon_social:     r.razon_social,
-        nombre_sku:       r.nombre_sku,
-        serial:           r.serial,
-        marca:            r.marca,
-        modelo:           r.modelo,
-        precio_unitario:  r.precio_unitario,
-        estado:           r.estado,
-        operador_red:     r.operador_red,
-        ciudad:           r.ciudad,
-        frontera:         r.frontera,
-        titulo:           r.titulo,
+        codigo_bia:        r.codigo_bia,
+        razon_social:      r.razon_social,
+        nombre_sku:        r.nombre_sku,
+        serial:            r.serial,
+        marca:             r.marca,
+        modelo:            r.modelo,
+        precio_unitario:   r.precio_unitario,
+        estado:            r.estado,
+        operador_red:      r.operador_red,
+        ciudad:            r.ciudad,
+        frontera:          r.frontera,
+        titulo:            r.titulo,
         propiedad_activos: r.propiedad_activos,
         fecha_instalacion: r.fecha_instalacion
       }));
