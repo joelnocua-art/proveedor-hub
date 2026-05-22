@@ -7,13 +7,16 @@
  *
  * Endpoints:
  *   GET /api/metabase-proxy?type=clients&q=<búsqueda>
- *     → Devuelve lista de clientes únicos (razón social + código BIA)
- *     → q puede ser código BIA parcial o razón social parcial
+ *     → Devuelve clientes únicos. q puede ser código BIA o razón social.
  *
  *   GET /api/metabase-proxy?type=equipment&codigo_bia=<código>
- *     → Devuelve todos los equipos asociados a ese cliente
+ *     → Devuelve todos los equipos del cliente.
  *
- * Fuente: Dashboard 11584, tab 12706 (Asignadas-Instaladas)
+ *   GET /api/metabase-proxy?debug=1
+ *     → Devuelve metadata del dataset (cardId, totalRows, sample, etc.)
+ *
+ * Fuente: Dashboard 11584, tab 12706 (Asignadas-Instaladas).
+ * Usa el endpoint /query/json (export) que NO tiene límite de 2000 filas.
  */
 
 const METABASE_URL = 'https://bia.metabaseapp.com';
@@ -21,14 +24,11 @@ const DASHBOARD_ID = 11584;
 const TAB_ID = 12706;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
-// Cache a nivel de módulo. Sobrevive entre invocaciones "warm" en Vercel
-// (se pierde en cold start, pero eso solo agrega ~1s a la primera llamada).
 let cachedCardId = null;
 let cachedRows = null;
 let cacheTime = 0;
-let cachedCodigoFieldRef = null; // field_ref numérico de codigo_bia
 
-// ─── Discovery del card ID + field_ref para codigo_bia ─────────────────
+// ─── Discovery del card ID ─────────────────────────────────────────────
 async function discoverCardId(apiKey) {
   if (cachedCardId) return cachedCardId;
 
@@ -62,131 +62,70 @@ async function discoverCardId(apiKey) {
   }
 
   if (!target?.card?.id) {
-    throw new Error(`No se encontró card de datos en dashboard ${DASHBOARD_ID}, tab ${TAB_ID}. Cards disponibles: ${tabCards.length}`);
+    throw new Error(`No se encontró card de datos en dashboard ${DASHBOARD_ID}, tab ${TAB_ID}.`);
   }
 
   cachedCardId = target.card.id;
-
-  // Intentar obtener field_ref de codigo_bia desde el dashboard
-  const dashMeta = target.card.result_metadata || [];
-  const dashCol = dashMeta.find(c =>
-    c.name === 'codigo_bia' || (c.display_name || '').toLowerCase().includes('código bia')
-  );
-  if (dashCol) {
-    if (typeof dashCol.id === 'number') {
-      cachedCodigoFieldRef = ['field', dashCol.id, null];
-    } else if (Array.isArray(dashCol.field_ref)) {
-      cachedCodigoFieldRef = dashCol.field_ref;
-    }
-  }
-
-  // Si no se obtuvo del dashboard, fetchar el card directamente (metadatos más completos)
-  if (!cachedCodigoFieldRef) {
-    try {
-      const cardResp = await fetch(`${METABASE_URL}/api/card/${cachedCardId}`, {
-        headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }
-      });
-      if (cardResp.ok) {
-        const card = await cardResp.json();
-        const cardMeta = card.result_metadata || [];
-        const cardCol = cardMeta.find(c =>
-          c.name === 'codigo_bia' || (c.display_name || '').toLowerCase().includes('código bia')
-        );
-        if (cardCol) {
-          if (typeof cardCol.id === 'number') {
-            cachedCodigoFieldRef = ['field', cardCol.id, null];
-          } else if (Array.isArray(cardCol.field_ref)) {
-            cachedCodigoFieldRef = cardCol.field_ref;
-          }
-        }
-      }
-    } catch (_) { /* non-fatal, usará fallback */ }
-  }
-
   return cachedCardId;
 }
 
-// ─── Normalizar filas de la API de Metabase ───────────────────────────
-function normalizeRows(cols, rows) {
-  const colIndex = {};
-  cols.forEach((c, idx) => {
-    if (c.name) colIndex[c.name] = idx;
-    if (c.display_name) colIndex[c.display_name] = idx;
-  });
-  function getCol(row, candidates) {
-    for (const name of candidates) {
-      if (colIndex[name] !== undefined) return row[colIndex[name]];
-    }
-    return null;
+// ─── Mapear un objeto de Metabase a nuestro formato ────────────────────
+function pick(obj, candidates) {
+  for (const name of candidates) {
+    if (obj[name] !== undefined && obj[name] !== null) return obj[name];
   }
-  return rows.map(row => ({
-    codigo_bia:        getCol(row, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
-    razon_social:      getCol(row, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
-    operador_red:      getCol(row, ['operador_de_red', 'Operador de Red', 'operador_red']),
-    nombre_sku:        getCol(row, ['nombre_sku', 'Nombre SKU', 'sku']),
-    serial:            getCol(row, ['serial', 'Serial']),
-    marca:             getCol(row, ['brand', 'Marca', 'marca']),
-    modelo:            getCol(row, ['model', 'Modelo', 'modelo']),
-    precio_unitario:   Number(getCol(row, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
-    estado:            getCol(row, ['state', 'Estado', 'estado', 'Estado Contrato']),
-    ciudad:            getCol(row, ['ciudad', 'Ciudad']),
-    frontera:          getCol(row, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
-    titulo:            getCol(row, ['titulo', 'Titulo']),
-    propiedad_activos: getCol(row, ['Propiedad de Activos']),
-    fecha_instalacion: getCol(row, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
-    fecha_ingreso:     getCol(row, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
-    fecha_retiro:      getCol(row, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
-  }));
+  return null;
 }
 
-// ─── Ejecutar query al card ────────────────────────────────────────────
-async function runCardQuery(apiKey, cardId, body) {
-  const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
+function normalizeRow(r) {
+  return {
+    codigo_bia:        pick(r, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
+    razon_social:      pick(r, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
+    operador_red:      pick(r, ['operador_de_red', 'Operador de Red', 'operador_red']),
+    nombre_sku:        pick(r, ['nombre_sku', 'Nombre SKU', 'sku']),
+    serial:            pick(r, ['serial', 'Serial']),
+    marca:             pick(r, ['brand', 'Marca', 'marca']),
+    modelo:            pick(r, ['model', 'Modelo', 'modelo']),
+    precio_unitario:   Number(pick(r, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
+    estado:            pick(r, ['state', 'Estado', 'estado', 'Estado Contrato']),
+    ciudad:            pick(r, ['ciudad', 'Ciudad']),
+    frontera:          pick(r, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
+    titulo:            pick(r, ['titulo', 'Titulo']),
+    propiedad_activos: pick(r, ['Propiedad de Activos']),
+    fecha_instalacion: pick(r, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
+    fecha_ingreso:     pick(r, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
+    fecha_retiro:      pick(r, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
+  };
+}
+
+// ─── Fetch todas las filas usando el endpoint de exportación ───────────
+// query/json es el endpoint de export — NO tiene el límite de 2000 filas
+// que sí tiene /query normal. Devuelve un array de objetos {col_name: value}.
+async function fetchAllRows(apiKey) {
+  if (cachedRows && (Date.now() - cacheTime) < CACHE_TTL_MS) {
+    return cachedRows;
+  }
+
+  const cardId = await discoverCardId(apiKey);
+
+  const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query/json`, {
     method: 'POST',
     headers: {
       'x-api-key': apiKey,
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify({})
   });
+
   if (!resp.ok) {
     const errText = await resp.text();
-    throw new Error(`Card query failed (${resp.status}): ${errText.substring(0, 300)}`);
-  }
-  const result = await resp.json();
-  return normalizeRows(result.data?.cols || [], result.data?.rows || []);
-}
-
-// ─── Fetch todos los equipos de un cliente ────────────────────────────
-async function fetchEquipmentByClient(apiKey, codigoBia) {
-  const cardId = await discoverCardId(apiKey);
-
-  // Intento 1: query con parámetro de filtro server-side (devuelve TODOS los registros)
-  if (cachedCodigoFieldRef) {
-    const filtered = await runCardQuery(apiKey, cardId, {
-      parameters: [{
-        type: 'string/=',
-        value: [codigoBia],
-        target: ['dimension', cachedCodigoFieldRef]
-      }]
-    });
-    if (filtered.length > 0) return filtered;
-    // Si vino vacío podría ser que el filtro no aplicó; sigue con fallback
+    throw new Error(`Card ${cardId} query/json failed (${resp.status}): ${errText.substring(0, 300)}`);
   }
 
-  // Intento 2 (fallback): query sin filtro, filtrar en memoria
-  const all = await runCardQuery(apiKey, cardId, {});
-  return all.filter(r => (r.codigo_bia || '').trim() === codigoBia.trim());
-}
-
-// ─── Fetch todas las filas (para búsqueda de clientes, 2000 rows max) ─
-async function fetchAllRows(apiKey) {
-  if (cachedRows && (Date.now() - cacheTime) < CACHE_TTL_MS) {
-    return cachedRows;
-  }
-  const cardId = await discoverCardId(apiKey);
-  cachedRows = await runCardQuery(apiKey, cardId, {});
+  const data = await resp.json();
+  const rows = Array.isArray(data) ? data : (data.data?.rows || []);
+  cachedRows = rows.map(normalizeRow);
   cacheTime = Date.now();
   return cachedRows;
 }
@@ -197,7 +136,7 @@ export default async function handler(req, res) {
   if (!apiKey) {
     return res.status(500).json({
       success: false,
-      error: 'METABASE_API_KEY no está configurada en el servidor. Agrégala en Vercel → Settings → Environment Variables.'
+      error: 'METABASE_API_KEY no está configurada en el servidor.'
     });
   }
 
@@ -209,19 +148,14 @@ export default async function handler(req, res) {
     // ── Modo debug ──
     if (debug === '1') {
       const cardId = await discoverCardId(apiKey);
-      const rawResp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
-        method: 'POST',
-        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({})
-      });
-      const raw = await rawResp.json();
-      const cols = raw.data?.cols || [];
+      // Conteo de codigos_bia únicos
+      const uniqueCodes = new Set();
+      for (const r of rows) if (r.codigo_bia) uniqueCodes.add(r.codigo_bia);
       return res.status(200).json({
         success: true,
         cardId,
         totalRows: rows.length,
-        codigoFieldRef: cachedCodigoFieldRef,
-        columnNames: cols.map(c => ({ name: c.name, display_name: c.display_name })),
+        uniqueClients: uniqueCodes.size,
         sampleRow: rows[0] || null,
         cacheAgeMs: Date.now() - cacheTime
       });
@@ -259,7 +193,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── Equipos por código BIA ──
+    // ── Equipos por código BIA — filtrado en memoria sobre TODAS las filas ──
     if (type === 'equipment') {
       if (!codigo_bia) {
         return res.status(400).json({
@@ -268,23 +202,25 @@ export default async function handler(req, res) {
         });
       }
 
-      const allEquipment = await fetchEquipmentByClient(apiKey, codigo_bia);
-      const equipment = allEquipment.map(r => ({
-        codigo_bia:        r.codigo_bia,
-        razon_social:      r.razon_social,
-        nombre_sku:        r.nombre_sku,
-        serial:            r.serial,
-        marca:             r.marca,
-        modelo:            r.modelo,
-        precio_unitario:   r.precio_unitario,
-        estado:            r.estado,
-        operador_red:      r.operador_red,
-        ciudad:            r.ciudad,
-        frontera:          r.frontera,
-        titulo:            r.titulo,
-        propiedad_activos: r.propiedad_activos,
-        fecha_instalacion: r.fecha_instalacion
-      }));
+      const targetCode = codigo_bia.trim();
+      const equipment = rows
+        .filter(r => (r.codigo_bia || '').trim() === targetCode)
+        .map(r => ({
+          codigo_bia:        r.codigo_bia,
+          razon_social:      r.razon_social,
+          nombre_sku:        r.nombre_sku,
+          serial:            r.serial,
+          marca:             r.marca,
+          modelo:            r.modelo,
+          precio_unitario:   r.precio_unitario,
+          estado:            r.estado,
+          operador_red:      r.operador_red,
+          ciudad:            r.ciudad,
+          frontera:          r.frontera,
+          titulo:            r.titulo,
+          propiedad_activos: r.propiedad_activos,
+          fecha_instalacion: r.fecha_instalacion
+        }));
 
       return res.status(200).json({
         success: true,
