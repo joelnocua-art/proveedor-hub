@@ -173,50 +173,26 @@
                 <div style="position:relative;margin-bottom:16px;">
                   <input type="text" class="input" id="salesSkuSearch" placeholder="Buscar SKU: TC, Medidor, Condensador..." style="font-size:14px;padding:12px 16px;" autocomplete="off" />
                 </div>
-                <!-- Mock items already added -->
+                <!-- Items (cargados desde Metabase según el cliente seleccionado en Paso 1) -->
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                   <span class="muted" style="font-size:13px;">Ítems agregados</span>
-                  <span style="background:rgba(91,107,255,0.15);color:var(--primary);padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;">3</span>
+                  <span id="swzEquipmentCount" style="background:rgba(91,107,255,0.15);color:var(--primary);padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;">0</span>
                 </div>
                 <div style="overflow-x:auto;">
                   <div class="item-row item-header">
                     <div>SKU / Descripción</div><div style="text-align:center;">Cant.</div><div style="text-align:right;">Precio base</div><div style="text-align:center;">Margen %</div><div style="text-align:right;">Precio final</div><div style="text-align:right;">Subtotal</div><div></div>
                   </div>
-                  <div class="item-row">
-                    <div><div style="font-weight:600;font-size:13px;">TC MONOF. 15KVA 13200/120-240V</div><div style="font-size:11px;color:var(--text-3);">Transformadores</div></div>
-                    <div style="text-align:center;"><input type="number" class="input" value="2" style="width:60px;text-align:center;padding:6px;" /></div>
-                    <div style="text-align:right;color:var(--text-2);font-size:13px;">$1.200.000</div>
-                    <div style="text-align:center;"><input type="number" class="input" value="15" style="width:60px;text-align:center;padding:6px;" />%</div>
-                    <div style="text-align:right;font-weight:600;color:var(--accent);">$1.380.000</div>
-                    <div style="text-align:right;font-weight:600;">$2.760.000</div>
-                    <div><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;">×</button></div>
-                  </div>
-                  <div class="item-row">
-                    <div><div style="font-weight:600;font-size:13px;">MEDIDOR TRIFÁSICO 4H CL 0.2S</div><div style="font-size:11px;color:var(--text-3);">Medidores</div></div>
-                    <div style="text-align:center;"><input type="number" class="input" value="3" style="width:60px;text-align:center;padding:6px;" /></div>
-                    <div style="text-align:right;color:var(--text-2);font-size:13px;">$850.000</div>
-                    <div style="text-align:center;"><input type="number" class="input" value="12" style="width:60px;text-align:center;padding:6px;" />%</div>
-                    <div style="text-align:right;font-weight:600;color:var(--accent);">$952.000</div>
-                    <div style="text-align:right;font-weight:600;">$2.856.000</div>
-                    <div><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;">×</button></div>
-                  </div>
-                  <div class="item-row">
-                    <div><div style="font-weight:600;font-size:13px;">CANALETA PLÁST. 40×25mm (2m)</div><div style="font-size:11px;color:var(--text-3);">Canalización</div></div>
-                    <div style="text-align:center;"><input type="number" class="input" value="50" style="width:60px;text-align:center;padding:6px;" /></div>
-                    <div style="text-align:right;color:var(--text-2);font-size:13px;">$8.500</div>
-                    <div style="text-align:center;"><input type="number" class="input" value="20" style="width:60px;text-align:center;padding:6px;" />%</div>
-                    <div style="text-align:right;font-weight:600;color:var(--accent);">$10.200</div>
-                    <div style="text-align:right;font-weight:600;">$510.000</div>
-                    <div><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;">×</button></div>
+                  <div id="swzEquipmentList">
+                    <div style="padding:30px;text-align:center;color:var(--text-3);font-size:13px;">Selecciona un cliente en el Paso 1 para cargar sus equipos desde Metabase.</div>
                   </div>
                 </div>
                 <div style="display:flex;gap:10px;margin-top:14px;">
-                  <button class="btn" style="font-size:12px;">+ Agregar otro ítem</button>
+                  <button class="btn" style="font-size:12px;" onclick="reloadEquipmentFromMetabase()">↻ Recargar desde Metabase</button>
                   <button class="btn" style="font-size:12px;border-color:rgba(0,229,200,.3);color:var(--accent);">+ Crear nuevo SKU</button>
                 </div>
                 <div style="margin-top:16px;padding:14px 16px;background:rgba(91,107,255,.06);border:1px solid rgba(91,107,255,.2);border-radius:var(--r-md);display:flex;justify-content:space-between;align-items:center;">
-                  <span style="font-size:13px;color:var(--text-2);">Total cotización (3 ítems, 55 unidades)</span>
-                  <span class="sales-valor" style="font-size:20px;color:var(--primary);">$6.126.000</span>
+                  <span id="swzEquipmentTotalLabel" style="font-size:13px;color:var(--text-2);">Total cotización (0 ítems)</span>
+                  <span id="swzEquipmentTotal" class="sales-valor" style="font-size:20px;color:var(--primary);">$0</span>
                 </div>
               </div></div>
             <div class="wz-footer"><button class="btn" onclick="salesWizGo(1)">← Volver</button><button class="btn btn-primary" onclick="salesWizGo(3)">Siguiente: Revisión →</button></div>
@@ -413,8 +389,13 @@
       if(typeof showToast==='function') showToast('Detalle de '+num,'info');
     };
 
-    // ═══ WIZARD NAV ═══
+    // ═══ WIZARD STATE ═══
     var wizStep = 1;
+    var selectedClient = null;       // { codigo_bia, razon_social, operador_red }
+    var equipmentItems = [];          // [{ nombre_sku, serial, marca, modelo, precio_base, cantidad, margen_pct, ... }]
+    var equipmentLoaded = false;      // true cuando ya cargamos equipos del cliente actual
+
+    // ═══ WIZARD NAV ═══
     window.salesWizGo = function(s){
       if(s<1||s>4) return;
       wizStep = s;
@@ -426,9 +407,19 @@
       document.querySelectorAll('#salesWizardView .wz-panel').forEach(function(p){p.classList.remove('active');});
       var pn=document.getElementById('swzP'+s);if(pn) pn.classList.add('active');
       window.scrollTo({top:0,behavior:'smooth'});
+
+      // Al entrar al Paso 2, cargar equipos del cliente seleccionado desde Metabase
+      if(s===2 && selectedClient && !equipmentLoaded){
+        loadEquipmentForClient();
+      }
     };
 
     window.showWizard = function(){
+      // Reset state al abrir el wizard (nueva solicitud)
+      selectedClient = null;
+      equipmentItems = [];
+      equipmentLoaded = false;
+      renderEquipmentList();
       document.getElementById('salesListView').style.display='none';
       document.getElementById('salesWizardView').style.display='block';
       document.getElementById('btnBackList').style.display='';
@@ -442,39 +433,235 @@
       renderSalesTable();
     };
 
-    // ═══ CLIENT SEARCH MOCK ═══
-    var MOCK_CLIENTS = [
-      { name:'Energía Solar Colombia S.A.S', nit:'901.234.567-8' },
-      { name:'Constructora Andina S.A.', nit:'860.123.456-1' },
-      { name:'Distribuidora Nacional de Equipos Ltda.', nit:'800.321.654-2' },
-      { name:'Minera del Pacífico S.A.S', nit:'900.876.543-9' },
-      { name:'Hospital Central de Bogotá', nit:'830.111.222-3' },
-    ];
+    // ═══ METABASE CLIENT SEARCH ═══
+    var clientSearchTimer = null;
+
+    async function fetchMetabaseClients(query){
+      try{
+        var res = await fetch('/api/metabase-proxy?type=clients&q='+encodeURIComponent(query));
+        var data = await res.json();
+        if(!data.success){
+          console.error('[Sales] Client search failed:', data.error);
+          return { error: data.error || 'Error desconocido' };
+        }
+        return data.clients || [];
+      }catch(err){
+        console.error('[Sales] Client fetch error:', err);
+        return { error: 'No se pudo conectar al servidor (' + err.message + ')' };
+      }
+    }
+
+    async function fetchMetabaseEquipment(codigoBia){
+      try{
+        var res = await fetch('/api/metabase-proxy?type=equipment&codigo_bia='+encodeURIComponent(codigoBia));
+        var data = await res.json();
+        if(!data.success){ console.error('[Sales] Equipment fetch failed:', data.error); return []; }
+        return data.equipment || [];
+      }catch(err){
+        console.error('[Sales] Equipment fetch error:', err);
+        return [];
+      }
+    }
+
     var cInput = document.getElementById('clientSearch');
     var cDrop = document.getElementById('clientDropdown');
     if(cInput && cDrop){
       cInput.addEventListener('input', function(){
-        var q = (cInput.value||'').trim().toLowerCase();
-        if(q.length<2){cDrop.style.display='none';return;}
-        var m = MOCK_CLIENTS.filter(function(c){return (c.name+' '+c.nit).toLowerCase().indexOf(q)!==-1;});
-        if(!m.length){cDrop.innerHTML='<div style="padding:12px 16px;color:var(--text-3);font-size:13px;">Sin resultados. Usa "+ Registrar cliente nuevo"</div>';cDrop.style.display='block';return;}
-        cDrop.innerHTML=m.map(function(c){
-          return '<div style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.04);transition:background .13s;" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'\'" onclick="selectMockClient(\''+esc(c.name).replace(/'/g,"\\'")+'\',\''+esc(c.nit)+'\')">'+
-            '<div><div style="font-weight:600;font-size:13px;">'+esc(c.name)+'</div><div style="font-size:11px;color:var(--text-3);">NIT: '+esc(c.nit)+'</div></div>'+
-            '<span style="font-size:11px;color:var(--accent);">Seleccionar</span></div>';
-        }).join('');
+        var q = (cInput.value||'').trim();
+        if(q.length<2){
+          cDrop.style.display='none';
+          if(clientSearchTimer) clearTimeout(clientSearchTimer);
+          return;
+        }
+        cDrop.innerHTML='<div style="padding:12px 16px;color:var(--text-3);font-size:13px;">Buscando en Metabase…</div>';
         cDrop.style.display='block';
+
+        if(clientSearchTimer) clearTimeout(clientSearchTimer);
+        clientSearchTimer = setTimeout(async function(){
+          var clients = await fetchMetabaseClients(q);
+
+          // Si es un objeto de error, mostrarlo al usuario
+          if(clients && clients.error){
+            cDrop.innerHTML='<div style="padding:12px 16px;color:var(--danger);font-size:12px;">⚠️ '+esc(clients.error)+'</div>';
+            return;
+          }
+
+          if(!clients.length){
+            cDrop.innerHTML='<div style="padding:12px 16px;color:var(--text-3);font-size:13px;">Sin resultados en Metabase. Usa "+ Registrar cliente nuevo"</div>';
+            return;
+          }
+          cDrop.innerHTML = clients.map(function(c){
+            var name = esc(c.razon_social||'');
+            var cbia = esc(c.codigo_bia||'');
+            var op   = esc(c.operador_red||'');
+            var safeName = name.replace(/'/g,"\\'");
+            var safeCbia = cbia.replace(/'/g,"\\'");
+            var safeOp   = op.replace(/'/g,"\\'");
+            return '<div style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.04);transition:background .13s;" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'\'" onclick="selectMetabaseClient(\''+safeCbia+'\',\''+safeName+'\',\''+safeOp+'\')">'+
+              '<div><div style="font-weight:600;font-size:13px;">'+name+'</div><div style="font-size:11px;color:var(--text-3);">BIA: '+cbia+(op?' • '+op:'')+'</div></div>'+
+              '<span style="font-size:11px;color:var(--accent);">Seleccionar</span></div>';
+          }).join('');
+        }, 250);
       });
-      document.addEventListener('click',function(e){if(!e.target.closest('#clientSearch')&&!e.target.closest('#clientDropdown'))cDrop.style.display='none';});
+      document.addEventListener('click',function(e){
+        if(!e.target.closest('#clientSearch')&&!e.target.closest('#clientDropdown')) cDrop.style.display='none';
+      });
     }
-    window.selectMockClient = function(name, nit){
+
+    window.selectMetabaseClient = function(codigoBia, name, operadorRed){
+      // Si cambia el cliente, resetear equipos
+      if(!selectedClient || selectedClient.codigo_bia !== codigoBia){
+        equipmentItems = [];
+        equipmentLoaded = false;
+      }
+      selectedClient = {
+        codigo_bia: codigoBia,
+        razon_social: name,
+        operador_red: operadorRed || ''
+      };
       document.getElementById('clientSearch').value = name;
       document.getElementById('clientDropdown').style.display='none';
       document.getElementById('clientForm').style.display='block';
       document.getElementById('clientNewToggle').style.display='none';
-      document.getElementById('sClientName').value=name;
-      document.getElementById('sClientNit').value=nit;
+      document.getElementById('sClientName').value = name;
+      document.getElementById('sClientNit').value = codigoBia;
+      // Actualizar la tarjeta preview con datos reales del cliente
+      var preview = document.querySelector('#clientForm .client-card');
+      if(preview){
+        var nameEl = preview.querySelector('.client-name');
+        if(nameEl) nameEl.textContent = name;
+        var sub = preview.querySelector('div[style*="font-size:12px"]');
+        if(sub) sub.textContent = 'Código BIA: '+codigoBia+(operadorRed?' • '+operadorRed:'');
+      }
       if(typeof showToast==='function') showToast('Cliente seleccionado: '+name,'success');
+    };
+
+    // Alias de compatibilidad (por si quedó algún call al nombre viejo)
+    window.selectMockClient = function(name, nit){
+      window.selectMetabaseClient(nit, name, '');
+    };
+
+    // ═══ EQUIPMENT RENDER (Step 2) ═══
+    function fmtCOPLocal(n){
+      return Number(n||0).toLocaleString('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0});
+    }
+
+    function renderEquipmentList(){
+      var list  = document.getElementById('swzEquipmentList');
+      var badge = document.getElementById('swzEquipmentCount');
+      var label = document.getElementById('swzEquipmentTotalLabel');
+      var totalEl = document.getElementById('swzEquipmentTotal');
+      if(!list) return;
+
+      if(!equipmentItems.length){
+        list.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-3);font-size:13px;">'+
+          (selectedClient
+            ? (equipmentLoaded
+                ? 'Este cliente no tiene equipos en Metabase.'
+                : 'Cargando equipos...')
+            : 'Selecciona un cliente en el Paso 1 para cargar sus equipos desde Metabase.')+
+          '</div>';
+        if(badge) badge.textContent = '0';
+        if(label) label.textContent = 'Total cotización (0 ítems)';
+        if(totalEl) totalEl.textContent = '$0';
+        return;
+      }
+
+      var totalUnidades = 0;
+      var totalCop = 0;
+      list.innerHTML = equipmentItems.map(function(item, idx){
+        var precioBase = Number(item.precio_base)||0;
+        var margen     = Number(item.margen_pct)||0;
+        var cantidad   = Number(item.cantidad)||0;
+        var precioFinal = precioBase * (1 + margen/100);
+        var subtotal    = precioFinal * cantidad;
+        totalUnidades += cantidad;
+        totalCop      += subtotal;
+
+        var desc = esc(item.nombre_sku || 'SKU sin nombre');
+        var subParts = [];
+        if(item.marca)  subParts.push(esc(item.marca));
+        if(item.modelo) subParts.push(esc(item.modelo));
+        if(item.serial) subParts.push('Serial: '+esc(item.serial));
+        if(item.estado) subParts.push('Estado: '+esc(item.estado));
+        var subStr = subParts.join(' • ');
+
+        return '<div class="item-row">'+
+          '<div><div style="font-weight:600;font-size:13px;">'+desc+'</div><div style="font-size:11px;color:var(--text-3);">'+subStr+'</div></div>'+
+          '<div style="text-align:center;"><input type="number" min="0" class="input" value="'+cantidad+'" data-eq-idx="'+idx+'" data-eq-field="cantidad" style="width:60px;text-align:center;padding:6px;" /></div>'+
+          '<div style="text-align:right;color:var(--text-2);font-size:13px;">'+fmtCOPLocal(precioBase)+'</div>'+
+          '<div style="text-align:center;"><input type="number" min="0" class="input" value="'+margen+'" data-eq-idx="'+idx+'" data-eq-field="margen_pct" style="width:60px;text-align:center;padding:6px;" />%</div>'+
+          '<div style="text-align:right;font-weight:600;color:var(--accent);">'+fmtCOPLocal(precioFinal)+'</div>'+
+          '<div style="text-align:right;font-weight:600;">'+fmtCOPLocal(subtotal)+'</div>'+
+          '<div><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;" data-eq-remove="'+idx+'" title="Quitar">×</button></div>'+
+        '</div>';
+      }).join('');
+
+      if(badge)   badge.textContent = String(equipmentItems.length);
+      if(label)   label.textContent = 'Total cotización ('+equipmentItems.length+' ítems, '+totalUnidades+' unidades)';
+      if(totalEl) totalEl.textContent = fmtCOPLocal(totalCop);
+
+      // Wire input listeners (cantidad y margen)
+      list.querySelectorAll('input[data-eq-idx]').forEach(function(inp){
+        inp.addEventListener('input', function(){
+          var idx = parseInt(this.getAttribute('data-eq-idx'),10);
+          var field = this.getAttribute('data-eq-field');
+          if(equipmentItems[idx]){
+            equipmentItems[idx][field] = Number(this.value)||0;
+            renderEquipmentList();
+          }
+        });
+      });
+      // Wire botones de remover
+      list.querySelectorAll('button[data-eq-remove]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var idx = parseInt(this.getAttribute('data-eq-remove'),10);
+          equipmentItems.splice(idx,1);
+          renderEquipmentList();
+        });
+      });
+    }
+
+    async function loadEquipmentForClient(){
+      if(!selectedClient || !selectedClient.codigo_bia){
+        equipmentItems = [];
+        renderEquipmentList();
+        return;
+      }
+      var list = document.getElementById('swzEquipmentList');
+      if(list) list.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-3);font-size:13px;">⏳ Cargando equipos desde Metabase...</div>';
+
+      var equipment = await fetchMetabaseEquipment(selectedClient.codigo_bia);
+      equipmentItems = equipment.map(function(e){
+        return {
+          codigo_bia: e.codigo_bia,
+          nombre_sku: e.nombre_sku,
+          serial:     e.serial,
+          marca:      e.marca,
+          modelo:     e.modelo,
+          estado:     e.estado,
+          operador_red: e.operador_red,
+          precio_base: Number(e.precio_unitario)||0,
+          cantidad:    1,
+          margen_pct:  0
+        };
+      });
+      equipmentLoaded = true;
+      renderEquipmentList();
+      if(typeof showToast==='function'){
+        if(equipmentItems.length) showToast(equipmentItems.length+' equipos cargados desde Metabase','success');
+        else showToast('El cliente no tiene equipos en Metabase','info');
+      }
+    }
+
+    // Botón "Recargar desde Metabase" (en Paso 2)
+    window.reloadEquipmentFromMetabase = function(){
+      if(!selectedClient){
+        if(typeof showToast==='function') showToast('Primero selecciona un cliente en el Paso 1','error');
+        return;
+      }
+      equipmentLoaded = false;
+      loadEquipmentForClient();
     };
 
     // ═══ INIT ═══
