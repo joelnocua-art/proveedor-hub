@@ -22,6 +22,7 @@ window._sbData = {
   quotes: null,
   providerResponses: null,
   adjudications: null,
+  salesRequests: null,
   loaded: false
 };
 
@@ -387,6 +388,144 @@ async function loginWithGoogle() {
     if (typeof showToast === 'function') showToast(msg, 'error');
     else if (typeof alert === 'function') alert(msg);
   }
+}
+
+// ═══ SALES (Venta de Activos) ═══════════════════════════════════════════
+//
+// Tablas: sales_requests + sales_request_items
+// Schema: ver /sql/sales_tables.sql
+
+// Carga todas las solicitudes con sus items asociados.
+// Devuelve un array plano de objetos compatibles con SALES_DATA del frontend.
+async function sbLoadSales() {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data: requests, error } = await sb
+    .from('sales_requests')
+    .select('*, items:sales_request_items(*)')
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.warn('[Supabase] Sales load error:', error.message);
+    return [];
+  }
+  const mapped = (requests || []).map(r => ({
+    _supaId:    r.id,
+    num:        r.numero,
+    codigo_bia: r.cliente_codigo_bia || '',
+    cliente:    r.cliente_razon_social || '',
+    nit:        r.cliente_nit || '',
+    rep:        r.cliente_rep || '',
+    email:      r.cliente_email || '',
+    telefono:   r.cliente_telefono || '',
+    operador_red: r.cliente_operador_red || '',
+    tipo_contrato: r.tipo_contrato || '',
+    equipos:    (r.items || []).length,
+    valor:      Number(r.valor_total) || 0,
+    status:     r.status || 'cotizacion_generada',
+    fecha:      r.fecha_cotizacion || (r.created_at ? r.created_at.split('T')[0] : ''),
+    observaciones: r.observaciones || '',
+    vigencia_dias: r.vigencia_dias || 30,
+    items:      r.items || [],
+    created_at: r.created_at
+  }));
+  window._sbData.salesRequests = mapped;
+  return mapped;
+}
+
+// Genera el siguiente número de solicitud: VTA-YYYY-NNN (NNN secuencial por año)
+async function sbNextSalesNumber() {
+  const sb = getSupabase();
+  if (!sb) return 'VTA-' + new Date().getFullYear() + '-001';
+  const year = new Date().getFullYear();
+  const prefix = 'VTA-' + year + '-';
+  const { data, error } = await sb
+    .from('sales_requests')
+    .select('numero')
+    .like('numero', prefix + '%')
+    .order('numero', { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return prefix + '001';
+  const last = data[0].numero;
+  const lastN = parseInt(last.slice(prefix.length), 10) || 0;
+  return prefix + String(lastN + 1).padStart(3, '0');
+}
+
+// Inserta una solicitud + sus items. Devuelve { ok, error, sale } con el objeto creado.
+async function sbInsertSale(sale) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+
+  const numero = sale.numero || await sbNextSalesNumber();
+
+  const requestRow = {
+    numero,
+    cliente_codigo_bia:   sale.codigo_bia || null,
+    cliente_razon_social: sale.cliente || '',
+    cliente_nit:          sale.nit || null,
+    cliente_rep:          sale.rep || null,
+    cliente_email:        sale.email || null,
+    cliente_telefono:     sale.telefono || null,
+    cliente_operador_red: sale.operador_red || null,
+    tipo_contrato:        sale.tipo_contrato || null,
+    valor_total:          Number(sale.valor) || 0,
+    observaciones:        sale.observaciones || null,
+    vigencia_dias:        sale.vigencia_dias || 30,
+    fecha_cotizacion:     sale.fecha || new Date().toISOString().slice(0, 10),
+    status:               sale.status || 'cotizacion_generada',
+    created_by:           sale.created_by || null
+  };
+
+  const { data: created, error: reqErr } = await sb
+    .from('sales_requests')
+    .insert([requestRow])
+    .select()
+    .single();
+
+  if (reqErr) {
+    console.error('[Supabase] Insert sales_request error:', reqErr);
+    return { ok: false, error: reqErr.message || 'Error al guardar la solicitud' };
+  }
+
+  // Insertar items asociados
+  if (sale.items && sale.items.length > 0) {
+    const itemRows = sale.items.map(it => ({
+      sales_request_id: created.id,
+      nombre_sku:    it.nombre_sku || '',
+      serial:        it.serial || null,
+      marca:         it.marca || null,
+      modelo:        it.modelo || null,
+      precio_base:   Number(it.precio_base) || 0,
+      margen_pct:    Number(it.margen_pct) || 0,
+      cantidad:      Number(it.cantidad) || 1,
+      ciudad:        it.ciudad || null,
+      frontera:      it.frontera || null,
+      estado_equipo: it.estado || null
+    }));
+    const { error: itemsErr } = await sb.from('sales_request_items').insert(itemRows);
+    if (itemsErr) {
+      console.error('[Supabase] Insert sales items error:', itemsErr);
+      // Rollback manual: borrar la request creada
+      await sb.from('sales_requests').delete().eq('id', created.id);
+      return { ok: false, error: 'Error al guardar los equipos: ' + (itemsErr.message || 'desconocido') };
+    }
+  }
+
+  return { ok: true, sale: created };
+}
+
+// Actualiza el status de una solicitud
+async function sbUpdateSaleStatus(saleId, newStatus) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false };
+  const { error } = await sb
+    .from('sales_requests')
+    .update({ status: newStatus })
+    .eq('id', saleId);
+  if (error) {
+    console.error('[Supabase] Update sale status error:', error);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
 }
 
 console.log('[Supabase] Client module loaded');
