@@ -208,15 +208,15 @@
                   <div id="revClientDetails" style="font-size:12px;color:var(--text-2);margin-top:4px;">—</div>
                 </div>
                 <div style="padding:16px;border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:16px;">
-                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:10px;">Equipos (3 ítems)</div>
+                  <div id="revEquipmentHeader" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:10px;">Equipos (0 ítems)</div>
                   <table style="width:100%;font-size:13px;">
-                    <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;font-weight:600;">TC MONOF. 15KVA</td><td style="text-align:center;">×2</td><td style="text-align:right;">15%</td><td style="text-align:right;font-weight:600;">$2.760.000</td></tr>
-                    <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;font-weight:600;">MEDIDOR TRIFÁSICO 4H</td><td style="text-align:center;">×3</td><td style="text-align:right;">12%</td><td style="text-align:right;font-weight:600;">$2.856.000</td></tr>
-                    <tr><td style="padding:8px 0;font-weight:600;">CANALETA PLÁST. 40×25mm</td><td style="text-align:center;">×50</td><td style="text-align:right;">20%</td><td style="text-align:right;font-weight:600;">$510.000</td></tr>
+                    <tbody id="revEquipmentTbody">
+                      <tr><td style="padding:16px 0;text-align:center;color:var(--text-3);">No hay equipos en la cotización.</td></tr>
+                    </tbody>
                   </table>
                   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:2px solid var(--border);">
                     <span style="font-weight:700;font-size:14px;">Total</span>
-                    <span class="sales-valor" style="font-size:20px;background:linear-gradient(135deg,var(--text),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">$6.126.000</span>
+                    <span id="revEquipmentTotal" class="sales-valor" style="font-size:20px;background:linear-gradient(135deg,var(--text),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">$0</span>
                   </div>
                 </div>
                 <div class="form-grid" style="margin:0;">
@@ -431,6 +431,47 @@
         if(mail) parts.push(mail);
         if(tel)  parts.push(tel);
         if(rDet) rDet.textContent = parts.join(' • ') || '—';
+
+        // Renderizar tabla de equipos con los items reales del Step 2
+        var revHeader = document.getElementById('revEquipmentHeader');
+        var revBody   = document.getElementById('revEquipmentTbody');
+        var revTotal  = document.getElementById('revEquipmentTotal');
+        var fmtCOP = function(n){
+          try { return '$'+(Number(n)||0).toLocaleString('es-CO'); }
+          catch(_) { return '$'+Math.round(Number(n)||0); }
+        };
+        if(revHeader) revHeader.textContent = 'Equipos ('+equipmentItems.length+' ítems)';
+        if(revBody){
+          if(!equipmentItems.length){
+            revBody.innerHTML = '<tr><td style="padding:16px 0;text-align:center;color:var(--text-3);">No hay equipos en la cotización.</td></tr>';
+          } else {
+            revBody.innerHTML = equipmentItems.map(function(it, idx){
+              var cant = Number(it.cantidad)||0;
+              var pBase = Number(it.precio_base)||0;
+              var margen = Number(it.margen_pct)||0;
+              var pFinal = pBase * (1 + margen/100);
+              var subtotal = pFinal * cant;
+              var isLast = idx === equipmentItems.length-1;
+              var sku = it.nombre_sku || '—';
+              var serial = it.serial ? ' • Serial: '+it.serial : '';
+              return '<tr'+(isLast?'':' style="border-bottom:1px solid var(--border);"')+'>'+
+                '<td style="padding:8px 0;font-weight:600;">'+esc(sku)+
+                  '<div style="font-size:11px;color:var(--text-3);font-weight:400;">'+esc(serial.replace(/^ • /,''))+'</div>'+
+                '</td>'+
+                '<td style="text-align:center;">×'+cant+'</td>'+
+                '<td style="text-align:right;">'+margen+'%</td>'+
+                '<td style="text-align:right;font-weight:600;">'+fmtCOP(subtotal)+'</td>'+
+              '</tr>';
+            }).join('');
+          }
+        }
+        if(revTotal){
+          var total = equipmentItems.reduce(function(sum, it){
+            var pFinal = (Number(it.precio_base)||0) * (1 + (Number(it.margen_pct)||0)/100);
+            return sum + pFinal * (Number(it.cantidad)||0);
+          }, 0);
+          revTotal.textContent = fmtCOP(total);
+        }
       }
     };
 
