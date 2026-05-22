@@ -61,6 +61,14 @@ CREATE INDEX IF NOT EXISTS idx_sales_items_request ON sales_request_items(sales_
 CREATE INDEX IF NOT EXISTS idx_sales_status ON sales_requests(status);
 CREATE INDEX IF NOT EXISTS idx_sales_created ON sales_requests(created_at DESC);
 
+-- ─── Permisos a nivel tabla ───────────────────────────────────────────
+-- Supabase requiere GRANT explícito además de las políticas RLS para que
+-- los roles `anon` y `authenticated` puedan operar sobre las tablas.
+GRANT ALL ON sales_requests        TO anon, authenticated;
+GRANT ALL ON sales_request_items   TO anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE sales_requests_id_seq      TO anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE sales_request_items_id_seq TO anon, authenticated;
+
 -- ─── Row Level Security ───────────────────────────────────────────────
 -- Habilitamos RLS y permitimos todo para el rol anon (mismo patrón que el resto del proyecto).
 ALTER TABLE sales_requests ENABLE ROW LEVEL SECURITY;

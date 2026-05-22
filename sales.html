@@ -240,71 +240,35 @@
                 <div class="card" style="margin-bottom:16px;">
                   <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
                     <div>
-                      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px;">VTA-2026-003</div>
-                      <div style="font-size:13px;color:var(--text-2);margin-top:2px;">Distribuidora Nacional de Equipos Ltda.</div>
+                      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px;" id="s4SaleNum">—</div>
+                      <div style="font-size:13px;color:var(--text-2);margin-top:2px;" id="s4ClientName">—</div>
                     </div>
-                    <span class="sales-status s-enviada"><span class="status-dot"></span>Enviada al cliente</span>
+                    <span id="s4StatusBadge" class="sales-status s-cotizacion"><span class="status-dot"></span>—</span>
                   </div>
                 </div>
                 <!-- Timeline -->
                 <div class="card" style="margin-bottom:16px;">
                   <div class="card-header"><div class="card-title">Historial de estados</div></div>
                   <div class="card-body">
-                    <div class="sales-timeline">
-                      <div class="timeline-item"><div class="timeline-dot active"></div><div class="timeline-content"><div style="font-weight:600;color:var(--accent);">Enviada al cliente</div><div style="font-size:12px;color:var(--text-2);">Se envió la cotización por email al contacto.</div><div class="timeline-date">16 abr 2026, 14:30 — joel.nocua@bia.app</div></div></div>
-                      <div class="timeline-item"><div class="timeline-dot active"></div><div class="timeline-content"><div style="font-weight:600;">Cotización generada</div><div style="font-size:12px;color:var(--text-2);">Se creó la solicitud con 5 equipos por $18.500.000</div><div class="timeline-date">15 abr 2026, 09:15 — joel.nocua@bia.app</div></div></div>
-                      <div class="timeline-item"><div class="timeline-dot active"></div><div class="timeline-content"><div style="font-weight:600;">Nueva</div><div style="font-size:12px;color:var(--text-2);">Solicitud creada por el equipo CX.</div><div class="timeline-date">15 abr 2026, 09:00 — joel.nocua@bia.app</div></div></div>
-                    </div>
+                    <div class="sales-timeline" id="s4Timeline"></div>
                   </div>
                 </div>
                 <!-- Action -->
                 <div class="card" style="margin-bottom:16px;">
                   <div class="card-header"><div class="card-title">Siguiente acción</div></div>
-                  <div class="card-body">
-                    <div class="action-card primary">
-                      <div style="font-size:28px;margin-bottom:8px;">📎</div>
-                      <div style="font-weight:700;font-size:14px;margin-bottom:4px;">Adjuntar firma del cliente</div>
-                      <div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Sube el documento firmado para avanzar al siguiente paso.</div>
-                      <button class="btn btn-primary" onclick="showToast('Demo: Se subiría el archivo firmado','info')">Subir documento firmado</button>
-                    </div>
-                    <div class="action-card danger" style="margin-top:10px;">
-                      <button class="btn btn-danger" style="font-size:12px;padding:6px 14px;" onclick="showToast('Demo: La solicitud sería cancelada','info')">❌ Cancelar solicitud</button>
-                    </div>
-                  </div>
+                  <div class="card-body" id="s4NextAction"></div>
                 </div>
                 <!-- Attachments -->
                 <div class="card">
                   <div class="card-header"><div class="card-title">Documentos adjuntos</div></div>
-                  <div class="card-body">
-                    <div class="attach-item">
-                      <div class="attach-icon" style="background:rgba(91,107,255,.12);color:var(--primary);">📄</div>
-                      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">Cotización_VTA-2026-003.pdf</div><div style="font-size:11px;color:var(--text-3);">Cotización generada • 15 abr 2026</div></div>
-                      <button class="btn" style="font-size:11px;padding:4px 10px;">Descargar</button>
-                    </div>
-                    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                      <select class="input" style="max-width:200px;font-size:12px;padding:7px 10px;">
-                        <option>Cotización firmada</option><option>Factura</option><option>Soporte de pago</option><option>Otro</option>
-                      </select>
-                      <button class="btn" style="font-size:12px;padding:6px 14px;">📎 Subir archivo</button>
-                    </div>
-                  </div>
+                  <div class="card-body" id="s4AttachList"></div>
                 </div>
               </div>
               <!-- Side Panel -->
               <div>
                 <div class="card" style="position:sticky;top:80px;">
                   <div class="card-header"><div class="card-title">Resumen</div></div>
-                  <div class="card-body">
-                    <div style="display:grid;gap:12px;font-size:13px;">
-                      <div><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Número</div><div style="font-weight:700;font-family:'Syne',sans-serif;">VTA-2026-003</div></div>
-                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Cliente</div><div style="font-weight:600;">Distribuidora Nacional de Equipos Ltda.</div><div style="font-size:11px;color:var(--text-2);">NIT: 800.321.654-2</div></div>
-                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Contacto</div><div style="font-size:12px;color:var(--text-2);">Carlos Mendoza</div><div style="font-size:12px;color:var(--accent);">cmendoza@distequipos.co</div></div>
-                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Equipos</div><div style="font-weight:600;">5 ítems</div></div>
-                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Valor total</div><div class="sales-valor" style="font-size:22px;background:linear-gradient(135deg,var(--text),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">$18.500.000</div></div>
-                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Vigencia</div><div style="font-size:12px;color:var(--text-2);">30 días (vence 16 may 2026)</div></div>
-                      <div style="border-top:1px solid var(--border);padding-top:12px;"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Creada por</div><div style="font-size:12px;color:var(--text-2);">joel.nocua@bia.app</div></div>
-                    </div>
-                  </div>
+                  <div class="card-body" id="s4Summary"></div>
                 </div>
               </div>
             </div>
@@ -400,16 +364,34 @@
     };
 
     window.openSaleDetail = function(num){
-      showWizard();
+      var sale = SALES_DATA.find(function(s){ return s.num === num; });
+      if(!sale){
+        if(typeof showToast==='function') showToast('No se encontró la solicitud '+num,'error');
+        return;
+      }
+      currentSale = sale;
+      document.getElementById('salesListView').style.display='none';
+      document.getElementById('salesWizardView').style.display='block';
+      document.getElementById('btnBackList').style.display='';
       salesWizGo(4);
-      if(typeof showToast==='function') showToast('Detalle de '+num,'info');
     };
+
+    // ═══ HELPERS ═══
+    function formatDateTime(isoStr){
+      if(!isoStr) return '—';
+      try{
+        var d=new Date(isoStr);
+        var months=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+        return d.getDate()+' '+months[d.getMonth()]+' '+d.getFullYear()+', '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+      }catch(_){return isoStr;}
+    }
 
     // ═══ WIZARD STATE ═══
     var wizStep = 1;
     var selectedClient = null;       // { codigo_bia, razon_social, operador_red }
     var equipmentItems = [];          // [{ nombre_sku, serial, marca, modelo, precio_base, cantidad, margen_pct, ... }]
     var equipmentLoaded = false;      // true cuando ya cargamos equipos del cliente actual
+    var currentSale = null;           // sale object shown in Step 4
 
     // ═══ WIZARD NAV ═══
     window.salesWizGo = function(s){
@@ -428,6 +410,9 @@
       if(s===2 && selectedClient && !equipmentLoaded){
         loadEquipmentForClient();
       }
+
+      // Al entrar al Paso 4, renderizar con datos reales
+      if(s===4){ renderStep4(currentSale); }
 
       // Al entrar al Paso 3, reflejar datos reales del formulario en la tarjeta de revisión
       if(s===3){
@@ -821,14 +806,177 @@
           if(btn){ btn.disabled = false; btn.textContent = originalText; }
           return;
         }
-        if(typeof showToast==='function') showToast('Solicitud '+result.sale.numero+' creada','success');
-        // Recargar lista desde Supabase y avanzar al paso 4
+        var savedNum = result.sale.numero;
+        if(typeof showToast==='function') showToast('Solicitud '+savedNum+' creada','success');
+        // Recargar lista desde Supabase, fijar la solicitud recién creada y avanzar al paso 4
         await refreshSalesData();
+        currentSale = SALES_DATA.find(function(s){ return s.num === savedNum; }) || null;
         salesWizGo(4);
       } catch(err) {
         console.error('[Sales] Save error:', err);
         if(typeof showToast==='function') showToast('Error inesperado: '+err.message,'error');
         if(btn){ btn.disabled = false; btn.textContent = originalText; }
+      }
+    };
+
+    // ═══ STEP 4 RENDER ═══
+    function renderStep4(sale){
+      var numEl    = document.getElementById('s4SaleNum');
+      var clientEl = document.getElementById('s4ClientName');
+      var badgeEl  = document.getElementById('s4StatusBadge');
+      var tlEl     = document.getElementById('s4Timeline');
+      var actionEl = document.getElementById('s4NextAction');
+      var attachEl = document.getElementById('s4AttachList');
+      var sumEl    = document.getElementById('s4Summary');
+
+      if(!sale){
+        if(numEl) numEl.textContent = '—';
+        if(clientEl) clientEl.textContent = '—';
+        if(badgeEl) badgeEl.innerHTML = '<span class="status-dot"></span>—';
+        if(tlEl) tlEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px;">Sin datos de solicitud.</div>';
+        if(actionEl) actionEl.innerHTML = '';
+        if(attachEl) attachEl.innerHTML = '';
+        if(sumEl) sumEl.innerHTML = '';
+        return;
+      }
+
+      var st = STATUS_MAP[sale.status] || STATUS_MAP['cotizacion_generada'];
+
+      // Header
+      if(numEl) numEl.textContent = sale.num || '—';
+      if(clientEl) clientEl.textContent = sale.cliente || '—';
+      if(badgeEl){
+        badgeEl.className = 'sales-status '+st.css;
+        badgeEl.innerHTML = '<span class="status-dot"></span>'+esc(st.label);
+      }
+
+      // Timeline — mostramos el evento de creación y el estado actual si difiere
+      if(tlEl){
+        var createdStr = sale.created_at ? formatDateTime(sale.created_at) : (sale.fecha ? fmtDate(sale.fecha) : '—');
+        var tItems = [];
+        // Estado actual (si no es cotizacion_generada, mostrarlo como el más reciente)
+        if(sale.status !== 'cotizacion_generada'){
+          tItems.push({ label: st.label, desc: 'Estado actual de la solicitud.', date: createdStr, accent: true });
+        }
+        tItems.push({
+          label: 'Cotización generada',
+          desc: 'Se creó la solicitud con '+(sale.equipos||0)+' equipos por '+fmtCOP(sale.valor||0)+'.',
+          date: createdStr,
+          accent: sale.status === 'cotizacion_generada'
+        });
+        tlEl.innerHTML = tItems.map(function(it){
+          return '<div class="timeline-item">'+
+            '<div class="timeline-dot active"></div>'+
+            '<div class="timeline-content">'+
+              '<div style="font-weight:600'+(it.accent?';color:var(--accent)':'')+'">' +esc(it.label)+'</div>'+
+              '<div style="font-size:12px;color:var(--text-2);">'+esc(it.desc)+'</div>'+
+              '<div class="timeline-date">'+esc(it.date)+'</div>'+
+            '</div>'+
+          '</div>';
+        }).join('');
+      }
+
+      // Next action
+      if(actionEl){
+        var s = sale.status;
+        if(s==='cotizacion_generada'||s==='enviada'||s==='nueva'){
+          actionEl.innerHTML =
+            '<div class="action-card primary">'+
+              '<div style="font-size:28px;margin-bottom:8px;">📎</div>'+
+              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Adjuntar firma del cliente</div>'+
+              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Sube el documento firmado para avanzar al siguiente paso.</div>'+
+              '<button class="btn btn-primary" onclick="showToast(\'Función próximamente disponible\',\'info\')">Subir documento firmado</button>'+
+            '</div>'+
+            '<div class="action-card danger" style="margin-top:10px;">'+
+              '<button class="btn btn-danger" style="font-size:12px;padding:6px 14px;" onclick="cancelarSolicitud()">❌ Cancelar solicitud</button>'+
+            '</div>';
+        } else if(s==='firmada'){
+          actionEl.innerHTML =
+            '<div class="action-card primary">'+
+              '<div style="font-size:28px;margin-bottom:8px;">🧾</div>'+
+              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Emitir factura</div>'+
+              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">La cotización está firmada. Procede a emitir la factura.</div>'+
+              '<button class="btn btn-primary" onclick="showToast(\'Función próximamente disponible\',\'info\')">Registrar factura emitida</button>'+
+            '</div>'+
+            '<div class="action-card danger" style="margin-top:10px;">'+
+              '<button class="btn btn-danger" style="font-size:12px;padding:6px 14px;" onclick="cancelarSolicitud()">❌ Cancelar solicitud</button>'+
+            '</div>';
+        } else {
+          actionEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px;">'+
+            'Esta solicitud está '+esc(st.label.toLowerCase())+'. No requiere acciones adicionales.</div>';
+        }
+      }
+
+      // Attachments
+      if(attachEl){
+        var docDate = sale.fecha ? fmtDate(sale.fecha) : '—';
+        attachEl.innerHTML =
+          '<div class="attach-item">'+
+            '<div class="attach-icon" style="background:rgba(91,107,255,.12);color:var(--primary);">📄</div>'+
+            '<div style="flex:1;min-width:0;">'+
+              '<div style="font-size:13px;font-weight:600;">Cotización_'+esc(sale.num||'')+'</div>'+
+              '<div style="font-size:11px;color:var(--text-3);">Cotización generada • '+esc(docDate)+'</div>'+
+            '</div>'+
+            '<button class="btn" style="font-size:11px;padding:4px 10px;" onclick="showToast(\'Descarga no disponible aún\',\'info\')">Descargar</button>'+
+          '</div>'+
+          '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+
+            '<select class="input" style="max-width:200px;font-size:12px;padding:7px 10px;">'+
+              '<option>Cotización firmada</option><option>Factura</option><option>Soporte de pago</option><option>Otro</option>'+
+            '</select>'+
+            '<button class="btn" style="font-size:12px;padding:6px 14px;" onclick="showToast(\'Función próximamente disponible\',\'info\')">📎 Subir archivo</button>'+
+          '</div>';
+      }
+
+      // Summary panel
+      if(sumEl){
+        var vigDias = sale.vigencia_dias || 30;
+        var expiryStr = '';
+        if(sale.fecha){
+          try{
+            var fp=sale.fecha.split('-');
+            var ed=new Date(parseInt(fp[0]),parseInt(fp[1])-1,parseInt(fp[2]));
+            ed.setDate(ed.getDate()+vigDias);
+            var mns=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+            expiryStr=' (vence '+ed.getDate()+' '+mns[ed.getMonth()]+' '+ed.getFullYear()+')';
+          }catch(_){}
+        }
+        var rows=[
+          {lbl:'Número',    html:'<div style="font-weight:700;font-family:\'Syne\',sans-serif;">'+esc(sale.num||'—')+'</div>'},
+          {lbl:'Cliente',   html:'<div style="font-weight:600;">'+esc(sale.cliente||'—')+'</div>'+(sale.nit?'<div style="font-size:11px;color:var(--text-2);">NIT: '+esc(sale.nit)+'</div>':'')},
+          {lbl:'Código BIA',html:'<div style="font-size:12px;color:var(--text-2);">'+esc(sale.codigo_bia||'—')+'</div>'},
+          {lbl:'Contacto',  html:(sale.rep?'<div style="font-size:12px;color:var(--text-2);">'+esc(sale.rep)+'</div>':'')+(sale.email?'<div style="font-size:12px;color:var(--accent);">'+esc(sale.email)+'</div>':'')+((!sale.rep&&!sale.email)?'<div style="font-size:12px;color:var(--text-3);">—</div>':'')},
+          {lbl:'Equipos',   html:'<div style="font-weight:600;">'+(sale.equipos||0)+' ítems</div>'},
+          {lbl:'Valor total',html:'<div class="sales-valor" style="font-size:22px;background:linear-gradient(135deg,var(--text),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">'+fmtCOP(sale.valor||0)+'</div>'},
+          {lbl:'Vigencia',  html:'<div style="font-size:12px;color:var(--text-2);">'+vigDias+' días'+esc(expiryStr)+'</div>'}
+        ];
+        sumEl.innerHTML='<div style="display:grid;gap:12px;font-size:13px;">'+
+          rows.map(function(r,i){
+            return (i>0?'<div style="border-top:1px solid var(--border);padding-top:12px;">':'<div>')+
+              '<div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">'+r.lbl+'</div>'+
+              r.html+'</div>';
+          }).join('')+'</div>';
+      }
+    }
+
+    window.cancelarSolicitud = async function(){
+      if(!currentSale||!currentSale._supaId){
+        if(typeof showToast==='function') showToast('No hay solicitud activa','error');
+        return;
+      }
+      if(!confirm('¿Cancelar la solicitud '+currentSale.num+'? Esta acción no se puede deshacer.')) return;
+      if(typeof sbUpdateSaleStatus!=='function'){
+        if(typeof showToast==='function') showToast('Supabase no está cargado','error');
+        return;
+      }
+      var result = await sbUpdateSaleStatus(currentSale._supaId, 'cancelada');
+      if(result.ok){
+        await refreshSalesData();
+        var updated = SALES_DATA.find(function(s){ return s.num===currentSale.num; });
+        if(updated) currentSale = updated;
+        renderStep4(currentSale);
+        if(typeof showToast==='function') showToast('Solicitud cancelada','info');
+      } else {
+        if(typeof showToast==='function') showToast('Error al cancelar: '+(result.error||'desconocido'),'error');
       }
     };
 
