@@ -77,10 +77,10 @@
         <div id="salesListView">
           <!-- KPI Cards -->
           <div class="sales-kpi-grid">
-            <div class="card sales-kpi"><div class="card-body"><div class="muted">Total solicitudes</div><div class="kpi-value">7</div><div class="kpi-tag"><span class="dot"></span><span class="muted">Este mes</span></div></div></div>
-            <div class="card sales-kpi"><div class="card-body"><div class="muted">Valor en pipeline</div><div class="kpi-value" style="font-size:22px;">$48.2M</div><div class="kpi-tag"><span class="dot" style="background:var(--primary);box-shadow:0 0 0 5px rgba(91,107,255,.12);"></span><span class="muted">Cotizaciones activas</span></div></div></div>
-            <div class="card sales-kpi"><div class="card-body"><div class="muted">Cerradas</div><div class="kpi-value" style="background:linear-gradient(135deg,var(--success),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">2</div><div class="kpi-tag"><span class="dot" style="background:var(--success);box-shadow:0 0 0 5px rgba(0,212,138,.12);"></span><span class="muted">Pagadas</span></div></div></div>
-            <div class="card sales-kpi"><div class="card-body"><div class="muted">Pendientes firma</div><div class="kpi-value" style="background:linear-gradient(135deg,var(--warning),#ff9838);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">2</div><div class="kpi-tag"><span class="dot" style="background:var(--warning);box-shadow:0 0 0 5px rgba(255,190,61,.12);"></span><span class="muted">Requieren acción</span></div></div></div>
+            <div class="card sales-kpi"><div class="card-body"><div class="muted">Total solicitudes</div><div class="kpi-value" id="kpiTotal">0</div><div class="kpi-tag"><span class="dot"></span><span class="muted">Este mes</span></div></div></div>
+            <div class="card sales-kpi"><div class="card-body"><div class="muted">Valor en pipeline</div><div class="kpi-value" id="kpiPipeline" style="font-size:22px;">$0</div><div class="kpi-tag"><span class="dot" style="background:var(--primary);box-shadow:0 0 0 5px rgba(91,107,255,.12);"></span><span class="muted">Cotizaciones activas</span></div></div></div>
+            <div class="card sales-kpi"><div class="card-body"><div class="muted">Cerradas</div><div class="kpi-value" id="kpiCerradas" style="background:linear-gradient(135deg,var(--success),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">0</div><div class="kpi-tag"><span class="dot" style="background:var(--success);box-shadow:0 0 0 5px rgba(0,212,138,.12);"></span><span class="muted">Pagadas</span></div></div></div>
+            <div class="card sales-kpi"><div class="card-body"><div class="muted">Pendientes firma</div><div class="kpi-value" id="kpiPendientes" style="background:linear-gradient(135deg,var(--warning),#ff9838);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">0</div><div class="kpi-tag"><span class="dot" style="background:var(--warning);box-shadow:0 0 0 5px rgba(255,190,61,.12);"></span><span class="muted">Requieren acción</span></div></div></div>
           </div>
 
           <!-- Filters -->
@@ -224,8 +224,8 @@
                   <div class="col-6"><label>Vigencia de cotización (días)</label><input type="number" class="input" value="30" /></div>
                   <div class="col-6"><label>Fecha</label><input type="date" class="input" value="2026-04-16" /></div>
                 </div>
-                <div style="margin-top:16px;padding:14px 16px;background:rgba(0,229,200,.06);border:1px solid rgba(0,229,200,.2);border-radius:var(--r-md);">
-                  <div style="font-size:13px;color:var(--accent);font-weight:600;">✓ Se generará la solicitud VTA-2026-008 con 3 ítems por $6.126.000</div>
+                <div id="revConfirmBanner" style="margin-top:16px;padding:14px 16px;background:rgba(0,229,200,.06);border:1px solid rgba(0,229,200,.2);border-radius:var(--r-md);">
+                  <div id="revConfirmText" style="font-size:13px;color:var(--accent);font-weight:600;">✓ Listo para generar la cotización</div>
                   <div style="font-size:12px;color:var(--text-3);margin-top:4px;">El estado cambiará a "Cotización generada".</div>
                 </div>
               </div></div>
@@ -322,16 +322,10 @@
   <script src="components.js"></script>
   <script>
   (function(){
-    // ═══ MOCK DATA ═══
-    var MOCK_SALES = [
-      { num:'VTA-2026-001', cliente:'Energía Solar Colombia S.A.S', nit:'901.234.567-8', equipos:3, valor:6126000, status:'cerrada', fecha:'2026-03-10', margen:15 },
-      { num:'VTA-2026-002', cliente:'Constructora Andina S.A.', nit:'860.123.456-1', equipos:8, valor:24800000, status:'cerrada', fecha:'2026-03-22', margen:12 },
-      { num:'VTA-2026-003', cliente:'Distribuidora Nacional de Equipos Ltda.', nit:'800.321.654-2', equipos:5, valor:18500000, status:'enviada', fecha:'2026-04-15', margen:18 },
-      { num:'VTA-2026-004', cliente:'Minera del Pacífico S.A.S', nit:'900.876.543-9', equipos:12, valor:45200000, status:'firmada', fecha:'2026-04-08', margen:10 },
-      { num:'VTA-2026-005', cliente:'Hospital Central de Bogotá', nit:'830.111.222-3', equipos:2, valor:3200000, status:'cotizacion_generada', fecha:'2026-04-14', margen:8 },
-      { num:'VTA-2026-006', cliente:'Universidad Nacional', nit:'899.999.063-3', equipos:1, valor:1500000, status:'cancelada', fecha:'2026-04-01', margen:0 },
-      { num:'VTA-2026-007', cliente:'Petrotech Colombia S.A.S', nit:'900.555.666-7', equipos:7, valor:32000000, status:'factura_emitida', fecha:'2026-04-12', margen:14 },
-    ];
+    // ═══ DATA ═══
+    // Aún no hay backend que guarde solicitudes. Cuando se conecte Supabase
+    // este array se reemplazará por una query a la tabla sales_requests.
+    var SALES_DATA = [];
 
     var STATUS_MAP = {
       'nueva':              { label:'Nueva',               css:'s-nueva',       icon:'○' },
@@ -348,11 +342,34 @@
     function fmtDate(d){ if(!d) return '-'; var p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
 
     // ═══ LIST VIEW ═══
+    function renderSalesKPIs(){
+      var setText = function(id, val){ var el = document.getElementById(id); if(el) el.textContent = val; };
+      var total = SALES_DATA.length;
+      var pipeline = SALES_DATA
+        .filter(function(s){ return s.status !== 'cerrada' && s.status !== 'cancelada'; })
+        .reduce(function(sum, s){ return sum + (Number(s.valor)||0); }, 0);
+      var cerradas = SALES_DATA.filter(function(s){ return s.status === 'cerrada'; }).length;
+      var pendientes = SALES_DATA.filter(function(s){ return s.status === 'enviada' || s.status === 'cotizacion_generada'; }).length;
+      var pipelineDisplay = pipeline >= 1000000
+        ? '$' + (pipeline/1000000).toFixed(1) + 'M'
+        : (pipeline > 0 ? fmtCOP(pipeline) : '$0');
+      setText('kpiTotal', total);
+      setText('kpiPipeline', pipelineDisplay);
+      setText('kpiCerradas', cerradas);
+      setText('kpiPendientes', pendientes);
+    }
+
     function renderSalesTable(data){
       var tb = document.getElementById('salesTableBody');
       if(!tb) return;
-      var list = data || MOCK_SALES;
-      if(!list.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-3);">Sin solicitudes con los filtros actuales.</td></tr>'; return; }
+      var list = data || SALES_DATA;
+      if(!list.length){
+        var msg = SALES_DATA.length === 0
+          ? 'Aún no hay solicitudes de venta. Crea la primera con "+ Nueva solicitud".'
+          : 'Sin solicitudes con los filtros actuales.';
+        tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-3);">'+msg+'</td></tr>';
+        return;
+      }
       tb.innerHTML = list.map(function(s){
         var st = STATUS_MAP[s.status] || STATUS_MAP['nueva'];
         return '<tr onclick="openSaleDetail(\''+esc(s.num)+'\')">'+
@@ -372,7 +389,7 @@
       var st = document.getElementById('salesStatusFilter').value;
       var from = document.getElementById('salesDateFrom').value;
       var to = document.getElementById('salesDateTo').value;
-      var filtered = MOCK_SALES.filter(function(s){
+      var filtered = SALES_DATA.filter(function(s){
         if(q && (s.cliente+' '+s.nit+' '+s.num).toLowerCase().indexOf(q)===-1) return false;
         if(st && s.status!==st) return false;
         if(from && s.fecha < from) return false;
@@ -465,12 +482,19 @@
             }).join('');
           }
         }
-        if(revTotal){
-          var total = equipmentItems.reduce(function(sum, it){
-            var pFinal = (Number(it.precio_base)||0) * (1 + (Number(it.margen_pct)||0)/100);
-            return sum + pFinal * (Number(it.cantidad)||0);
-          }, 0);
-          revTotal.textContent = fmtCOP(total);
+        var totalFinal = equipmentItems.reduce(function(sum, it){
+          var pFinal = (Number(it.precio_base)||0) * (1 + (Number(it.margen_pct)||0)/100);
+          return sum + pFinal * (Number(it.cantidad)||0);
+        }, 0);
+        if(revTotal) revTotal.textContent = fmtCOP(totalFinal);
+
+        // Banner de confirmación con número de solicitud dinámico
+        var bannerText = document.getElementById('revConfirmText');
+        if(bannerText){
+          var nextNum = 'VTA-' + new Date().getFullYear() + '-' + String(SALES_DATA.length + 1).padStart(3, '0');
+          bannerText.textContent = equipmentItems.length
+            ? '✓ Se generará la solicitud ' + nextNum + ' con ' + equipmentItems.length + ' ítems por ' + fmtCOP(totalFinal)
+            : '⚠️ Agrega al menos un equipo en el paso 2 antes de confirmar';
         }
       }
     };
@@ -491,6 +515,7 @@
       document.getElementById('salesListView').style.display='block';
       document.getElementById('salesWizardView').style.display='none';
       document.getElementById('btnBackList').style.display='none';
+      renderSalesKPIs();
       renderSalesTable();
     };
 
@@ -732,6 +757,7 @@
     };
 
     // ═══ INIT ═══
+    renderSalesKPIs();
     renderSalesTable();
 
   })();
