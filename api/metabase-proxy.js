@@ -25,6 +25,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 let cachedCardId = null;
 let cachedRows = null;
 let cacheTime = 0;
+let cachedCodigoFieldRef = null; // field_ref de codigo_bia para queries filtradas
 
 // ─── Discovery del card ID ─────────────────────────────────────────────
 async function discoverCardId(apiKey) {
@@ -70,17 +71,81 @@ async function discoverCardId(apiKey) {
   }
 
   cachedCardId = target.card.id;
+
+  // Intentar obtener field_ref desde result_metadata del dashboard
+  const dashMeta = target.card.result_metadata || [];
+  const dashCol = dashMeta.find(c =>
+    c.name === 'codigo_bia' || (c.display_name || '').toLowerCase().includes('código bia')
+  );
+  if (dashCol) {
+    if (typeof dashCol.id === 'number') {
+      cachedCodigoFieldRef = ['field', dashCol.id, null];
+    } else if (Array.isArray(dashCol.field_ref)) {
+      cachedCodigoFieldRef = dashCol.field_ref;
+    }
+  }
+
+  // Si no se obtuvo del dashboard, fetchar el card directamente (más completo)
+  if (!cachedCodigoFieldRef) {
+    try {
+      const cardResp = await fetch(`${METABASE_URL}/api/card/${cachedCardId}`, {
+        headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }
+      });
+      if (cardResp.ok) {
+        const card = await cardResp.json();
+        const cardMeta = card.result_metadata || [];
+        const cardCol = cardMeta.find(c =>
+          c.name === 'codigo_bia' || (c.display_name || '').toLowerCase().includes('código bia')
+        );
+        if (cardCol) {
+          if (typeof cardCol.id === 'number') {
+            cachedCodigoFieldRef = ['field', cardCol.id, null];
+          } else if (Array.isArray(cardCol.field_ref)) {
+            cachedCodigoFieldRef = cardCol.field_ref;
+          }
+        }
+      }
+    } catch (_) { /* non-fatal, usará fallback */ }
+  }
+
   return cachedCardId;
 }
 
-// ─── Fetch + normalización de todas las filas ──────────────────────────
-async function fetchAllRows(apiKey) {
-  if (cachedRows && (Date.now() - cacheTime) < CACHE_TTL_MS) {
-    return cachedRows;
+// ─── Normalizar un array de [cols, rows] de la API de Metabase ────────
+function normalizeRows(cols, rows) {
+  const colIndex = {};
+  cols.forEach((c, idx) => {
+    if (c.name) colIndex[c.name] = idx;
+    if (c.display_name) colIndex[c.display_name] = idx;
+  });
+  function getCol(row, candidates) {
+    for (const name of candidates) {
+      if (colIndex[name] !== undefined) return row[colIndex[name]];
+    }
+    return null;
   }
+  return rows.map(row => ({
+    codigo_bia:       getCol(row, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
+    razon_social:     getCol(row, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
+    operador_red:     getCol(row, ['operador_de_red', 'Operador de Red', 'operador_red']),
+    nombre_sku:       getCol(row, ['nombre_sku', 'Nombre SKU', 'sku']),
+    serial:           getCol(row, ['serial', 'Serial']),
+    marca:            getCol(row, ['brand', 'Marca', 'marca']),
+    modelo:           getCol(row, ['model', 'Modelo', 'modelo']),
+    precio_unitario:  Number(getCol(row, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
+    estado:           getCol(row, ['state', 'Estado', 'estado', 'Estado Contrato']),
+    ciudad:           getCol(row, ['ciudad', 'Ciudad']),
+    frontera:         getCol(row, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
+    titulo:           getCol(row, ['titulo', 'Titulo']),
+    propiedad_activos: getCol(row, ['Propiedad de Activos']),
+    fecha_instalacion: getCol(row, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
+    fecha_ingreso:    getCol(row, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
+    fecha_retiro:     getCol(row, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
+  }));
+}
 
-  const cardId = await discoverCardId(apiKey);
-
+// ─── Ejecutar query al card y normalizar resultado ─────────────────────
+async function runCardQuery(apiKey, cardId, body) {
   const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
     method: 'POST',
     headers: {
@@ -88,54 +153,49 @@ async function fetchAllRows(apiKey) {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     },
-    body: JSON.stringify({})
+    body: JSON.stringify(body)
   });
-
   if (!resp.ok) {
     const errText = await resp.text();
-    throw new Error(`Card ${cardId} query failed (${resp.status}): ${errText.substring(0, 300)}`);
+    throw new Error(`Card query failed (${resp.status}): ${errText.substring(0, 300)}`);
   }
-
   const result = await resp.json();
-  const cols = result.data?.cols || [];
-  const rows = result.data?.rows || [];
+  return normalizeRows(result.data?.cols || [], result.data?.rows || []);
+}
 
-  // Mapa flexible nombre→índice (acepta tanto el nombre interno como el display)
-  const colIndex = {};
-  cols.forEach((c, idx) => {
-    if (c.name) colIndex[c.name] = idx;
-    if (c.display_name) colIndex[c.display_name] = idx;
-  });
+// ─── Fetch filtrado por codigo_bia (todos los equipos del cliente) ─────
+async function fetchEquipmentByClient(apiKey, codigoBia) {
+  const cardId = await discoverCardId(apiKey);
 
-  function getCol(row, candidates) {
-    for (const name of candidates) {
-      if (colIndex[name] !== undefined) return row[colIndex[name]];
-    }
-    return null;
+  // Intento 1: query con parámetro de filtro (devuelve TODOS los registros del cliente)
+  if (cachedCodigoFieldRef) {
+    const filtered = await runCardQuery(apiKey, cardId, {
+      parameters: [{
+        type: 'string/=',
+        value: [codigoBia],
+        target: ['dimension', cachedCodigoFieldRef]
+      }]
+    });
+    if (filtered.length > 0) return filtered;
+    // Si vino vacío, podría ser que el filtro no funcionó; continúa con fallback
   }
 
-  const normalized = rows.map(row => ({
-    codigo_bia: getCol(row, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
-    razon_social: getCol(row, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
-    operador_red: getCol(row, ['operador_de_red', 'Operador de Red', 'operador_red']),
-    nombre_sku: getCol(row, ['nombre_sku', 'Nombre SKU', 'sku']),
-    serial: getCol(row, ['serial', 'Serial']),
-    marca: getCol(row, ['brand', 'Marca', 'marca']),
-    modelo: getCol(row, ['model', 'Modelo', 'modelo']),
-    precio_unitario: Number(getCol(row, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
-    estado: getCol(row, ['state', 'Estado', 'estado', 'Estado Contrato']),
-    ciudad: getCol(row, ['ciudad', 'Ciudad']),
-    frontera: getCol(row, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
-    titulo: getCol(row, ['titulo', 'Titulo']),
-    propiedad_activos: getCol(row, ['Propiedad de Activos']),
-    fecha_instalacion: getCol(row, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
-    fecha_ingreso: getCol(row, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
-    fecha_retiro: getCol(row, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
-  }));
+  // Intento 2 (fallback): query sin filtro, filtrar en memoria
+  // Cubre el caso donde field_ref no está disponible o el filtro no aplicó
+  const all = await runCardQuery(apiKey, cardId, {});
+  return all.filter(r => (r.codigo_bia || '').trim() === codigoBia.trim());
+}
 
-  cachedRows = normalized;
+// ─── Fetch + normalización de todas las filas (para búsqueda de clientes) ─
+async function fetchAllRows(apiKey) {
+  if (cachedRows && (Date.now() - cacheTime) < CACHE_TTL_MS) {
+    return cachedRows;
+  }
+
+  const cardId = await discoverCardId(apiKey);
+  cachedRows = await runCardQuery(apiKey, cardId, {});
   cacheTime = Date.now();
-  return normalized;
+  return cachedRows;
 }
 
 // ─── Handler ───────────────────────────────────────────────────────────
@@ -168,6 +228,7 @@ export default async function handler(req, res) {
         success: true,
         cardId,
         totalRows: rows.length,
+        codigoFieldRef: cachedCodigoFieldRef,
         columnNames: cols.map(c => ({ name: c.name, display_name: c.display_name })),
         sampleRow: rows[0] || null,
         cacheAgeMs: Date.now() - cacheTime
@@ -185,7 +246,7 @@ export default async function handler(req, res) {
         if (seen.has(row.codigo_bia)) continue;
 
         if (searchQuery) {
-          const haystack = (row.razon_social + ' ' + row.codigo_bia).toLowerCase();
+          const haystack = (row.codigo_bia + ' ' + row.razon_social).toLowerCase();
           if (!haystack.includes(searchQuery)) continue;
         }
 
@@ -206,7 +267,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── Equipos por código BIA ──
+    // ── Equipos por código BIA (llamada filtrada directa, sin límite de caché) ──
     if (type === 'equipment') {
       if (!codigo_bia) {
         return res.status(400).json({
@@ -215,24 +276,23 @@ export default async function handler(req, res) {
         });
       }
 
-      const equipment = rows
-        .filter(r => r.codigo_bia === codigo_bia)
-        .map(r => ({
-          codigo_bia: r.codigo_bia,
-          razon_social: r.razon_social,
-          nombre_sku: r.nombre_sku,
-          serial: r.serial,
-          marca: r.marca,
-          modelo: r.modelo,
-          precio_unitario: r.precio_unitario,
-          estado: r.estado,
-          operador_red: r.operador_red,
-          ciudad: r.ciudad,
-          frontera: r.frontera,
-          titulo: r.titulo,
-          propiedad_activos: r.propiedad_activos,
-          fecha_instalacion: r.fecha_instalacion
-        }));
+      const allEquipment = await fetchEquipmentByClient(apiKey, codigo_bia);
+      const equipment = allEquipment.map(r => ({
+        codigo_bia:       r.codigo_bia,
+        razon_social:     r.razon_social,
+        nombre_sku:       r.nombre_sku,
+        serial:           r.serial,
+        marca:            r.marca,
+        modelo:           r.modelo,
+        precio_unitario:  r.precio_unitario,
+        estado:           r.estado,
+        operador_red:     r.operador_red,
+        ciudad:           r.ciudad,
+        frontera:         r.frontera,
+        titulo:           r.titulo,
+        propiedad_activos: r.propiedad_activos,
+        fecha_instalacion: r.fecha_instalacion
+      }));
 
       return res.status(200).json({
         success: true,
