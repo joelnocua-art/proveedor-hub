@@ -7,12 +7,16 @@
  *
  * Endpoints:
  *   GET /api/metabase-proxy?type=clients&q=<búsqueda>
- *     → Devuelve lista de clientes únicos (razón social + código BIA)
+ *     → Devuelve clientes únicos. q puede ser código BIA o razón social.
  *
  *   GET /api/metabase-proxy?type=equipment&codigo_bia=<código>
- *     → Devuelve todos los equipos asociados a ese cliente
+ *     → Devuelve todos los equipos del cliente.
  *
- * Fuente: Dashboard 11584, tab 12706 (Asignadas-Instaladas)
+ *   GET /api/metabase-proxy?debug=1
+ *     → Devuelve metadata del dataset (cardId, totalRows, sample, etc.)
+ *
+ * Fuente: Dashboard 11584, tab 12706 (Asignadas-Instaladas).
+ * Usa el endpoint /query/json (export) que NO tiene límite de 2000 filas.
  */
 
 const METABASE_URL = 'https://bia.metabaseapp.com';
@@ -20,12 +24,9 @@ const DASHBOARD_ID = 11584;
 const TAB_ID = 12706;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
-// Cache a nivel de módulo. Sobrevive entre invocaciones "warm" en Vercel
-// (se pierde en cold start, pero eso solo agrega ~1s a la primera llamada).
 let cachedCardId = null;
 let cachedRows = null;
 let cacheTime = 0;
-let cachedCodigoFieldRef = null; // field_ref de codigo_bia para queries filtradas
 
 // ─── Discovery del card ID ─────────────────────────────────────────────
 async function discoverCardId(apiKey) {
@@ -43,147 +44,137 @@ async function discoverCardId(apiKey) {
   const dashboard = await resp.json();
   const dashcards = dashboard.dashcards || dashboard.ordered_cards || [];
 
-  // Filtrar solo cards del tab que nos interesa (o sin tab si no aplica)
   const tabCards = dashcards.filter(dc =>
     !dc.dashboard_tab_id || dc.dashboard_tab_id === TAB_ID
   );
 
-  // Preferir card cuyo nombre incluya "precios" o "data" (la tabla principal)
   let target = tabCards.find(dc => {
     const name = (dc.card?.name || '').toLowerCase();
     return name.includes('precios') || name.includes('data') || name.includes('sku');
   });
 
-  // Fallback: el card con más columnas (típicamente la tabla, no el KPI)
   if (!target) {
     let maxCols = 0;
     for (const dc of tabCards) {
       const numCols = (dc.card?.result_metadata || []).length;
-      if (numCols > maxCols) {
-        maxCols = numCols;
-        target = dc;
-      }
+      if (numCols > maxCols) { maxCols = numCols; target = dc; }
     }
   }
 
   if (!target?.card?.id) {
-    throw new Error(`No se encontró card de datos en dashboard ${DASHBOARD_ID}, tab ${TAB_ID}. Cards disponibles: ${tabCards.length}`);
+    throw new Error(`No se encontró card de datos en dashboard ${DASHBOARD_ID}, tab ${TAB_ID}.`);
   }
 
   cachedCardId = target.card.id;
-
-  // Cachear field_ref de codigo_bia para poder hacer queries filtradas
-  const meta = target.card.result_metadata || [];
-  const codigoMeta = meta.find(c =>
-    c.name === 'codigo_bia' || (c.display_name || '').toLowerCase().includes('código bia')
-  );
-  if (codigoMeta?.field_ref) cachedCodigoFieldRef = codigoMeta.field_ref;
-
   return cachedCardId;
 }
 
-// ─── Normalizar un array de [cols, rows] de la API de Metabase ────────
-function normalizeRows(cols, rows) {
-  const colIndex = {};
+// ─── Mapear un objeto de Metabase a nuestro formato ────────────────────
+function pick(obj, candidates) {
+  for (const name of candidates) {
+    if (obj[name] !== undefined && obj[name] !== null) return obj[name];
+  }
+  return null;
+}
+
+function normalizeRow(r) {
+  return {
+    codigo_bia:        pick(r, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
+    razon_social:      pick(r, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
+    operador_red:      pick(r, ['operador_de_red', 'Operador de Red', 'operador_red']),
+    nombre_sku:        pick(r, ['nombre_sku', 'Nombre SKU', 'sku']),
+    serial:            pick(r, ['serial', 'Serial']),
+    marca:             pick(r, ['brand', 'Marca', 'marca']),
+    modelo:            pick(r, ['model', 'Modelo', 'modelo']),
+    precio_unitario:   Number(pick(r, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
+    estado:            pick(r, ['state', 'Estado', 'estado', 'Estado Contrato']),
+    ciudad:            pick(r, ['ciudad', 'Ciudad']),
+    frontera:          pick(r, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
+    titulo:            pick(r, ['titulo', 'Titulo']),
+    propiedad_activos: pick(r, ['Propiedad de Activos']),
+    fecha_instalacion: pick(r, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
+    fecha_ingreso:     pick(r, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
+    fecha_retiro:      pick(r, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
+  };
+}
+
+// ─── Helper: normalizar fila desde formato cols+rows ──────────────────
+function normalizeRowFromCols(cols, rowArr) {
+  const obj = {};
   cols.forEach((c, idx) => {
-    if (c.name) colIndex[c.name] = idx;
-    if (c.display_name) colIndex[c.display_name] = idx;
+    if (c.name) obj[c.name] = rowArr[idx];
+    if (c.display_name && obj[c.display_name] === undefined) obj[c.display_name] = rowArr[idx];
   });
-  function getCol(row, candidates) {
-    for (const name of candidates) {
-      if (colIndex[name] !== undefined) return row[colIndex[name]];
-    }
-    return null;
-  }
-  return rows.map(row => ({
-    codigo_bia:       getCol(row, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
-    razon_social:     getCol(row, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
-    operador_red:     getCol(row, ['operador_de_red', 'Operador de Red', 'operador_red']),
-    nombre_sku:       getCol(row, ['nombre_sku', 'Nombre SKU', 'sku']),
-    serial:           getCol(row, ['serial', 'Serial']),
-    marca:            getCol(row, ['brand', 'Marca', 'marca']),
-    modelo:           getCol(row, ['model', 'Modelo', 'modelo']),
-    precio_unitario:  Number(getCol(row, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
-    estado:           getCol(row, ['state', 'Estado', 'estado', 'Estado Contrato']),
-    ciudad:           getCol(row, ['ciudad', 'Ciudad']),
-    frontera:         getCol(row, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
-    titulo:           getCol(row, ['titulo', 'Titulo']),
-    propiedad_activos: getCol(row, ['Propiedad de Activos']),
-    fecha_instalacion: getCol(row, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
-    fecha_ingreso:    getCol(row, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
-    fecha_retiro:     getCol(row, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
-  }));
+  return normalizeRow(obj);
 }
 
-// ─── Fetch filtrado por codigo_bia (sin límite de caché) ──────────────
-async function fetchEquipmentByClient(apiKey, codigoBia) {
-  const cardId = await discoverCardId(apiKey);
-
-  // Construir parámetros de filtro si tenemos el field_ref
-  const body = {};
-  if (cachedCodigoFieldRef) {
-    body.parameters = [{
-      type: 'string/=',
-      value: [codigoBia],
-      target: ['dimension', cachedCodigoFieldRef]
-    }];
-  }
-
-  const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Equipment query failed (${resp.status}): ${errText.substring(0, 300)}`);
-  }
-
-  const result = await resp.json();
-  const cols = result.data?.cols || [];
-  const rows = result.data?.rows || [];
-  const all = normalizeRows(cols, rows);
-
-  // Si no tenemos field_ref, filtramos en memoria (fallback)
-  if (!cachedCodigoFieldRef) {
-    return all.filter(r => r.codigo_bia === codigoBia);
-  }
-  return all;
-}
-
-// ─── Fetch + normalización de todas las filas (para búsqueda de clientes) ─
+// ─── Fetch todas las filas — bypassea el límite de 2000 vía /api/dataset ───
+//
+// Estrategia: obtener el dataset_query del card (MBQL o SQL nativa) y
+// ejecutarlo directamente vía /api/dataset con constraints altos para
+// que Metabase no aplique el límite por defecto de 2000 filas.
 async function fetchAllRows(apiKey) {
   if (cachedRows && (Date.now() - cacheTime) < CACHE_TTL_MS) {
     return cachedRows;
   }
 
   const cardId = await discoverCardId(apiKey);
+  let cols = [];
+  let rows = [];
 
-  const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    body: JSON.stringify({})
-  });
+  // Intento 1: dataset con constraints altos (bypassa límite por defecto)
+  try {
+    const cardResp = await fetch(`${METABASE_URL}/api/card/${cardId}`, {
+      headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }
+    });
+    if (cardResp.ok) {
+      const card = await cardResp.json();
+      if (card.dataset_query) {
+        const dsResp = await fetch(`${METABASE_URL}/api/dataset`, {
+          method: 'POST',
+          headers: {
+            'x-api-key': apiKey,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            ...card.dataset_query,
+            constraints: {
+              'max-results': 1000000,
+              'max-results-bare-rows': 1000000
+            }
+          })
+        });
+        if (dsResp.ok) {
+          const dsResult = await dsResp.json();
+          cols = dsResult.data?.cols || [];
+          rows = dsResult.data?.rows || [];
+        }
+      }
+    }
+  } catch (_) { /* fallback abajo */ }
 
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Card ${cardId} query failed (${resp.status}): ${errText.substring(0, 300)}`);
+  // Intento 2 (fallback): query estándar del card (max 2000 filas)
+  if (rows.length === 0) {
+    const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`Card ${cardId} query failed (${resp.status}): ${errText.substring(0, 300)}`);
+    }
+    const result = await resp.json();
+    cols = result.data?.cols || [];
+    rows = result.data?.rows || [];
   }
 
-  const result = await resp.json();
-  const cols = result.data?.cols || [];
-  const rows = result.data?.rows || [];
-
-  cachedRows = normalizeRows(cols, rows);
+  cachedRows = rows.map(rowArr => normalizeRowFromCols(cols, rowArr));
   cacheTime = Date.now();
   return cachedRows;
 }
@@ -194,7 +185,7 @@ export default async function handler(req, res) {
   if (!apiKey) {
     return res.status(500).json({
       success: false,
-      error: 'METABASE_API_KEY no está configurada en el servidor. Agrégala en Vercel → Settings → Environment Variables.'
+      error: 'METABASE_API_KEY no está configurada en el servidor.'
     });
   }
 
@@ -203,29 +194,23 @@ export default async function handler(req, res) {
   try {
     const rows = await fetchAllRows(apiKey);
 
-    // ── Modo debug: devuelve metadata para diagnosticar ──
+    // ── Modo debug ──
     if (debug === '1') {
-      // Re-fetch raw para ver los nombres exactos de columnas que manda Metabase
       const cardId = await discoverCardId(apiKey);
-      const rawResp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
-        method: 'POST',
-        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({})
-      });
-      const raw = await rawResp.json();
-      const cols = raw.data?.cols || [];
+      // Conteo de codigos_bia únicos
+      const uniqueCodes = new Set();
+      for (const r of rows) if (r.codigo_bia) uniqueCodes.add(r.codigo_bia);
       return res.status(200).json({
         success: true,
         cardId,
         totalRows: rows.length,
-        codigoFieldRef: cachedCodigoFieldRef,
-        columnNames: cols.map(c => ({ name: c.name, display_name: c.display_name })),
+        uniqueClients: uniqueCodes.size,
         sampleRow: rows[0] || null,
         cacheAgeMs: Date.now() - cacheTime
       });
     }
 
-    // ── Clientes únicos ──
+    // ── Clientes únicos — busca por código BIA o razón social ──
     if (type === 'clients') {
       const searchQuery = (q || '').toLowerCase().trim();
       const seen = new Set();
@@ -236,13 +221,13 @@ export default async function handler(req, res) {
         if (seen.has(row.codigo_bia)) continue;
 
         if (searchQuery) {
-          const haystack = (row.razon_social + ' ' + row.codigo_bia).toLowerCase();
+          const haystack = (row.codigo_bia + ' ' + row.razon_social).toLowerCase();
           if (!haystack.includes(searchQuery)) continue;
         }
 
         seen.add(row.codigo_bia);
         clients.push({
-          codigo_bia: row.codigo_bia,
+          codigo_bia:   row.codigo_bia,
           razon_social: row.razon_social,
           operador_red: row.operador_red
         });
@@ -257,7 +242,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── Equipos por código BIA (llamada filtrada directa, sin límite de caché) ──
+    // ── Equipos por código BIA — filtrado en memoria sobre TODAS las filas ──
     if (type === 'equipment') {
       if (!codigo_bia) {
         return res.status(400).json({
@@ -266,23 +251,25 @@ export default async function handler(req, res) {
         });
       }
 
-      const allEquipment = await fetchEquipmentByClient(apiKey, codigo_bia);
-      const equipment = allEquipment.map(r => ({
-        codigo_bia:       r.codigo_bia,
-        razon_social:     r.razon_social,
-        nombre_sku:       r.nombre_sku,
-        serial:           r.serial,
-        marca:            r.marca,
-        modelo:           r.modelo,
-        precio_unitario:  r.precio_unitario,
-        estado:           r.estado,
-        operador_red:     r.operador_red,
-        ciudad:           r.ciudad,
-        frontera:         r.frontera,
-        titulo:           r.titulo,
-        propiedad_activos: r.propiedad_activos,
-        fecha_instalacion: r.fecha_instalacion
-      }));
+      const targetCode = codigo_bia.trim();
+      const equipment = rows
+        .filter(r => (r.codigo_bia || '').trim() === targetCode)
+        .map(r => ({
+          codigo_bia:        r.codigo_bia,
+          razon_social:      r.razon_social,
+          nombre_sku:        r.nombre_sku,
+          serial:            r.serial,
+          marca:             r.marca,
+          modelo:            r.modelo,
+          precio_unitario:   r.precio_unitario,
+          estado:            r.estado,
+          operador_red:      r.operador_red,
+          ciudad:            r.ciudad,
+          frontera:          r.frontera,
+          titulo:            r.titulo,
+          propiedad_activos: r.propiedad_activos,
+          fecha_instalacion: r.fecha_instalacion
+        }));
 
       return res.status(200).json({
         success: true,
