@@ -281,7 +281,11 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="supabase-client.js?v=16"></script>
+  <script src="https://unpkg.com/pizzip@3.1.6/dist/pizzip.js"></script>
+  <script src="https://unpkg.com/pizzip@3.1.6/dist/pizzip-utils.js"></script>
+  <script src="https://unpkg.com/docxtemplater@3.50.0/build/docxtemplater.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <script src="supabase-client.js?v=17"></script>
   <script src="script.js?v=15"></script>
   <script src="components.js"></script>
   <script>
@@ -835,6 +839,11 @@
         await refreshSalesData();
         currentSale = SALES_DATA.find(function(s){ return s.num === savedNum; }) || null;
         salesWizGo(4);
+        // Auto-descargar la cotización en formato Word
+        if(currentSale){
+          try { await generateQuoteDocx(currentSale); }
+          catch(_){ /* error ya mostrado dentro */ }
+        }
       } catch(err) {
         console.error('[Sales] Save error:', err);
         if(typeof showToast==='function') showToast('Error inesperado: '+err.message,'error');
@@ -937,10 +946,10 @@
           '<div class="attach-item">'+
             '<div class="attach-icon" style="background:rgba(91,107,255,.12);color:var(--primary);">📄</div>'+
             '<div style="flex:1;min-width:0;">'+
-              '<div style="font-size:13px;font-weight:600;">Cotización_'+esc(sale.num||'')+'</div>'+
+              '<div style="font-size:13px;font-weight:600;">Cotización_'+esc(sale.num||'')+'.docx</div>'+
               '<div style="font-size:11px;color:var(--text-3);">Cotización generada • '+esc(docDate)+'</div>'+
             '</div>'+
-            '<button class="btn" style="font-size:11px;padding:4px 10px;" onclick="showToast(\'Descarga no disponible aún\',\'info\')">Descargar</button>'+
+            '<button class="btn btn-primary" style="font-size:11px;padding:6px 12px;" onclick="generateQuoteDocx(currentSale)">⬇ Descargar</button>'+
           '</div>'+
           '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+
             '<select class="input" style="max-width:200px;font-size:12px;padding:7px 10px;">'+
@@ -980,6 +989,100 @@
           }).join('')+'</div>';
       }
     }
+
+    // ═══ GENERAR Y DESCARGAR COTIZACIÓN .DOCX ═══════════════════════════
+    // Usa docxtemplater + pizzip para llenar el template assets/cotizacion_template.docx
+    // con los datos de la solicitud y dispara la descarga.
+    function loadDocxTemplate(){
+      return new Promise(function(resolve, reject){
+        if(typeof PizZipUtils === 'undefined' || typeof PizZip === 'undefined' || typeof window.docxtemplater === 'undefined'){
+          return reject(new Error('Librerías docx no cargadas todavía. Recarga la página.'));
+        }
+        PizZipUtils.getBinaryContent('assets/cotizacion_template.docx', function(err, content){
+          if(err) return reject(err);
+          resolve(content);
+        });
+      });
+    }
+
+    function fmtFechaLarga(d){
+      var meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      return d.getDate() + ' de ' + meses[d.getMonth()] + ' de ' + d.getFullYear();
+    }
+
+    function fmtCOPDocx(n){
+      try { return '$' + (Number(n)||0).toLocaleString('es-CO'); }
+      catch(_) { return '$' + Math.round(Number(n)||0); }
+    }
+
+    window.generateQuoteDocx = async function(sale){
+      if(!sale){
+        if(typeof showToast==='function') showToast('No hay solicitud activa','error');
+        return;
+      }
+      try {
+        var content = await loadDocxTemplate();
+        var zip = new PizZip(content);
+        var Docxtemplater = window.docxtemplater;
+        var doc = new Docxtemplater(zip, {
+          paragraphLoop: true,
+          linebreaks: true,
+          delimiters: { start: '{', end: '}' }
+        });
+
+        // Construir lista de items para el loop
+        var items = (sale.items || []).map(function(it){
+          var precioBase = Number(it.precio_base)||0;
+          var margen     = Number(it.margen_pct)||0;
+          var cantidad   = Number(it.cantidad)||1;
+          var precioFinal = precioBase * (1 + margen/100);
+          var subtotal    = precioFinal * cantidad;
+          return {
+            nombre_sku: it.nombre_sku || '',
+            referencia: [it.modelo, it.serial].filter(Boolean).join(' • ') || (it.nombre_sku||''),
+            cantidad:   String(cantidad),
+            marca:      it.marca || '',
+            precio:     fmtCOPDocx(precioFinal),
+            subtotal:   fmtCOPDocx(subtotal)
+          };
+        });
+
+        var razonSocial = (sale.cliente || '').toUpperCase();
+        var fecha = new Date();
+        // Si la solicitud ya tiene fecha_cotizacion (formato YYYY-MM-DD), usarla
+        if(sale.fecha){
+          try{
+            var p = sale.fecha.split('-');
+            fecha = new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2]));
+          }catch(_){}
+        }
+
+        doc.render({
+          ciudad_fecha:             'Bogotá, D.C., ' + fmtFechaLarga(fecha),
+          razon_social:             razonSocial,
+          razon_social_aceptacion:  razonSocial,
+          items:                    items,
+          total:                    fmtCOPDocx(sale.valor || 0)
+        });
+
+        var out = doc.getZip().generate({
+          type: 'blob',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        });
+
+        var fileName = 'Cotizacion_' + (sale.num || 'sin-numero') + '.docx';
+        saveAs(out, fileName);
+
+        if(typeof showToast==='function') showToast('Cotización descargada','success');
+      } catch(err) {
+        console.error('[Sales] Generate docx error:', err);
+        var msg = err.message || 'Error desconocido';
+        if(err.properties && err.properties.errors){
+          msg = err.properties.errors.map(function(e){ return e.message; }).join(', ');
+        }
+        if(typeof showToast==='function') showToast('Error al generar cotización: '+msg, 'error');
+      }
+    };
 
     window.cancelarSolicitud = async function(){
       if(!currentSale||!currentSale._supaId){
