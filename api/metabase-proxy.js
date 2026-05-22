@@ -108,33 +108,55 @@ function normalizeRowFromCols(cols, rowArr) {
   return normalizeRow(obj);
 }
 
-// ─── Fetch todas las filas. Intenta bypasear el límite de 2000 filas ───
+// ─── Fetch todas las filas — bypassea el límite de 2000 vía /api/dataset ───
+//
+// Estrategia: obtener el dataset_query del card (MBQL o SQL nativa) y
+// ejecutarlo directamente vía /api/dataset con constraints altos para
+// que Metabase no aplique el límite por defecto de 2000 filas.
 async function fetchAllRows(apiKey) {
   if (cachedRows && (Date.now() - cacheTime) < CACHE_TTL_MS) {
     return cachedRows;
   }
 
   const cardId = await discoverCardId(apiKey);
+  let cols = [];
+  let rows = [];
 
-  // Intento 1: query con middleware disable-max-results (bypassa límite de 2000)
-  let resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    body: JSON.stringify({
-      middleware: {
-        'disable-max-results?': true,
-        'add-default-userland-constraints?': false
+  // Intento 1: dataset con constraints altos (bypassa límite por defecto)
+  try {
+    const cardResp = await fetch(`${METABASE_URL}/api/card/${cardId}`, {
+      headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }
+    });
+    if (cardResp.ok) {
+      const card = await cardResp.json();
+      if (card.dataset_query) {
+        const dsResp = await fetch(`${METABASE_URL}/api/dataset`, {
+          method: 'POST',
+          headers: {
+            'x-api-key': apiKey,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            ...card.dataset_query,
+            constraints: {
+              'max-results': 1000000,
+              'max-results-bare-rows': 1000000
+            }
+          })
+        });
+        if (dsResp.ok) {
+          const dsResult = await dsResp.json();
+          cols = dsResult.data?.cols || [];
+          rows = dsResult.data?.rows || [];
+        }
       }
-    })
-  });
+    }
+  } catch (_) { /* fallback abajo */ }
 
-  // Si falla por bad request del middleware, hacer query estándar
-  if (!resp.ok) {
-    resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
+  // Intento 2 (fallback): query estándar del card (max 2000 filas)
+  if (rows.length === 0) {
+    const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
       method: 'POST',
       headers: {
         'x-api-key': apiKey,
@@ -143,16 +165,15 @@ async function fetchAllRows(apiKey) {
       },
       body: JSON.stringify({})
     });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`Card ${cardId} query failed (${resp.status}): ${errText.substring(0, 300)}`);
+    }
+    const result = await resp.json();
+    cols = result.data?.cols || [];
+    rows = result.data?.rows || [];
   }
 
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Card ${cardId} query failed (${resp.status}): ${errText.substring(0, 300)}`);
-  }
-
-  const result = await resp.json();
-  const cols = result.data?.cols || [];
-  const rows = result.data?.rows || [];
   cachedRows = rows.map(rowArr => normalizeRowFromCols(cols, rowArr));
   cacheTime = Date.now();
   return cachedRows;
