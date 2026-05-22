@@ -25,6 +25,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 let cachedCardId = null;
 let cachedRows = null;
 let cacheTime = 0;
+let cachedCodigoFieldRef = null; // field_ref de codigo_bia para queries filtradas
 
 // ─── Discovery del card ID ─────────────────────────────────────────────
 async function discoverCardId(apiKey) {
@@ -70,10 +71,92 @@ async function discoverCardId(apiKey) {
   }
 
   cachedCardId = target.card.id;
+
+  // Cachear field_ref de codigo_bia para poder hacer queries filtradas
+  const meta = target.card.result_metadata || [];
+  const codigoMeta = meta.find(c =>
+    c.name === 'codigo_bia' || (c.display_name || '').toLowerCase().includes('código bia')
+  );
+  if (codigoMeta?.field_ref) cachedCodigoFieldRef = codigoMeta.field_ref;
+
   return cachedCardId;
 }
 
-// ─── Fetch + normalización de todas las filas ──────────────────────────
+// ─── Normalizar un array de [cols, rows] de la API de Metabase ────────
+function normalizeRows(cols, rows) {
+  const colIndex = {};
+  cols.forEach((c, idx) => {
+    if (c.name) colIndex[c.name] = idx;
+    if (c.display_name) colIndex[c.display_name] = idx;
+  });
+  function getCol(row, candidates) {
+    for (const name of candidates) {
+      if (colIndex[name] !== undefined) return row[colIndex[name]];
+    }
+    return null;
+  }
+  return rows.map(row => ({
+    codigo_bia:       getCol(row, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
+    razon_social:     getCol(row, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
+    operador_red:     getCol(row, ['operador_de_red', 'Operador de Red', 'operador_red']),
+    nombre_sku:       getCol(row, ['nombre_sku', 'Nombre SKU', 'sku']),
+    serial:           getCol(row, ['serial', 'Serial']),
+    marca:            getCol(row, ['brand', 'Marca', 'marca']),
+    modelo:           getCol(row, ['model', 'Modelo', 'modelo']),
+    precio_unitario:  Number(getCol(row, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
+    estado:           getCol(row, ['state', 'Estado', 'estado', 'Estado Contrato']),
+    ciudad:           getCol(row, ['ciudad', 'Ciudad']),
+    frontera:         getCol(row, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
+    titulo:           getCol(row, ['titulo', 'Titulo']),
+    propiedad_activos: getCol(row, ['Propiedad de Activos']),
+    fecha_instalacion: getCol(row, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
+    fecha_ingreso:    getCol(row, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
+    fecha_retiro:     getCol(row, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
+  }));
+}
+
+// ─── Fetch filtrado por codigo_bia (sin límite de caché) ──────────────
+async function fetchEquipmentByClient(apiKey, codigoBia) {
+  const cardId = await discoverCardId(apiKey);
+
+  // Construir parámetros de filtro si tenemos el field_ref
+  const body = {};
+  if (cachedCodigoFieldRef) {
+    body.parameters = [{
+      type: 'string/=',
+      value: [codigoBia],
+      target: ['dimension', cachedCodigoFieldRef]
+    }];
+  }
+
+  const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Equipment query failed (${resp.status}): ${errText.substring(0, 300)}`);
+  }
+
+  const result = await resp.json();
+  const cols = result.data?.cols || [];
+  const rows = result.data?.rows || [];
+  const all = normalizeRows(cols, rows);
+
+  // Si no tenemos field_ref, filtramos en memoria (fallback)
+  if (!cachedCodigoFieldRef) {
+    return all.filter(r => r.codigo_bia === codigoBia);
+  }
+  return all;
+}
+
+// ─── Fetch + normalización de todas las filas (para búsqueda de clientes) ─
 async function fetchAllRows(apiKey) {
   if (cachedRows && (Date.now() - cacheTime) < CACHE_TTL_MS) {
     return cachedRows;
@@ -100,42 +183,9 @@ async function fetchAllRows(apiKey) {
   const cols = result.data?.cols || [];
   const rows = result.data?.rows || [];
 
-  // Mapa flexible nombre→índice (acepta tanto el nombre interno como el display)
-  const colIndex = {};
-  cols.forEach((c, idx) => {
-    if (c.name) colIndex[c.name] = idx;
-    if (c.display_name) colIndex[c.display_name] = idx;
-  });
-
-  function getCol(row, candidates) {
-    for (const name of candidates) {
-      if (colIndex[name] !== undefined) return row[colIndex[name]];
-    }
-    return null;
-  }
-
-  const normalized = rows.map(row => ({
-    codigo_bia: getCol(row, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
-    razon_social: getCol(row, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
-    operador_red: getCol(row, ['operador_de_red', 'Operador de Red', 'operador_red']),
-    nombre_sku: getCol(row, ['nombre_sku', 'Nombre SKU', 'sku']),
-    serial: getCol(row, ['serial', 'Serial']),
-    marca: getCol(row, ['brand', 'Marca', 'marca']),
-    modelo: getCol(row, ['model', 'Modelo', 'modelo']),
-    precio_unitario: Number(getCol(row, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
-    estado: getCol(row, ['state', 'Estado', 'estado', 'Estado Contrato']),
-    ciudad: getCol(row, ['ciudad', 'Ciudad']),
-    frontera: getCol(row, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
-    titulo: getCol(row, ['titulo', 'Titulo']),
-    propiedad_activos: getCol(row, ['Propiedad de Activos']),
-    fecha_instalacion: getCol(row, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
-    fecha_ingreso: getCol(row, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
-    fecha_retiro: getCol(row, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
-  }));
-
-  cachedRows = normalized;
+  cachedRows = normalizeRows(cols, rows);
   cacheTime = Date.now();
-  return normalized;
+  return cachedRows;
 }
 
 // ─── Handler ───────────────────────────────────────────────────────────
@@ -168,6 +218,7 @@ export default async function handler(req, res) {
         success: true,
         cardId,
         totalRows: rows.length,
+        codigoFieldRef: cachedCodigoFieldRef,
         columnNames: cols.map(c => ({ name: c.name, display_name: c.display_name })),
         sampleRow: rows[0] || null,
         cacheAgeMs: Date.now() - cacheTime
@@ -206,7 +257,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── Equipos por código BIA ──
+    // ── Equipos por código BIA (llamada filtrada directa, sin límite de caché) ──
     if (type === 'equipment') {
       if (!codigo_bia) {
         return res.status(400).json({
@@ -215,24 +266,23 @@ export default async function handler(req, res) {
         });
       }
 
-      const equipment = rows
-        .filter(r => r.codigo_bia === codigo_bia)
-        .map(r => ({
-          codigo_bia: r.codigo_bia,
-          razon_social: r.razon_social,
-          nombre_sku: r.nombre_sku,
-          serial: r.serial,
-          marca: r.marca,
-          modelo: r.modelo,
-          precio_unitario: r.precio_unitario,
-          estado: r.estado,
-          operador_red: r.operador_red,
-          ciudad: r.ciudad,
-          frontera: r.frontera,
-          titulo: r.titulo,
-          propiedad_activos: r.propiedad_activos,
-          fecha_instalacion: r.fecha_instalacion
-        }));
+      const allEquipment = await fetchEquipmentByClient(apiKey, codigo_bia);
+      const equipment = allEquipment.map(r => ({
+        codigo_bia:       r.codigo_bia,
+        razon_social:     r.razon_social,
+        nombre_sku:       r.nombre_sku,
+        serial:           r.serial,
+        marca:            r.marca,
+        modelo:           r.modelo,
+        precio_unitario:  r.precio_unitario,
+        estado:           r.estado,
+        operador_red:     r.operador_red,
+        ciudad:           r.ciudad,
+        frontera:         r.frontera,
+        titulo:           r.titulo,
+        propiedad_activos: r.propiedad_activos,
+        fecha_instalacion: r.fecha_instalacion
+      }));
 
       return res.status(200).json({
         success: true,
