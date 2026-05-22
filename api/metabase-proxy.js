@@ -115,16 +115,22 @@ async function fetchAllRows(apiKey) {
   }
 
   const normalized = rows.map(row => ({
-    codigo_bia: getCol(row, ['Código BIA', 'codigo_bia', 'code_bia', 'CodigoBIA']),
-    razon_social: getCol(row, ['Razón social', 'razon_social', 'razón_social', 'RazonSocial']),
-    operador_red: getCol(row, ['Operador de Red', 'operador_de_red', 'operador_red']),
-    nombre_sku: getCol(row, ['nombre_sku', 'Nombre SKU', 'sku', 'SKU']),
+    codigo_bia: getCol(row, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
+    razon_social: getCol(row, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
+    operador_red: getCol(row, ['operador_de_red', 'Operador de Red', 'operador_red']),
+    nombre_sku: getCol(row, ['nombre_sku', 'Nombre SKU', 'sku']),
     serial: getCol(row, ['serial', 'Serial']),
-    marca: getCol(row, ['Marca', 'marca']),
-    modelo: getCol(row, ['Modelo', 'modelo']),
-    precio_unitario: Number(getCol(row, ['Precio unitario', 'precio_unitario', 'PrecioUnitario'])) || 0,
-    estado: getCol(row, ['Estado', 'estado']),
-    fecha_instalacion: getCol(row, ['Fecha de instalación', 'fecha_instalacion'])
+    marca: getCol(row, ['brand', 'Marca', 'marca']),
+    modelo: getCol(row, ['model', 'Modelo', 'modelo']),
+    precio_unitario: Number(getCol(row, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
+    estado: getCol(row, ['state', 'Estado', 'estado', 'Estado Contrato']),
+    ciudad: getCol(row, ['ciudad', 'Ciudad']),
+    frontera: getCol(row, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
+    titulo: getCol(row, ['titulo', 'Titulo']),
+    propiedad_activos: getCol(row, ['Propiedad de Activos']),
+    fecha_instalacion: getCol(row, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
+    fecha_ingreso: getCol(row, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
+    fecha_retiro: getCol(row, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
   }));
 
   cachedRows = normalized;
@@ -220,7 +226,12 @@ export default async function handler(req, res) {
           modelo: r.modelo,
           precio_unitario: r.precio_unitario,
           estado: r.estado,
-          operador_red: r.operador_red
+          operador_red: r.operador_red,
+          ciudad: r.ciudad,
+          frontera: r.frontera,
+          titulo: r.titulo,
+          propiedad_activos: r.propiedad_activos,
+          fecha_instalacion: r.fecha_instalacion
         }));
 
       return res.status(200).json({
