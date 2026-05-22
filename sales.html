@@ -440,11 +440,14 @@
       try{
         var res = await fetch('/api/metabase-proxy?type=clients&q='+encodeURIComponent(query));
         var data = await res.json();
-        if(!data.success){ console.error('[Sales] Client search failed:', data.error); return []; }
+        if(!data.success){
+          console.error('[Sales] Client search failed:', data.error);
+          return { error: data.error || 'Error desconocido' };
+        }
         return data.clients || [];
       }catch(err){
         console.error('[Sales] Client fetch error:', err);
-        return [];
+        return { error: 'No se pudo conectar al servidor (' + err.message + ')' };
       }
     }
 
@@ -476,6 +479,13 @@
         if(clientSearchTimer) clearTimeout(clientSearchTimer);
         clientSearchTimer = setTimeout(async function(){
           var clients = await fetchMetabaseClients(q);
+
+          // Si es un objeto de error, mostrarlo al usuario
+          if(clients && clients.error){
+            cDrop.innerHTML='<div style="padding:12px 16px;color:var(--danger);font-size:12px;">⚠️ '+esc(clients.error)+'</div>';
+            return;
+          }
+
           if(!clients.length){
             cDrop.innerHTML='<div style="padding:12px 16px;color:var(--text-3);font-size:13px;">Sin resultados en Metabase. Usa "+ Registrar cliente nuevo"</div>';
             return;

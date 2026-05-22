@@ -149,10 +149,20 @@ export default async function handler(req, res) {
 
     // ── Modo debug: devuelve metadata para diagnosticar ──
     if (debug === '1') {
+      // Re-fetch raw para ver los nombres exactos de columnas que manda Metabase
+      const cardId = await discoverCardId(apiKey);
+      const rawResp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
+        method: 'POST',
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const raw = await rawResp.json();
+      const cols = raw.data?.cols || [];
       return res.status(200).json({
         success: true,
-        cardId: cachedCardId,
+        cardId,
         totalRows: rows.length,
+        columnNames: cols.map(c => ({ name: c.name, display_name: c.display_name })),
         sampleRow: rows[0] || null,
         cacheAgeMs: Date.now() - cacheTime
       });
