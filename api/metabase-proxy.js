@@ -236,8 +236,7 @@ export default async function handler(req, res) {
         if (seen.has(row.codigo_bia)) continue;
 
         if (searchQuery) {
-          const haystack = (row.razon_social + ' ' + row.codigo_bia).toLowerCase();
-          if (!haystack.includes(searchQuery)) continue;
+          if (!row.codigo_bia.toLowerCase().includes(searchQuery)) continue;
         }
 
         seen.add(row.codigo_bia);
