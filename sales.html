@@ -343,7 +343,10 @@
           '<td style="text-align:right;"><span class="sales-valor" style="font-size:14px;">'+fmtCOP(s.valor)+'</span></td>'+
           '<td style="text-align:center;"><span class="sales-status '+st.css+'"><span class="status-dot"></span>'+esc(st.label)+'</span></td>'+
           '<td style="font-size:13px;color:var(--text-2);">'+fmtDate(s.fecha)+'</td>'+
-          '<td style="text-align:center;"><button class="btn" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();openSaleDetail(\''+esc(s.num)+'\')">Ver</button></td>'+
+          '<td style="text-align:center;display:flex;gap:6px;justify-content:center;align-items:center;">'+
+            '<button class="btn" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();openSaleDetail(\''+esc(s.num)+'\')">Ver</button>'+
+            '<button class="btn" style="padding:4px 8px;font-size:13px;border-color:rgba(255,77,109,.3);color:var(--danger);" title="Eliminar solicitud" onclick="event.stopPropagation();deleteSale(\''+esc(s.num)+'\')">🗑</button>'+
+          '</td>'+
           '</tr>';
       }).join('');
     }
@@ -361,6 +364,26 @@
         return true;
       });
       renderSalesTable(filtered);
+    };
+
+    window.deleteSale = async function(num){
+      var sale = SALES_DATA.find(function(s){ return s.num === num; });
+      if(!sale){
+        if(typeof showToast==='function') showToast('No se encontró la solicitud '+num,'error');
+        return;
+      }
+      if(!confirm('¿Eliminar la solicitud '+num+' de '+sale.cliente+'?\nEsta acción no se puede deshacer.')) return;
+      if(typeof sbDeleteSale !== 'function'){
+        if(typeof showToast==='function') showToast('Supabase no está cargado','error');
+        return;
+      }
+      var result = await sbDeleteSale(sale._supaId);
+      if(result.ok){
+        if(typeof showToast==='function') showToast('Solicitud '+num+' eliminada','info');
+        await refreshSalesData();
+      } else {
+        if(typeof showToast==='function') showToast('Error al eliminar: '+(result.error||'desconocido'),'error');
+      }
     };
 
     window.openSaleDetail = function(num){

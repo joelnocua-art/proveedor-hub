@@ -513,6 +513,18 @@ async function sbInsertSale(sale) {
   return { ok: true, sale: created };
 }
 
+// Elimina una solicitud (los items se borran en cascada por ON DELETE CASCADE)
+async function sbDeleteSale(supaId) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+  const { error } = await sb.from('sales_requests').delete().eq('id', supaId);
+  if (error) {
+    console.error('[Supabase] Delete sale error:', error);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
 // Actualiza el status de una solicitud
 async function sbUpdateSaleStatus(saleId, newStatus) {
   const sb = getSupabase();
