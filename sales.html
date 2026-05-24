@@ -280,12 +280,42 @@
     </div>
   </div>
 
+  <!-- ═══ MODAL: Subir cotización firmada ═══ -->
+  <div id="signedQuoteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-lg);padding:28px;width:100%;max-width:460px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
+      <button onclick="closeSignedModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;line-height:1;" title="Cerrar">×</button>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;margin-bottom:4px;">Subir cotización firmada</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:20px;">El estado cambiará a <strong>Firmada</strong> y se enviará una notificación automática a Finanzas, Supply y más.</div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">PDF firmado *</label>
+        <input type="file" id="signedQuoteFile" accept=".pdf,application/pdf"
+          style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.04);border:1px dashed var(--border-md);border-radius:var(--r-md);padding:12px;font-size:13px;color:var(--text);cursor:pointer;" />
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Tu correo *</label>
+        <input type="email" id="signedByEmail" placeholder="tu.correo@bia.app" class="input" style="width:100%;box-sizing:border-box;" />
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px;">Se te incluirá en copia del correo de notificación.</div>
+      </div>
+
+      <div id="signedUploadProgress" style="display:none;margin-bottom:14px;padding:10px 14px;background:rgba(91,107,255,0.08);border:1px solid rgba(91,107,255,0.2);border-radius:var(--r-sm);font-size:13px;color:var(--text-2);">
+        ⏳ Subiendo archivo y enviando notificación…
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn" onclick="closeSignedModal()">Cancelar</button>
+        <button class="btn btn-accent" id="btnSubmitSigned" onclick="submitSignedQuote()">✓ Confirmar firma</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://unpkg.com/pizzip@3.1.6/dist/pizzip.js"></script>
   <script src="https://unpkg.com/pizzip@3.1.6/dist/pizzip-utils.js"></script>
   <script src="https://unpkg.com/docxtemplater@3.50.0/build/docxtemplater.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-  <script src="supabase-client.js?v=17"></script>
+  <script src="supabase-client.js?v=18"></script>
   <script src="script.js?v=15"></script>
   <script src="components.js"></script>
   <script>
@@ -882,20 +912,31 @@
         badgeEl.innerHTML = '<span class="status-dot"></span>'+esc(st.label);
       }
 
-      // Timeline — mostramos el evento de creación y el estado actual si difiere
+      // Timeline — cronológico: creación → firma (si existe) → estado actual
       if(tlEl){
         var createdStr = sale.created_at ? formatDateTime(sale.created_at) : (sale.fecha ? fmtDate(sale.fecha) : '—');
         var tItems = [];
-        // Estado actual (si no es cotizacion_generada, mostrarlo como el más reciente)
-        if(sale.status !== 'cotizacion_generada'){
-          tItems.push({ label: st.label, desc: 'Estado actual de la solicitud.', date: createdStr, accent: true });
-        }
+        // Evento de creación (siempre primero, abajo en la UI)
         tItems.push({
           label: 'Cotización generada',
           desc: 'Se creó la solicitud con '+(sale.equipos||0)+' equipos por '+fmtCOP(sale.valor||0)+'.',
           date: createdStr,
           accent: sale.status === 'cotizacion_generada'
         });
+        // Evento de firma (si existe)
+        if(sale.signed_at){
+          var signedByStr = sale.signed_by ? ' por '+sale.signed_by : '';
+          tItems.unshift({
+            label: 'Cotización firmada',
+            desc: 'Documento firmado recibido'+signedByStr+'. Notificación enviada a Finanzas.',
+            date: formatDateTime(sale.signed_at),
+            accent: sale.status === 'firmada'
+          });
+        }
+        // Estado adicional si no está cubierto por los eventos anteriores
+        if(sale.status !== 'cotizacion_generada' && sale.status !== 'firmada'){
+          tItems.unshift({ label: st.label, desc: 'Estado actual de la solicitud.', date: createdStr, accent: true });
+        }
         tlEl.innerHTML = tItems.map(function(it){
           return '<div class="timeline-item">'+
             '<div class="timeline-dot active"></div>'+
@@ -917,7 +958,7 @@
               '<div style="font-size:28px;margin-bottom:8px;">📎</div>'+
               '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Adjuntar firma del cliente</div>'+
               '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Sube el documento firmado para avanzar al siguiente paso.</div>'+
-              '<button class="btn btn-primary" onclick="showToast(\'Función próximamente disponible\',\'info\')">Subir documento firmado</button>'+
+              '<button class="btn btn-primary" onclick="showSignedUploadModal()">⬆ Subir cotización firmada</button>'+
             '</div>'+
             '<div class="action-card danger" style="margin-top:10px;">'+
               '<button class="btn btn-danger" style="font-size:12px;padding:6px 14px;" onclick="cancelarSolicitud()">❌ Cancelar solicitud</button>'+
@@ -942,6 +983,24 @@
       // Attachments
       if(attachEl){
         var docDate = sale.fecha ? fmtDate(sale.fecha) : '—';
+        var signedRow = '';
+        if(sale.signed_quote_url){
+          var signedDate = sale.signed_at ? formatDateTime(sale.signed_at) : '—';
+          signedRow =
+            '<div class="attach-item" style="border-color:rgba(0,229,200,.2);background:rgba(0,229,200,.04);">'+
+              '<div class="attach-icon" style="background:rgba(0,229,200,.12);color:var(--accent);">✅</div>'+
+              '<div style="flex:1;min-width:0;">'+
+                '<div style="font-size:13px;font-weight:600;">Cotización firmada</div>'+
+                '<div style="font-size:11px;color:var(--text-3);">Recibida '+esc(signedDate)+(sale.signed_by?' • '+esc(sale.signed_by):'')+'</div>'+
+              '</div>'+
+              '<a href="'+esc(sale.signed_quote_url)+'" target="_blank" class="btn" style="font-size:11px;padding:6px 12px;text-decoration:none;">⬇ Ver PDF</a>'+
+            '</div>';
+        }
+        var uploadBtn = (sale.status !== 'firmada' && sale.status !== 'cerrada' && sale.status !== 'cancelada')
+          ? '<div style="margin-top:12px;">'+
+              '<button class="btn" style="font-size:12px;padding:6px 14px;" onclick="showSignedUploadModal()">📎 Subir cotización firmada</button>'+
+            '</div>'
+          : '';
         attachEl.innerHTML =
           '<div class="attach-item">'+
             '<div class="attach-icon" style="background:rgba(91,107,255,.12);color:var(--primary);">📄</div>'+
@@ -951,12 +1010,8 @@
             '</div>'+
             '<button class="btn btn-primary" style="font-size:11px;padding:6px 12px;" onclick="generateQuoteDocx(currentSale)">⬇ Descargar</button>'+
           '</div>'+
-          '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+
-            '<select class="input" style="max-width:200px;font-size:12px;padding:7px 10px;">'+
-              '<option>Cotización firmada</option><option>Factura</option><option>Soporte de pago</option><option>Otro</option>'+
-            '</select>'+
-            '<button class="btn" style="font-size:12px;padding:6px 14px;" onclick="showToast(\'Función próximamente disponible\',\'info\')">📎 Subir archivo</button>'+
-          '</div>';
+          signedRow+
+          uploadBtn;
       }
 
       // Summary panel
@@ -1103,6 +1158,96 @@
         if(typeof showToast==='function') showToast('Solicitud cancelada','info');
       } else {
         if(typeof showToast==='function') showToast('Error al cancelar: '+(result.error||'desconocido'),'error');
+      }
+    };
+
+    // ═══ SUBIR COTIZACIÓN FIRMADA ═══════════════════════════════════════
+    window.showSignedUploadModal = function(){
+      if(!currentSale){
+        if(typeof showToast==='function') showToast('No hay solicitud activa','error');
+        return;
+      }
+      document.getElementById('signedQuoteFile').value = '';
+      document.getElementById('signedByEmail').value = '';
+      document.getElementById('signedUploadProgress').style.display = 'none';
+      var btn = document.getElementById('btnSubmitSigned');
+      if(btn) btn.disabled = false;
+      document.getElementById('signedQuoteModal').style.display = 'flex';
+    };
+
+    window.closeSignedModal = function(){
+      document.getElementById('signedQuoteModal').style.display = 'none';
+    };
+
+    window.submitSignedQuote = async function(){
+      var file = document.getElementById('signedQuoteFile').files[0];
+      var signedBy = (document.getElementById('signedByEmail').value||'').trim();
+
+      if(!file){
+        if(typeof showToast==='function') showToast('Selecciona el PDF firmado','error');
+        return;
+      }
+      if(file.type && file.type !== 'application/pdf'){
+        if(typeof showToast==='function') showToast('Solo se aceptan archivos PDF','error');
+        return;
+      }
+      if(!signedBy || !signedBy.includes('@')){
+        if(typeof showToast==='function') showToast('Ingresa tu correo para el CC','error');
+        return;
+      }
+      if(!currentSale || !currentSale._supaId){
+        if(typeof showToast==='function') showToast('Error: solicitud no disponible','error');
+        return;
+      }
+
+      var btn = document.getElementById('btnSubmitSigned');
+      var progress = document.getElementById('signedUploadProgress');
+      if(btn) btn.disabled = true;
+      if(progress) progress.style.display = 'block';
+
+      try {
+        // 1. Subir PDF a Supabase Storage
+        var uploadResult = await sbUploadSignedQuote(currentSale._supaId, currentSale.num, file);
+        if(!uploadResult.ok) throw new Error('Error al subir el PDF: '+(uploadResult.error||'desconocido'));
+
+        // 2. Marcar como firmada en la BD
+        var markResult = await sbMarkAsSigned(currentSale._supaId, signedBy, uploadResult.url);
+        if(!markResult.ok) throw new Error('Error al actualizar la solicitud: '+(markResult.error||'desconocido'));
+
+        // 3. Enviar notificación por correo
+        var notifResp = await fetch('/api/notify-signed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            saleNum:    currentSale.num,
+            clientName: currentSale.cliente,
+            clientNit:  currentSale.nit,
+            total:      currentSale.valor,
+            items:      currentSale.items || [],
+            signedBy:   signedBy,
+            pdfUrl:     uploadResult.url
+          })
+        });
+        var notifData = await notifResp.json().catch(function(){ return {}; });
+        if(!notifResp.ok || !notifData.ok){
+          console.warn('[Sales] Email notification failed:', notifData.error);
+          if(typeof showToast==='function') showToast('Firma registrada. (Aviso: el correo no se pudo enviar)','info');
+        } else {
+          if(typeof showToast==='function') showToast('¡Firma registrada! Notificación enviada a Finanzas, Supply y más.','success');
+        }
+
+        // 4. Cerrar modal y refrescar
+        document.getElementById('signedQuoteModal').style.display = 'none';
+        await refreshSalesData();
+        var updated = SALES_DATA.find(function(s){ return s.num === currentSale.num; });
+        if(updated) currentSale = updated;
+        renderStep4(currentSale);
+
+      } catch(err){
+        console.error('[Sales] Submit signed quote error:', err);
+        if(typeof showToast==='function') showToast('Error: '+err.message,'error');
+        if(btn) btn.disabled = false;
+        if(progress) progress.style.display = 'none';
       }
     };
 
