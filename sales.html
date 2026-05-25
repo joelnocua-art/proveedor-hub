@@ -346,24 +346,6 @@
     </div>
   </div>
 
-  <!-- ═══ MODAL: Registrar despacho ═══ -->
-  <div id="dispatchModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;padding:20px;">
-    <div style="background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-lg);padding:28px;width:100%;max-width:440px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
-      <button onclick="closeDispatchModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;line-height:1;" title="Cerrar">×</button>
-      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;margin-bottom:4px;">Registrar despacho</div>
-      <div style="font-size:13px;color:var(--text-2);margin-bottom:20px;">Confirma que los equipos ya salieron. La solicitud quedará <strong>cerrada</strong> con la fecha de hoy.</div>
-
-      <div style="margin-bottom:20px;">
-        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Tu correo *</label>
-        <input type="email" id="dispatchByEmail" placeholder="tu.correo@bia.app" class="input" style="width:100%;box-sizing:border-box;" />
-      </div>
-
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <button class="btn" onclick="closeDispatchModal()">Cancelar</button>
-        <button class="btn btn-accent" id="btnSubmitDispatch" onclick="submitDispatch()">✓ Confirmar despacho</button>
-      </div>
-    </div>
-  </div>
 
   <!-- ═══ MODAL: Subir cotización firmada ═══ -->
   <div id="signedQuoteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;padding:20px;">
@@ -400,7 +382,7 @@
   <script src="https://unpkg.com/pizzip@3.1.6/dist/pizzip-utils.js"></script>
   <script src="https://unpkg.com/docxtemplater@3.50.0/build/docxtemplater.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-  <script src="supabase-client.js?v=22"></script>
+  <script src="supabase-client.js?v=23"></script>
   <script src="script.js?v=15"></script>
   <script src="components.js"></script>
   <script>
@@ -1192,15 +1174,9 @@
             '</div>'+
             '<div class="action-card primary" style="margin-top:10px;">'+
               '<div style="font-size:28px;margin-bottom:8px;">✉️</div>'+
-              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">2. Notificar a almacenistas</div>'+
-              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Una vez los equipos estén marcados como vendidos en Voltio, abre el correo a Julián (Bogotá) y Agustín (Barranquilla) para coordinar el despacho.</div>'+
-              '<button class="btn btn-primary" onclick="notifyAlmacenistas()">✉️ Abrir correo a almacenistas</button>'+
-            '</div>'+
-            '<div class="action-card primary" style="margin-top:10px;">'+
-              '<div style="font-size:28px;margin-bottom:8px;">🚚</div>'+
-              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">3. Registrar despacho</div>'+
-              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Cuando los equipos salgan, registra el despacho para cerrar la solicitud.</div>'+
-              '<button class="btn btn-primary" onclick="showDispatchModal()">🚚 Registrar despacho</button>'+
+              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">2. Despachar y cerrar solicitud</div>'+
+              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Una vez marcados en Voltio, envía la orden de despacho a Julián (Bogotá) y Agustín (Barranquilla). Al abrir el correo, la solicitud se cierra automáticamente.</div>'+
+              '<button class="btn btn-primary" onclick="notifyAlmacenistas()">✉️ Enviar orden de despacho y cerrar</button>'+
             '</div>';
         } else {
           actionEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px;">'+
@@ -1698,17 +1674,31 @@
       }
     };
 
-    // Abre Gmail compose para notificar a almacenistas que ya pueden despachar.
-    // TODO: cuando tengamos API key de Voltio (Retool) + Metabase, automatizar:
-    //   1) marcar equipos como vendidos en Voltio
-    //   2) verificar en Metabase que el inventario quedó como vendido
-    //   3) solo entonces disparar este correo
-    window.notifyAlmacenistas = function(){
+    // Abre Gmail compose con la orden de despacho y cierra la solicitud automáticamente.
+    // TODO (Fase 2 — requiere API key de Voltio/Retool + Metabase):
+    //   Antes de abrir el correo, verificar automáticamente que los equipos
+    //   quedaron marcados como "vendido" en Voltio consultando Metabase.
+    //   Una vez verificado, disparar el correo sin intervención manual.
+    window.notifyAlmacenistas = async function(){
       if(!currentSale) return;
-      var paymentBy = currentSale.payment_by || '';
-      try { if(!paymentBy) paymentBy = localStorage.getItem('ph_user_email') || ''; } catch(_){}
-      openAlmacenistasEmail(currentSale, paymentBy, currentSale.invoice_url, currentSale.payment_proof_url);
-      if(typeof showToast==='function') showToast('Correo a almacenistas abierto — solo dale "Enviar".','success');
+      var by = currentSale.payment_by || '';
+      try { if(!by) by = localStorage.getItem('ph_user_email') || ''; } catch(_){}
+
+      // 1. Abrir Gmail con la orden de despacho
+      openAlmacenistasEmail(currentSale, by, currentSale.invoice_url, currentSale.payment_proof_url);
+
+      // 2. Cerrar la solicitud automáticamente (dispatch_at queda como fecha del envío)
+      if(currentSale._supaId && typeof sbMarkAsDispatched === 'function'){
+        var result = await sbMarkAsDispatched(currentSale._supaId, by);
+        if(result.ok){
+          await refreshSalesData();
+          var updated = SALES_DATA.find(function(s){ return s.num === currentSale.num; });
+          if(updated) currentSale = updated;
+          renderStep4(currentSale);
+        }
+      }
+
+      if(typeof showToast==='function') showToast('Orden de despacho abierta. Solicitud cerrada — solo dale "Enviar".','success');
     };
 
     // Copia seriales al portapapeles y abre Voltio en nueva pestaña
@@ -1805,61 +1795,6 @@
         if(typeof showToast==='function') showToast('Error: '+err.message,'error');
         if(btn) btn.disabled = false;
         if(progress) progress.style.display = 'none';
-      }
-    };
-
-    // ═══ REGISTRAR DESPACHO ══════════════════════════════════════════════
-    window.showDispatchModal = function(){
-      if(!currentSale){
-        if(typeof showToast==='function') showToast('No hay solicitud activa','error');
-        return;
-      }
-      var emailEl = document.getElementById('dispatchByEmail');
-      if(emailEl){
-        var cached = '';
-        try { cached = localStorage.getItem('ph_user_email') || ''; } catch(_){}
-        emailEl.value = cached;
-      }
-      var btn = document.getElementById('btnSubmitDispatch');
-      if(btn) btn.disabled = false;
-      document.getElementById('dispatchModal').style.display = 'flex';
-    };
-
-    window.closeDispatchModal = function(){
-      document.getElementById('dispatchModal').style.display = 'none';
-    };
-
-    window.submitDispatch = async function(){
-      var dispatchBy = (document.getElementById('dispatchByEmail').value||'').trim();
-
-      if(!dispatchBy || !dispatchBy.includes('@')){
-        if(typeof showToast==='function') showToast('Ingresa un correo válido','error');
-        return;
-      }
-      if(!currentSale || !currentSale._supaId){
-        if(typeof showToast==='function') showToast('No hay solicitud activa','error');
-        return;
-      }
-      if(typeof sbMarkAsDispatched !== 'function'){
-        if(typeof showToast==='function') showToast('Supabase no está cargado','error');
-        return;
-      }
-
-      var btn = document.getElementById('btnSubmitDispatch');
-      if(btn) btn.disabled = true;
-
-      var result = await sbMarkAsDispatched(currentSale._supaId, dispatchBy);
-      if(result.ok){
-        try { localStorage.setItem('ph_user_email', dispatchBy); } catch(_){}
-        document.getElementById('dispatchModal').style.display = 'none';
-        await refreshSalesData();
-        var updated = SALES_DATA.find(function(s){ return s.num === currentSale.num; });
-        if(updated) currentSale = updated;
-        renderStep4(currentSale);
-        if(typeof showToast==='function') showToast('Despacho registrado. Solicitud cerrada.','success');
-      } else {
-        if(typeof showToast==='function') showToast('Error: '+(result.error||'desconocido'),'error');
-        if(btn) btn.disabled = false;
       }
     };
 
