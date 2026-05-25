@@ -223,6 +223,7 @@
                   <div class="col-12"><label>Observaciones / Condiciones</label><textarea class="input" rows="2" placeholder="Incluye IVA, condiciones de pago, garantías...">Precios incluyen IVA. Pago a 30 días. Garantía de 12 meses en transformadores.</textarea></div>
                   <div class="col-6"><label>Vigencia de cotización (días)</label><input type="number" class="input" value="30" /></div>
                   <div class="col-6"><label>Fecha</label><input type="date" class="input" value="2026-04-16" /></div>
+                  <div class="col-12"><label>Tu correo (para recordatorio en Calendar)</label><input type="email" class="input" id="sResponsableEmail" placeholder="tu.correo@bia.app" /><div style="font-size:11px;color:var(--text-3);margin-top:4px;">Se creará un recordatorio en Google Calendar a 5 días hábiles para verificar la firma del cliente.</div></div>
                 </div>
                 <div id="revConfirmBanner" style="margin-top:16px;padding:14px 16px;background:rgba(0,229,200,.06);border:1px solid rgba(0,229,200,.2);border-radius:var(--r-md);">
                   <div id="revConfirmText" style="font-size:13px;color:var(--accent);font-weight:600;">✓ Listo para generar la cotización</div>
@@ -473,6 +474,11 @@
 
       // Al entrar al Paso 3, reflejar datos reales del formulario en la tarjeta de revisión
       if(s===3){
+        // Pre-llenar el correo del responsable desde localStorage
+        var respEl = document.getElementById('sResponsableEmail');
+        if(respEl && !respEl.value){
+          respEl.value = (typeof localStorage !== 'undefined' && localStorage.getItem('ph_user_email')) || '';
+        }
         var rName = document.getElementById('revClientName');
         var rDet  = document.getElementById('revClientDetails');
         var nm  = (document.getElementById('sClientName')||{}).value || '—';
@@ -874,12 +880,79 @@
           try { await generateQuoteDocx(currentSale); }
           catch(_){ /* error ya mostrado dentro */ }
         }
+        // Crear recordatorio en Calendar (5 días hábiles) para verificar firma del cliente
+        var responsableEmail = ((document.getElementById('sResponsableEmail')||{}).value || '').trim();
+        if(currentSale && responsableEmail && responsableEmail.includes('@')){
+          try { localStorage.setItem('ph_user_email', responsableEmail); } catch(_){}
+          openCalendarReminder(currentSale, 'firma', responsableEmail);
+        }
       } catch(err) {
         console.error('[Sales] Save error:', err);
         if(typeof showToast==='function') showToast('Error inesperado: '+err.message,'error');
         if(btn){ btn.disabled = false; btn.textContent = originalText; }
       }
     };
+
+    // ═══ RECORDATORIOS EN GOOGLE CALENDAR ═════════════════════════════════
+    // Suma N días hábiles a una fecha. Sábados cuentan, domingos no.
+    function addBusinessDays(date, days){
+      var result = new Date(date);
+      var added = 0;
+      while(added < days){
+        result.setDate(result.getDate() + 1);
+        if(result.getDay() !== 0) added++; // 0 = Domingo (se salta)
+      }
+      return result;
+    }
+
+    function buildCalendarReminderUrl(sale, type, responsibleEmail){
+      var fmtCOPCal = function(n){
+        try { return '$'+(Number(n)||0).toLocaleString('es-CO'); }
+        catch(_) { return '$'+Math.round(Number(n)||0); }
+      };
+
+      var businessDays = type === 'firma' ? 5 : 3;
+      var typeTitle = type === 'firma' ? 'firma del cliente' : 'factura emitida';
+      var typeBody  = type === 'firma'
+        ? 'Verificar que el cliente firmó y devolvió la cotización por correo.'
+        : 'Verificar que Finanzas (Daniela) emitió la factura para esta venta.';
+
+      var startDate = addBusinessDays(new Date(), businessDays);
+      startDate.setHours(9, 0, 0, 0); // 9:00 AM hora local
+      var endDate = new Date(startDate);
+      endDate.setMinutes(endDate.getMinutes() + 30);
+
+      var pad = function(n){ return String(n).padStart(2, '0'); };
+      var fmtCal = function(d){
+        return d.getUTCFullYear() + pad(d.getUTCMonth()+1) + pad(d.getUTCDate()) +
+          'T' + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + '00Z';
+      };
+
+      var title = '🔔 Verificar ' + typeTitle + ' — ' + (sale.num || '');
+      var nItems = (sale.items && sale.items.length) || sale.equipos || 0;
+      var details = typeBody + '\n\n' +
+        'Cliente: ' + (sale.cliente || '') + '\n' +
+        (sale.nit ? 'NIT: ' + sale.nit + '\n' : '') +
+        'Valor: ' + fmtCOPCal(sale.valor || 0) + '\n' +
+        'Equipos: ' + nItems + ' ítems\n\n' +
+        'Ver en Proveedor Hub: ' + window.location.origin + '/sales.html';
+
+      var params = new URLSearchParams();
+      params.set('action', 'TEMPLATE');
+      params.set('text', title);
+      params.set('dates', fmtCal(startDate) + '/' + fmtCal(endDate));
+      params.set('details', details);
+      if(responsibleEmail) params.set('add', responsibleEmail);
+
+      return 'https://calendar.google.com/calendar/render?' + params.toString();
+    }
+
+    function openCalendarReminder(sale, type, responsibleEmail){
+      if(!responsibleEmail || !responsibleEmail.includes('@')) return false;
+      var url = buildCalendarReminderUrl(sale, type, responsibleEmail);
+      var w = window.open(url, '_blank');
+      return !!w;
+    }
 
     // ═══ STEP 4 RENDER ═══
     function renderStep4(sale){
@@ -1168,7 +1241,12 @@
         return;
       }
       document.getElementById('signedQuoteFile').value = '';
-      document.getElementById('signedByEmail').value = '';
+      var emailEl = document.getElementById('signedByEmail');
+      if(emailEl){
+        var cached = '';
+        try { cached = localStorage.getItem('ph_user_email') || ''; } catch(_){}
+        emailEl.value = cached;
+      }
       document.getElementById('signedUploadProgress').style.display = 'none';
       var btn = document.getElementById('btnSubmitSigned');
       if(btn) btn.disabled = false;
@@ -1271,7 +1349,11 @@
           '&body=' + body;
         window.open(gmailUrl, '_blank');
 
-        if(typeof showToast==='function') showToast('Firma registrada. Se abrió tu correo con la notificación lista para enviar.','success');
+        // Crear recordatorio en Calendar (3 días hábiles) para verificar emisión de factura
+        try { localStorage.setItem('ph_user_email', signedBy); } catch(_){}
+        openCalendarReminder(currentSale, 'factura', signedBy);
+
+        if(typeof showToast==='function') showToast('Firma registrada. Se abrieron tu correo y un recordatorio en Calendar — solo dale "Enviar" y "Guardar".','success');
 
         // 4. Cerrar modal y refrescar el paso 4
         document.getElementById('signedQuoteModal').style.display = 'none';
