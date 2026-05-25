@@ -523,6 +523,7 @@ tbody tr:last-child td { border-bottom: none; }
 .sales-status.s-enviada         { background:rgba(255,190,61,.1);   color:var(--warning); border-color:rgba(255,190,61,.25); }
 .sales-status.s-firmada         { background:rgba(255,152,56,.1);   color:#ff9838; border-color:rgba(255,152,56,.25); }
 .sales-status.s-factura         { background:rgba(168,85,247,.1);   color:#a855f7; border-color:rgba(168,85,247,.25); }
+.sales-status.s-pagada          { background:rgba(0,229,200,.1);    color:var(--accent); border-color:rgba(0,229,200,.3); }
 .sales-status.s-cerrada         { background:rgba(0,212,138,.1);    color:var(--success); border-color:rgba(0,212,138,.25); }
 .sales-status.s-cancelada       { background:rgba(255,77,109,.08);  color:var(--danger); border-color:rgba(255,77,109,.25); }
 .sales-status .status-dot { width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
@@ -549,6 +550,7 @@ tbody tr:last-child td { border-bottom: none; }
 [data-theme="light"] .sales-status.s-enviada     { background:rgba(200,150,0,.08); color:#b8860b; border-color:rgba(200,150,0,.2); }
 [data-theme="light"] .sales-status.s-firmada     { background:rgba(220,120,30,.08); color:#c87518; border-color:rgba(220,120,30,.2); }
 [data-theme="light"] .sales-status.s-factura     { background:rgba(140,60,220,.08); color:#7c3aed; border-color:rgba(140,60,220,.2); }
+[data-theme="light"] .sales-status.s-pagada      { background:rgba(0,180,160,.08); color:#0d9488; border-color:rgba(0,180,160,.2); }
 [data-theme="light"] .sales-status.s-cerrada     { background:rgba(0,160,100,.08); color:#059669; border-color:rgba(0,160,100,.2); }
 [data-theme="light"] .sales-status.s-cancelada   { background:rgba(220,40,60,.06); color:#dc2626; border-color:rgba(220,40,60,.18); }
 [data-theme="light"] .timeline-dot { background:#f5f3ef; }
