@@ -283,14 +283,30 @@
 
   <!-- ═══ MODAL: Registrar factura emitida ═══ -->
   <div id="invoiceModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;padding:20px;">
-    <div style="background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-lg);padding:28px;width:100%;max-width:440px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
+    <div style="background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-lg);padding:28px;width:100%;max-width:460px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
       <button onclick="closeInvoiceModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;line-height:1;" title="Cerrar">×</button>
       <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;margin-bottom:4px;">Registrar factura emitida</div>
-      <div style="font-size:13px;color:var(--text-2);margin-bottom:20px;">Confirma que Finanzas ya emitió la factura. El estado cambiará a <strong>Factura emitida</strong> y podrás marcar los equipos en Voltio.</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:20px;">Sube el PDF de la factura emitida por Finanzas. El estado cambiará a <strong>Factura emitida</strong> y podrás marcar los equipos en Voltio.</div>
 
-      <div style="margin-bottom:20px;">
+      <div style="margin-bottom:16px;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">PDF de la factura *</label>
+        <input type="file" id="invoiceFile" accept=".pdf,application/pdf"
+          style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.04);border:1px dashed var(--border-md);border-radius:var(--r-md);padding:12px;font-size:13px;color:var(--text);cursor:pointer;" />
+      </div>
+
+      <div style="margin-bottom:16px;">
         <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Número de factura <span style="color:var(--text-3);font-weight:400;">(opcional)</span></label>
         <input type="text" id="invoiceNumInput" placeholder="Ej: FE-2026-00123" class="input" style="width:100%;box-sizing:border-box;" />
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Tu correo *</label>
+        <input type="email" id="invoiceByEmail" placeholder="tu.correo@bia.app" class="input" style="width:100%;box-sizing:border-box;" />
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px;">Se registra para el seguimiento.</div>
+      </div>
+
+      <div id="invoiceUploadProgress" style="display:none;margin-bottom:14px;padding:10px 14px;background:rgba(91,107,255,0.08);border:1px solid rgba(91,107,255,0.2);border-radius:var(--r-sm);font-size:13px;color:var(--text-2);">
+        ⏳ Subiendo factura…
       </div>
 
       <div style="display:flex;gap:10px;justify-content:flex-end;">
@@ -335,7 +351,7 @@
   <script src="https://unpkg.com/pizzip@3.1.6/dist/pizzip-utils.js"></script>
   <script src="https://unpkg.com/docxtemplater@3.50.0/build/docxtemplater.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-  <script src="supabase-client.js?v=19"></script>
+  <script src="supabase-client.js?v=20"></script>
   <script src="script.js?v=15"></script>
   <script src="components.js"></script>
   <script>
@@ -1025,8 +1041,19 @@
             accent: sale.status === 'firmada'
           });
         }
+        // Evento de factura emitida (si existe)
+        if(sale.invoice_at){
+          var invoiceByStr = sale.invoice_by ? ' por '+sale.invoice_by : '';
+          var invoiceNumStr = sale.invoice_number ? ' (#'+sale.invoice_number+')' : '';
+          tItems.unshift({
+            label: 'Factura emitida',
+            desc: 'Factura'+invoiceNumStr+' registrada'+invoiceByStr+'. Listo para marcar equipos en Voltio.',
+            date: formatDateTime(sale.invoice_at),
+            accent: sale.status === 'factura_emitida'
+          });
+        }
         // Estado adicional si no está cubierto por los eventos anteriores
-        if(sale.status !== 'cotizacion_generada' && sale.status !== 'firmada'){
+        if(sale.status !== 'cotizacion_generada' && sale.status !== 'firmada' && sale.status !== 'factura_emitida'){
           tItems.unshift({ label: st.label, desc: 'Estado actual de la solicitud.', date: createdStr, accent: true });
         }
         tlEl.innerHTML = tItems.map(function(it){
@@ -1104,6 +1131,20 @@
               '<a href="'+esc(sale.signed_quote_url)+'" target="_blank" class="btn" style="font-size:11px;padding:6px 12px;text-decoration:none;">⬇ Ver PDF</a>'+
             '</div>';
         }
+        var invoiceRow = '';
+        if(sale.invoice_url){
+          var invoiceDate = sale.invoice_at ? formatDateTime(sale.invoice_at) : '—';
+          var invoiceNumLbl = sale.invoice_number ? ' • #'+sale.invoice_number : '';
+          invoiceRow =
+            '<div class="attach-item" style="border-color:rgba(91,107,255,.25);background:rgba(91,107,255,.05);">'+
+              '<div class="attach-icon" style="background:rgba(91,107,255,.14);color:var(--primary);">🧾</div>'+
+              '<div style="flex:1;min-width:0;">'+
+                '<div style="font-size:13px;font-weight:600;">Factura emitida'+esc(invoiceNumLbl)+'</div>'+
+                '<div style="font-size:11px;color:var(--text-3);">Registrada '+esc(invoiceDate)+(sale.invoice_by?' • '+esc(sale.invoice_by):'')+'</div>'+
+              '</div>'+
+              '<a href="'+esc(sale.invoice_url)+'" target="_blank" class="btn" style="font-size:11px;padding:6px 12px;text-decoration:none;">⬇ Ver PDF</a>'+
+            '</div>';
+        }
         var uploadBtn = (sale.status !== 'firmada' && sale.status !== 'cerrada' && sale.status !== 'cancelada')
           ? '<div style="margin-top:12px;">'+
               '<button class="btn" style="font-size:12px;padding:6px 14px;" onclick="showSignedUploadModal()">📎 Subir cotización firmada</button>'+
@@ -1119,6 +1160,7 @@
             '<button class="btn btn-primary" style="font-size:11px;padding:6px 12px;" onclick="generateQuoteDocx(currentSale)">⬇ Descargar</button>'+
           '</div>'+
           signedRow+
+          invoiceRow+
           uploadBtn;
       }
 
@@ -1411,7 +1453,17 @@
         if(typeof showToast==='function') showToast('No hay solicitud activa','error');
         return;
       }
+      document.getElementById('invoiceFile').value = '';
       document.getElementById('invoiceNumInput').value = '';
+      var emailEl = document.getElementById('invoiceByEmail');
+      if(emailEl){
+        var cached = '';
+        try { cached = localStorage.getItem('ph_user_email') || ''; } catch(_){}
+        emailEl.value = cached;
+      }
+      document.getElementById('invoiceUploadProgress').style.display = 'none';
+      var btn = document.getElementById('btnSubmitInvoice');
+      if(btn) btn.disabled = false;
       document.getElementById('invoiceModal').style.display = 'flex';
     };
 
@@ -1420,28 +1472,58 @@
     };
 
     window.submitInvoiceRegistration = async function(){
+      var file = document.getElementById('invoiceFile').files[0];
+      var invoiceBy = (document.getElementById('invoiceByEmail').value||'').trim();
+      var invoiceNum = (document.getElementById('invoiceNumInput').value||'').trim();
+
+      if(!file){
+        if(typeof showToast==='function') showToast('Selecciona el PDF de la factura','error');
+        return;
+      }
+      if(file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
+        if(typeof showToast==='function') showToast('El archivo debe ser un PDF','error');
+        return;
+      }
+      if(!invoiceBy || !invoiceBy.includes('@')){
+        if(typeof showToast==='function') showToast('Ingresa un correo válido','error');
+        return;
+      }
       if(!currentSale || !currentSale._supaId){
         if(typeof showToast==='function') showToast('No hay solicitud activa','error');
         return;
       }
-      if(typeof sbUpdateSaleStatus !== 'function'){
+      if(typeof sbUploadInvoice !== 'function' || typeof sbMarkInvoiceEmitted !== 'function'){
         if(typeof showToast==='function') showToast('Supabase no está cargado','error');
         return;
       }
-      var btn = document.getElementById('btnSubmitInvoice');
-      if(btn) btn.disabled = true;
 
-      var result = await sbUpdateSaleStatus(currentSale._supaId, 'factura_emitida');
-      if(result.ok){
+      var btn = document.getElementById('btnSubmitInvoice');
+      var progress = document.getElementById('invoiceUploadProgress');
+      if(btn) btn.disabled = true;
+      if(progress) progress.style.display = 'block';
+
+      try {
+        // 1. Subir PDF a Storage
+        var uploadResult = await sbUploadInvoice(currentSale._supaId, currentSale.num, file);
+        if(!uploadResult.ok) throw new Error(uploadResult.error || 'Error al subir el PDF');
+
+        // 2. Marcar como factura_emitida en la BD
+        var markResult = await sbMarkInvoiceEmitted(currentSale._supaId, invoiceBy, uploadResult.url, invoiceNum);
+        if(!markResult.ok) throw new Error(markResult.error || 'Error al actualizar el estado');
+
+        try { localStorage.setItem('ph_user_email', invoiceBy); } catch(_){}
+
         document.getElementById('invoiceModal').style.display = 'none';
         await refreshSalesData();
         var updated = SALES_DATA.find(function(s){ return s.num === currentSale.num; });
         if(updated) currentSale = updated;
         renderStep4(currentSale);
         if(typeof showToast==='function') showToast('Factura registrada. Ahora puedes marcar los equipos en Voltio.','success');
-      } else {
-        if(typeof showToast==='function') showToast('Error al registrar: '+(result.error||'desconocido'),'error');
+      } catch(err){
+        console.error('[Sales] Submit invoice error:', err);
+        if(typeof showToast==='function') showToast('Error: '+err.message,'error');
         if(btn) btn.disabled = false;
+        if(progress) progress.style.display = 'none';
       }
     };
 
