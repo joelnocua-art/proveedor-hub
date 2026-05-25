@@ -426,7 +426,10 @@ async function sbLoadSales() {
     observaciones: r.observaciones || '',
     vigencia_dias: r.vigencia_dias || 30,
     items:      r.items || [],
-    created_at: r.created_at
+    created_at: r.created_at,
+    signed_quote_url: r.signed_quote_url || null,
+    signed_at:  r.signed_at || null,
+    signed_by:  r.signed_by || null
   }));
   window._sbData.salesRequests = mapped;
   return mapped;
@@ -535,6 +538,41 @@ async function sbUpdateSaleStatus(saleId, newStatus) {
     .eq('id', saleId);
   if (error) {
     console.error('[Supabase] Update sale status error:', error);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+// Sube el PDF firmado al bucket de Storage y devuelve la URL pública
+async function sbUploadSignedQuote(supaId, num, file) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+  const path = `${num}/${Date.now()}.pdf`;
+  const { data, error } = await sb.storage
+    .from('cotizaciones-firmadas')
+    .upload(path, file, { contentType: 'application/pdf', upsert: true });
+  if (error) {
+    console.error('[Supabase] Upload signed quote error:', error);
+    return { ok: false, error: error.message };
+  }
+  const { data: urlData } = sb.storage
+    .from('cotizaciones-firmadas')
+    .getPublicUrl(data.path);
+  return { ok: true, url: urlData.publicUrl };
+}
+
+// Marca la solicitud como firmada: status, URL del PDF, fecha y quien procesó
+async function sbMarkAsSigned(supaId, signedBy, pdfUrl) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+  const { error } = await sb.from('sales_requests').update({
+    status:           'firmada',
+    signed_quote_url: pdfUrl || null,
+    signed_at:        new Date().toISOString(),
+    signed_by:        signedBy || null
+  }).eq('id', supaId);
+  if (error) {
+    console.error('[Supabase] Mark as signed error:', error);
     return { ok: false, error: error.message };
   }
   return { ok: true };
