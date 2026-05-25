@@ -281,6 +281,25 @@
     </div>
   </div>
 
+  <!-- ═══ MODAL: Registrar factura emitida ═══ -->
+  <div id="invoiceModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-lg);padding:28px;width:100%;max-width:440px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
+      <button onclick="closeInvoiceModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;line-height:1;" title="Cerrar">×</button>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;margin-bottom:4px;">Registrar factura emitida</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:20px;">Confirma que Finanzas ya emitió la factura. El estado cambiará a <strong>Factura emitida</strong> y podrás marcar los equipos en Voltio.</div>
+
+      <div style="margin-bottom:20px;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Número de factura <span style="color:var(--text-3);font-weight:400;">(opcional)</span></label>
+        <input type="text" id="invoiceNumInput" placeholder="Ej: FE-2026-00123" class="input" style="width:100%;box-sizing:border-box;" />
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn" onclick="closeInvoiceModal()">Cancelar</button>
+        <button class="btn btn-accent" id="btnSubmitInvoice" onclick="submitInvoiceRegistration()">✓ Confirmar factura emitida</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ MODAL: Subir cotización firmada ═══ -->
   <div id="signedQuoteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;padding:20px;">
     <div style="background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-lg);padding:28px;width:100%;max-width:460px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
@@ -316,7 +335,7 @@
   <script src="https://unpkg.com/pizzip@3.1.6/dist/pizzip-utils.js"></script>
   <script src="https://unpkg.com/docxtemplater@3.50.0/build/docxtemplater.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-  <script src="supabase-client.js?v=18"></script>
+  <script src="supabase-client.js?v=19"></script>
   <script src="script.js?v=15"></script>
   <script src="components.js"></script>
   <script>
@@ -1040,12 +1059,28 @@
           actionEl.innerHTML =
             '<div class="action-card primary">'+
               '<div style="font-size:28px;margin-bottom:8px;">🧾</div>'+
-              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Emitir factura</div>'+
-              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">La cotización está firmada. Procede a emitir la factura.</div>'+
-              '<button class="btn btn-primary" onclick="showToast(\'Función próximamente disponible\',\'info\')">Registrar factura emitida</button>'+
+              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Registrar factura emitida</div>'+
+              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Cuando Finanzas emita la factura, regístrala aquí para avanzar al siguiente paso.</div>'+
+              '<button class="btn btn-primary" onclick="showInvoiceModal()">🧾 Registrar factura emitida</button>'+
             '</div>'+
             '<div class="action-card danger" style="margin-top:10px;">'+
               '<button class="btn btn-danger" style="font-size:12px;padding:6px 14px;" onclick="cancelarSolicitud()">❌ Cancelar solicitud</button>'+
+            '</div>';
+        } else if(s==='factura_emitida'){
+          var serialLines = (sale.items||[]).filter(function(it){ return it.serial; }).map(function(it){
+            return (it.serial||'').trim();
+          });
+          var hasSerials = serialLines.length > 0;
+          var serialHtml = hasSerials
+            ? serialLines.map(function(sr){ return '<div style="font-family:monospace;font-size:12px;padding:4px 8px;background:rgba(0,229,200,0.06);border:1px solid rgba(0,229,200,0.15);border-radius:6px;margin-bottom:4px;">'+esc(sr)+'</div>'; }).join('')
+            : '<div style="font-size:12px;color:var(--text-3);font-style:italic;">Sin seriales registrados en esta solicitud.</div>';
+          actionEl.innerHTML =
+            '<div class="action-card primary" style="border-color:rgba(0,229,200,.3);background:rgba(0,229,200,.04);">'+
+              '<div style="font-size:28px;margin-bottom:8px;">📦</div>'+
+              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Marcar equipos como vendidos en Voltio</div>'+
+              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">La factura está emitida. Abre Voltio y marca los siguientes seriales como vendidos.</div>'+
+              '<div style="margin-bottom:14px;">'+serialHtml+'</div>'+
+              '<button class="btn btn-accent" onclick="copySerialsAndOpenVoltio()" '+(hasSerials?'':'disabled title="No hay seriales para copiar"')+'>'+(hasSerials?'📋 Copiar seriales y abrir Voltio':'📋 Abrir Voltio')+'</button>'+
             '</div>';
         } else {
           actionEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px;">'+
@@ -1368,6 +1403,67 @@
         if(btn) btn.disabled = false;
         if(progress) progress.style.display = 'none';
       }
+    };
+
+    // ═══ REGISTRAR FACTURA EMITIDA ═══════════════════════════════════════
+    window.showInvoiceModal = function(){
+      if(!currentSale){
+        if(typeof showToast==='function') showToast('No hay solicitud activa','error');
+        return;
+      }
+      document.getElementById('invoiceNumInput').value = '';
+      document.getElementById('invoiceModal').style.display = 'flex';
+    };
+
+    window.closeInvoiceModal = function(){
+      document.getElementById('invoiceModal').style.display = 'none';
+    };
+
+    window.submitInvoiceRegistration = async function(){
+      if(!currentSale || !currentSale._supaId){
+        if(typeof showToast==='function') showToast('No hay solicitud activa','error');
+        return;
+      }
+      if(typeof sbUpdateSaleStatus !== 'function'){
+        if(typeof showToast==='function') showToast('Supabase no está cargado','error');
+        return;
+      }
+      var btn = document.getElementById('btnSubmitInvoice');
+      if(btn) btn.disabled = true;
+
+      var result = await sbUpdateSaleStatus(currentSale._supaId, 'factura_emitida');
+      if(result.ok){
+        document.getElementById('invoiceModal').style.display = 'none';
+        await refreshSalesData();
+        var updated = SALES_DATA.find(function(s){ return s.num === currentSale.num; });
+        if(updated) currentSale = updated;
+        renderStep4(currentSale);
+        if(typeof showToast==='function') showToast('Factura registrada. Ahora puedes marcar los equipos en Voltio.','success');
+      } else {
+        if(typeof showToast==='function') showToast('Error al registrar: '+(result.error||'desconocido'),'error');
+        if(btn) btn.disabled = false;
+      }
+    };
+
+    // Copia seriales al portapapeles y abre Voltio en nueva pestaña
+    window.copySerialsAndOpenVoltio = function(){
+      if(!currentSale) return;
+      var serials = (currentSale.items||[])
+        .filter(function(it){ return it.serial; })
+        .map(function(it){ return it.serial.trim(); });
+
+      var text = serials.length > 0
+        ? serials.join('\n')
+        : '';
+
+      if(text){
+        navigator.clipboard.writeText(text).then(function(){
+          if(typeof showToast==='function') showToast('Seriales copiados al portapapeles. Voltio abierto — pégalos y marca como vendido.','success');
+        }).catch(function(){
+          if(typeof showToast==='function') showToast('No se pudo copiar automáticamente. Copia los seriales manualmente.','warning');
+        });
+      }
+      window.open('https://nebulabia.retool.com/', '_blank');
     };
 
     // Refresca SALES_DATA desde Supabase y re-renderiza la lista
