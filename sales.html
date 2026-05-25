@@ -1179,39 +1179,39 @@
       document.getElementById('signedQuoteModal').style.display = 'none';
     };
 
-    // Construye el cuerpo de texto plano para el correo a Finanzas
+    // Construye el cuerpo del correo a Finanzas (texto plano legible en Gmail)
     function buildFinanzasEmailBody(sale, signedBy, pdfUrl){
       var fmtCOPPlain = function(n){
         try { return '$'+(Number(n)||0).toLocaleString('es-CO'); }
         catch(_) { return '$'+Math.round(Number(n)||0); }
       };
+      var nItems = (sale.items||[]).length;
       var itemsTxt = (sale.items||[]).map(function(it, i){
         var lines = [];
-        lines.push('  ['+(i+1)+'] '+(it.nombre_sku || 'SKU sin nombre'));
-        var meta = [];
-        if(it.marca)  meta.push('Marca: '+it.marca);
-        if(it.modelo) meta.push('Modelo: '+it.modelo);
-        if(it.serial) meta.push('Serial: '+it.serial);
-        if(meta.length) lines.push('      '+meta.join(' | '));
-        lines.push('      Cantidad: '+(Number(it.cantidad)||1));
+        lines.push('▸ Ítem '+(i+1)+': '+(it.nombre_sku || 'SKU sin nombre'));
+        if(it.marca)  lines.push('   • Marca: '+it.marca);
+        if(it.modelo) lines.push('   • Modelo: '+it.modelo);
+        if(it.serial) lines.push('   • Serial: '+it.serial);
+        lines.push('   • Cantidad: '+(Number(it.cantidad)||1));
         return lines.join('\n');
       }).join('\n\n');
 
       return 'Estimado equipo de Finanzas,\n\n'+
         'Adjuntamos la cotización firmada del cliente. Por favor proceder con la emisión de la factura.\n\n'+
-        '==============================================================\n'+
-        '   DETALLES DE LA VENTA\n'+
-        '==============================================================\n'+
-        '   Solicitud: '+sale.num+'\n'+
-        '   Cliente:   '+sale.cliente+'\n'+
-        (sale.nit ? '   NIT:       '+sale.nit+'\n' : '')+
-        (sale.codigo_bia ? '   Código BIA: '+sale.codigo_bia+'\n' : '')+
-        '   Valor total: '+fmtCOPPlain(sale.valor)+'\n'+
-        '==============================================================\n\n'+
-        'EQUIPOS VENDIDOS ('+(sale.items||[]).length+' ítems):\n\n'+
-        (itemsTxt || '  (sin ítems registrados)')+'\n\n'+
-        '==============================================================\n\n'+
-        (pdfUrl ? '📎 Cotización firmada (PDF):\n'+pdfUrl+'\n\n' : '')+
+        '────────────────────────────────────────\n'+
+        '  DETALLES DE LA VENTA\n'+
+        '────────────────────────────────────────\n\n'+
+        '• Solicitud: '+sale.num+'\n'+
+        '• Cliente: '+sale.cliente+'\n'+
+        (sale.nit ? '• NIT: '+sale.nit+'\n' : '')+
+        (sale.codigo_bia ? '• Código BIA: '+sale.codigo_bia+'\n' : '')+
+        '• Valor total: '+fmtCOPPlain(sale.valor)+'\n\n'+
+        '────────────────────────────────────────\n'+
+        '  EQUIPOS VENDIDOS ('+nItems+(nItems===1?' ítem':' ítems')+')\n'+
+        '────────────────────────────────────────\n\n'+
+        (itemsTxt || '(sin ítems registrados)')+'\n\n'+
+        '────────────────────────────────────────\n\n'+
+        (pdfUrl ? '📎 Cotización firmada (PDF):\n'+pdfUrl+'\n\n──\n\n' : '')+
         'Procesado por: '+signedBy+'\n\n'+
         'Atentamente,\nProveedor Hub — BIA Energy';
     }
