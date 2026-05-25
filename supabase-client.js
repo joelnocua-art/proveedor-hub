@@ -433,7 +433,12 @@ async function sbLoadSales() {
     invoice_url:    r.invoice_url || null,
     invoice_number: r.invoice_number || null,
     invoice_at:     r.invoice_at || null,
-    invoice_by:     r.invoice_by || null
+    invoice_by:     r.invoice_by || null,
+    payment_proof_url: r.payment_proof_url || null,
+    payment_at:     r.payment_at || null,
+    payment_by:     r.payment_by || null,
+    dispatch_at:    r.dispatch_at || null,
+    dispatch_by:    r.dispatch_by || null
   }));
   window._sbData.salesRequests = mapped;
   return mapped;
@@ -613,6 +618,57 @@ async function sbMarkInvoiceEmitted(supaId, invoiceBy, pdfUrl, invoiceNumber) {
   }).eq('id', supaId);
   if (error) {
     console.error('[Supabase] Mark invoice emitted error:', error);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+// Sube el PDF del comprobante de pago al bucket comprobantes-pago
+async function sbUploadPaymentProof(supaId, num, file) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+  const path = `${num}/${Date.now()}.pdf`;
+  const { data, error } = await sb.storage
+    .from('comprobantes-pago')
+    .upload(path, file, { contentType: 'application/pdf', upsert: true });
+  if (error) {
+    console.error('[Supabase] Upload payment proof error:', error);
+    return { ok: false, error: error.message };
+  }
+  const { data: urlData } = sb.storage
+    .from('comprobantes-pago')
+    .getPublicUrl(data.path);
+  return { ok: true, url: urlData.publicUrl };
+}
+
+// Marca la solicitud como pagada
+async function sbMarkAsPaid(supaId, paymentBy, pdfUrl) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+  const { error } = await sb.from('sales_requests').update({
+    status:            'pagada',
+    payment_proof_url: pdfUrl || null,
+    payment_at:        new Date().toISOString(),
+    payment_by:        paymentBy || null
+  }).eq('id', supaId);
+  if (error) {
+    console.error('[Supabase] Mark as paid error:', error);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+// Marca la solicitud como despachada (cerrada)
+async function sbMarkAsDispatched(supaId, dispatchBy) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+  const { error } = await sb.from('sales_requests').update({
+    status:       'cerrada',
+    dispatch_at:  new Date().toISOString(),
+    dispatch_by:  dispatchBy || null
+  }).eq('id', supaId);
+  if (error) {
+    console.error('[Supabase] Mark as dispatched error:', error);
     return { ok: false, error: error.message };
   }
   return { ok: true };

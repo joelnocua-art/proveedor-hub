@@ -95,6 +95,7 @@
                   <option value="enviada">Enviada</option>
                   <option value="firmada">Firmada</option>
                   <option value="factura_emitida">Factura emitida</option>
+                  <option value="pagada">Pagada</option>
                   <option value="cerrada">Cerrada</option>
                   <option value="cancelada">Cancelada</option>
                 </select>
@@ -316,6 +317,54 @@
     </div>
   </div>
 
+  <!-- ═══ MODAL: Subir comprobante de pago ═══ -->
+  <div id="paymentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-lg);padding:28px;width:100%;max-width:460px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
+      <button onclick="closePaymentModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;line-height:1;" title="Cerrar">×</button>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;margin-bottom:4px;">Subir comprobante de pago</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:20px;">Sube el comprobante que CX te envió. El estado cambiará a <strong>Pagada</strong> y podrás marcar los equipos en Voltio + registrar el despacho.</div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">PDF del comprobante *</label>
+        <input type="file" id="paymentFile" accept=".pdf,application/pdf"
+          style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.04);border:1px dashed var(--border-md);border-radius:var(--r-md);padding:12px;font-size:13px;color:var(--text);cursor:pointer;" />
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Tu correo *</label>
+        <input type="email" id="paymentByEmail" placeholder="tu.correo@bia.app" class="input" style="width:100%;box-sizing:border-box;" />
+      </div>
+
+      <div id="paymentUploadProgress" style="display:none;margin-bottom:14px;padding:10px 14px;background:rgba(91,107,255,0.08);border:1px solid rgba(91,107,255,0.2);border-radius:var(--r-sm);font-size:13px;color:var(--text-2);">
+        ⏳ Subiendo comprobante…
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn" onclick="closePaymentModal()">Cancelar</button>
+        <button class="btn btn-accent" id="btnSubmitPayment" onclick="submitPaymentProof()">✓ Confirmar pago</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MODAL: Registrar despacho ═══ -->
+  <div id="dispatchModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-lg);padding:28px;width:100%;max-width:440px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
+      <button onclick="closeDispatchModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;line-height:1;" title="Cerrar">×</button>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;margin-bottom:4px;">Registrar despacho</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:20px;">Confirma que los equipos ya salieron. La solicitud quedará <strong>cerrada</strong> con la fecha de hoy.</div>
+
+      <div style="margin-bottom:20px;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Tu correo *</label>
+        <input type="email" id="dispatchByEmail" placeholder="tu.correo@bia.app" class="input" style="width:100%;box-sizing:border-box;" />
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn" onclick="closeDispatchModal()">Cancelar</button>
+        <button class="btn btn-accent" id="btnSubmitDispatch" onclick="submitDispatch()">✓ Confirmar despacho</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ MODAL: Subir cotización firmada ═══ -->
   <div id="signedQuoteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;padding:20px;">
     <div style="background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-lg);padding:28px;width:100%;max-width:460px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
@@ -351,7 +400,7 @@
   <script src="https://unpkg.com/pizzip@3.1.6/dist/pizzip-utils.js"></script>
   <script src="https://unpkg.com/docxtemplater@3.50.0/build/docxtemplater.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-  <script src="supabase-client.js?v=20"></script>
+  <script src="supabase-client.js?v=21"></script>
   <script src="script.js?v=15"></script>
   <script src="components.js"></script>
   <script>
@@ -367,6 +416,7 @@
       'enviada':            { label:'Enviada al cliente',   css:'s-enviada',     icon:'◑' },
       'firmada':            { label:'Firmada',              css:'s-firmada',     icon:'◕' },
       'factura_emitida':    { label:'Factura emitida',      css:'s-factura',     icon:'●' },
+      'pagada':             { label:'Pagada',               css:'s-pagada',      icon:'◉' },
       'cerrada':            { label:'Cerrada',              css:'s-cerrada',     icon:'✓' },
       'cancelada':          { label:'Cancelada',            css:'s-cancelada',   icon:'✕' },
     };
@@ -1047,13 +1097,33 @@
           var invoiceNumStr = sale.invoice_number ? ' (#'+sale.invoice_number+')' : '';
           tItems.unshift({
             label: 'Factura emitida',
-            desc: 'Factura'+invoiceNumStr+' registrada'+invoiceByStr+'. Listo para marcar equipos en Voltio.',
+            desc: 'Factura'+invoiceNumStr+' registrada'+invoiceByStr+'. Esperando comprobante de pago.',
             date: formatDateTime(sale.invoice_at),
             accent: sale.status === 'factura_emitida'
           });
         }
+        // Evento de pago confirmado (si existe)
+        if(sale.payment_at){
+          var paymentByStr = sale.payment_by ? ' por '+sale.payment_by : '';
+          tItems.unshift({
+            label: 'Comprobante de pago recibido',
+            desc: 'Pago confirmado'+paymentByStr+'. Listo para marcar en Voltio y despachar.',
+            date: formatDateTime(sale.payment_at),
+            accent: sale.status === 'pagada'
+          });
+        }
+        // Evento de despacho (si existe)
+        if(sale.dispatch_at){
+          var dispatchByStr = sale.dispatch_by ? ' por '+sale.dispatch_by : '';
+          tItems.unshift({
+            label: 'Despacho registrado',
+            desc: 'Equipos despachados'+dispatchByStr+'. Solicitud cerrada.',
+            date: formatDateTime(sale.dispatch_at),
+            accent: sale.status === 'cerrada'
+          });
+        }
         // Estado adicional si no está cubierto por los eventos anteriores
-        if(sale.status !== 'cotizacion_generada' && sale.status !== 'firmada' && sale.status !== 'factura_emitida'){
+        if(sale.status !== 'cotizacion_generada' && sale.status !== 'firmada' && sale.status !== 'factura_emitida' && sale.status !== 'pagada' && sale.status !== 'cerrada'){
           tItems.unshift({ label: st.label, desc: 'Estado actual de la solicitud.', date: createdStr, accent: true });
         }
         tlEl.innerHTML = tItems.map(function(it){
@@ -1094,6 +1164,17 @@
               '<button class="btn btn-danger" style="font-size:12px;padding:6px 14px;" onclick="cancelarSolicitud()">❌ Cancelar solicitud</button>'+
             '</div>';
         } else if(s==='factura_emitida'){
+          actionEl.innerHTML =
+            '<div class="action-card primary">'+
+              '<div style="font-size:28px;margin-bottom:8px;">💳</div>'+
+              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Subir comprobante de pago</div>'+
+              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Cuando CX confirme el pago, sube el comprobante para avanzar a Voltio y despacho.</div>'+
+              '<button class="btn btn-primary" onclick="showPaymentModal()">💳 Subir comprobante de pago</button>'+
+            '</div>'+
+            '<div class="action-card danger" style="margin-top:10px;">'+
+              '<button class="btn btn-danger" style="font-size:12px;padding:6px 14px;" onclick="cancelarSolicitud()">❌ Cancelar solicitud</button>'+
+            '</div>';
+        } else if(s==='pagada'){
           var serialLines = (sale.items||[]).filter(function(it){ return it.serial; }).map(function(it){
             return (it.serial||'').trim();
           });
@@ -1105,9 +1186,15 @@
             '<div class="action-card primary" style="border-color:rgba(0,229,200,.3);background:rgba(0,229,200,.04);">'+
               '<div style="font-size:28px;margin-bottom:8px;">📦</div>'+
               '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Marcar equipos como vendidos en Voltio</div>'+
-              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">La factura está emitida. Abre Voltio y marca los siguientes seriales como vendidos.</div>'+
+              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">El pago está confirmado. Abre Voltio y marca los siguientes seriales como vendidos.</div>'+
               '<div style="margin-bottom:14px;">'+serialHtml+'</div>'+
               '<button class="btn btn-accent" onclick="copySerialsAndOpenVoltio()" '+(hasSerials?'':'disabled title="No hay seriales para copiar"')+'>'+(hasSerials?'📋 Copiar seriales y abrir Voltio':'📋 Abrir Voltio')+'</button>'+
+            '</div>'+
+            '<div class="action-card primary" style="margin-top:10px;">'+
+              '<div style="font-size:28px;margin-bottom:8px;">🚚</div>'+
+              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Registrar despacho</div>'+
+              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Cuando los equipos salgan, registra el despacho para cerrar la solicitud.</div>'+
+              '<button class="btn btn-primary" onclick="showDispatchModal()">🚚 Registrar despacho</button>'+
             '</div>';
         } else {
           actionEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px;">'+
@@ -1129,6 +1216,19 @@
                 '<div style="font-size:11px;color:var(--text-3);">Recibida '+esc(signedDate)+(sale.signed_by?' • '+esc(sale.signed_by):'')+'</div>'+
               '</div>'+
               '<a href="'+esc(sale.signed_quote_url)+'" target="_blank" class="btn" style="font-size:11px;padding:6px 12px;text-decoration:none;">⬇ Ver PDF</a>'+
+            '</div>';
+        }
+        var paymentRow = '';
+        if(sale.payment_proof_url){
+          var paymentDate = sale.payment_at ? formatDateTime(sale.payment_at) : '—';
+          paymentRow =
+            '<div class="attach-item" style="border-color:rgba(0,229,200,.2);background:rgba(0,229,200,.04);">'+
+              '<div class="attach-icon" style="background:rgba(0,229,200,.12);color:var(--accent);">💳</div>'+
+              '<div style="flex:1;min-width:0;">'+
+                '<div style="font-size:13px;font-weight:600;">Comprobante de pago</div>'+
+                '<div style="font-size:11px;color:var(--text-3);">Registrado '+esc(paymentDate)+(sale.payment_by?' • '+esc(sale.payment_by):'')+'</div>'+
+              '</div>'+
+              '<a href="'+esc(sale.payment_proof_url)+'" target="_blank" class="btn" style="font-size:11px;padding:6px 12px;text-decoration:none;">⬇ Ver PDF</a>'+
             '</div>';
         }
         var invoiceRow = '';
@@ -1161,6 +1261,7 @@
           '</div>'+
           signedRow+
           invoiceRow+
+          paymentRow+
           uploadBtn;
       }
 
@@ -1546,6 +1647,137 @@
         });
       }
       window.open('https://nebulabia.retool.com/', '_blank');
+    };
+
+    // ═══ SUBIR COMPROBANTE DE PAGO ═══════════════════════════════════════
+    window.showPaymentModal = function(){
+      if(!currentSale){
+        if(typeof showToast==='function') showToast('No hay solicitud activa','error');
+        return;
+      }
+      document.getElementById('paymentFile').value = '';
+      var emailEl = document.getElementById('paymentByEmail');
+      if(emailEl){
+        var cached = '';
+        try { cached = localStorage.getItem('ph_user_email') || ''; } catch(_){}
+        emailEl.value = cached;
+      }
+      document.getElementById('paymentUploadProgress').style.display = 'none';
+      var btn = document.getElementById('btnSubmitPayment');
+      if(btn) btn.disabled = false;
+      document.getElementById('paymentModal').style.display = 'flex';
+    };
+
+    window.closePaymentModal = function(){
+      document.getElementById('paymentModal').style.display = 'none';
+    };
+
+    window.submitPaymentProof = async function(){
+      var file = document.getElementById('paymentFile').files[0];
+      var paymentBy = (document.getElementById('paymentByEmail').value||'').trim();
+
+      if(!file){
+        if(typeof showToast==='function') showToast('Selecciona el PDF del comprobante','error');
+        return;
+      }
+      if(file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
+        if(typeof showToast==='function') showToast('El archivo debe ser un PDF','error');
+        return;
+      }
+      if(!paymentBy || !paymentBy.includes('@')){
+        if(typeof showToast==='function') showToast('Ingresa un correo válido','error');
+        return;
+      }
+      if(!currentSale || !currentSale._supaId){
+        if(typeof showToast==='function') showToast('No hay solicitud activa','error');
+        return;
+      }
+      if(typeof sbUploadPaymentProof !== 'function' || typeof sbMarkAsPaid !== 'function'){
+        if(typeof showToast==='function') showToast('Supabase no está cargado','error');
+        return;
+      }
+
+      var btn = document.getElementById('btnSubmitPayment');
+      var progress = document.getElementById('paymentUploadProgress');
+      if(btn) btn.disabled = true;
+      if(progress) progress.style.display = 'block';
+
+      try {
+        var uploadResult = await sbUploadPaymentProof(currentSale._supaId, currentSale.num, file);
+        if(!uploadResult.ok) throw new Error(uploadResult.error || 'Error al subir el PDF');
+
+        var markResult = await sbMarkAsPaid(currentSale._supaId, paymentBy, uploadResult.url);
+        if(!markResult.ok) throw new Error(markResult.error || 'Error al actualizar el estado');
+
+        try { localStorage.setItem('ph_user_email', paymentBy); } catch(_){}
+
+        document.getElementById('paymentModal').style.display = 'none';
+        await refreshSalesData();
+        var updated = SALES_DATA.find(function(s){ return s.num === currentSale.num; });
+        if(updated) currentSale = updated;
+        renderStep4(currentSale);
+        if(typeof showToast==='function') showToast('Pago confirmado. Ya puedes marcar en Voltio y despachar.','success');
+      } catch(err){
+        console.error('[Sales] Submit payment proof error:', err);
+        if(typeof showToast==='function') showToast('Error: '+err.message,'error');
+        if(btn) btn.disabled = false;
+        if(progress) progress.style.display = 'none';
+      }
+    };
+
+    // ═══ REGISTRAR DESPACHO ══════════════════════════════════════════════
+    window.showDispatchModal = function(){
+      if(!currentSale){
+        if(typeof showToast==='function') showToast('No hay solicitud activa','error');
+        return;
+      }
+      var emailEl = document.getElementById('dispatchByEmail');
+      if(emailEl){
+        var cached = '';
+        try { cached = localStorage.getItem('ph_user_email') || ''; } catch(_){}
+        emailEl.value = cached;
+      }
+      var btn = document.getElementById('btnSubmitDispatch');
+      if(btn) btn.disabled = false;
+      document.getElementById('dispatchModal').style.display = 'flex';
+    };
+
+    window.closeDispatchModal = function(){
+      document.getElementById('dispatchModal').style.display = 'none';
+    };
+
+    window.submitDispatch = async function(){
+      var dispatchBy = (document.getElementById('dispatchByEmail').value||'').trim();
+
+      if(!dispatchBy || !dispatchBy.includes('@')){
+        if(typeof showToast==='function') showToast('Ingresa un correo válido','error');
+        return;
+      }
+      if(!currentSale || !currentSale._supaId){
+        if(typeof showToast==='function') showToast('No hay solicitud activa','error');
+        return;
+      }
+      if(typeof sbMarkAsDispatched !== 'function'){
+        if(typeof showToast==='function') showToast('Supabase no está cargado','error');
+        return;
+      }
+
+      var btn = document.getElementById('btnSubmitDispatch');
+      if(btn) btn.disabled = true;
+
+      var result = await sbMarkAsDispatched(currentSale._supaId, dispatchBy);
+      if(result.ok){
+        try { localStorage.setItem('ph_user_email', dispatchBy); } catch(_){}
+        document.getElementById('dispatchModal').style.display = 'none';
+        await refreshSalesData();
+        var updated = SALES_DATA.find(function(s){ return s.num === currentSale.num; });
+        if(updated) currentSale = updated;
+        renderStep4(currentSale);
+        if(typeof showToast==='function') showToast('Despacho registrado. Solicitud cerrada.','success');
+      } else {
+        if(typeof showToast==='function') showToast('Error: '+(result.error||'desconocido'),'error');
+        if(btn) btn.disabled = false;
+      }
     };
 
     // Refresca SALES_DATA desde Supabase y re-renderiza la lista
