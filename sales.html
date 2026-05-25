@@ -1263,7 +1263,13 @@
         var subject = encodeURIComponent('['+currentSale.num+'] Cotización firmada — '+currentSale.cliente+' — '+fmtCOPPlain(currentSale.valor));
         var body = encodeURIComponent(buildFinanzasEmailBody(currentSale, signedBy, uploadResult.url));
 
-        window.open('mailto:'+to+'?cc='+cc+'&subject='+subject+'&body='+body, '_blank');
+        // Forzar Gmail compose (en vez de mailto: que abre el cliente por defecto del sistema)
+        var gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1'+
+          '&to=' + encodeURIComponent(to) +
+          '&cc=' + encodeURIComponent(cc) +
+          '&su=' + subject +
+          '&body=' + body;
+        window.open(gmailUrl, '_blank');
 
         if(typeof showToast==='function') showToast('Firma registrada. Se abrió tu correo con la notificación lista para enviar.','success');
 
