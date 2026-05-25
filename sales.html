@@ -322,7 +322,7 @@
     <div style="background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-lg);padding:28px;width:100%;max-width:460px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
       <button onclick="closePaymentModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;line-height:1;" title="Cerrar">×</button>
       <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;margin-bottom:4px;">Subir comprobante de pago</div>
-      <div style="font-size:13px;color:var(--text-2);margin-bottom:20px;">Sube el comprobante que CX te envió. El estado cambiará a <strong>Pagada</strong> y podrás marcar los equipos en Voltio + registrar el despacho.</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:20px;">Sube el comprobante que CX te envió. El estado cambiará a <strong>Pagada</strong> y podrás marcar los equipos en Voltio + notificar a los almacenistas.</div>
 
       <div style="margin-bottom:16px;">
         <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">PDF del comprobante *</label>
@@ -400,7 +400,7 @@
   <script src="https://unpkg.com/pizzip@3.1.6/dist/pizzip-utils.js"></script>
   <script src="https://unpkg.com/docxtemplater@3.50.0/build/docxtemplater.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-  <script src="supabase-client.js?v=21"></script>
+  <script src="supabase-client.js?v=22"></script>
   <script src="script.js?v=15"></script>
   <script src="components.js"></script>
   <script>
@@ -1185,14 +1185,20 @@
           actionEl.innerHTML =
             '<div class="action-card primary" style="border-color:rgba(0,229,200,.3);background:rgba(0,229,200,.04);">'+
               '<div style="font-size:28px;margin-bottom:8px;">📦</div>'+
-              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Marcar equipos como vendidos en Voltio</div>'+
+              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">1. Marcar equipos como vendidos en Voltio</div>'+
               '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">El pago está confirmado. Abre Voltio y marca los siguientes seriales como vendidos.</div>'+
               '<div style="margin-bottom:14px;">'+serialHtml+'</div>'+
               '<button class="btn btn-accent" onclick="copySerialsAndOpenVoltio()" '+(hasSerials?'':'disabled title="No hay seriales para copiar"')+'>'+(hasSerials?'📋 Copiar seriales y abrir Voltio':'📋 Abrir Voltio')+'</button>'+
             '</div>'+
             '<div class="action-card primary" style="margin-top:10px;">'+
+              '<div style="font-size:28px;margin-bottom:8px;">✉️</div>'+
+              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">2. Notificar a almacenistas</div>'+
+              '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Una vez los equipos estén marcados como vendidos en Voltio, abre el correo a Julián (Bogotá) y Agustín (Barranquilla) para coordinar el despacho.</div>'+
+              '<button class="btn btn-primary" onclick="notifyAlmacenistas()">✉️ Abrir correo a almacenistas</button>'+
+            '</div>'+
+            '<div class="action-card primary" style="margin-top:10px;">'+
               '<div style="font-size:28px;margin-bottom:8px;">🚚</div>'+
-              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">Registrar despacho</div>'+
+              '<div style="font-weight:700;font-size:14px;margin-bottom:4px;">3. Registrar despacho</div>'+
               '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">Cuando los equipos salgan, registra el despacho para cerrar la solicitud.</div>'+
               '<button class="btn btn-primary" onclick="showDispatchModal()">🚚 Registrar despacho</button>'+
             '</div>';
@@ -1472,6 +1478,70 @@
         'Atentamente,\nProveedor Hub — BIA Energy';
     }
 
+    // Construye el cuerpo del correo a Almacenistas (texto plano para Gmail)
+    function buildAlmacenistasEmailBody(sale, paymentBy, invoiceUrl, paymentUrl){
+      var fmtCOPPlain = function(n){
+        try { return '$'+(Number(n)||0).toLocaleString('es-CO'); }
+        catch(_) { return '$'+Math.round(Number(n)||0); }
+      };
+      var nItems = (sale.items||[]).length;
+      var itemsTxt = (sale.items||[]).map(function(it, i){
+        var lines = [];
+        lines.push('▸ Ítem '+(i+1)+': '+(it.nombre_sku || 'SKU sin nombre'));
+        if(it.marca)  lines.push('   • Marca: '+it.marca);
+        if(it.modelo) lines.push('   • Modelo: '+it.modelo);
+        if(it.serial) lines.push('   • Serial: '+it.serial);
+        if(it.ciudad) lines.push('   • Ciudad: '+it.ciudad);
+        lines.push('   • Cantidad: '+(Number(it.cantidad)||1));
+        return lines.join('\n');
+      }).join('\n\n');
+
+      return 'Hola equipo de Almacén,\n\n'+
+        'El pago de la siguiente venta ya fue confirmado. Por favor proceder con el despacho de los equipos.\n\n'+
+        '────────────────────────────────────────\n'+
+        '  DETALLES DE LA VENTA\n'+
+        '────────────────────────────────────────\n\n'+
+        '• Solicitud: '+sale.num+'\n'+
+        '• Cliente: '+sale.cliente+'\n'+
+        (sale.nit ? '• NIT: '+sale.nit+'\n' : '')+
+        (sale.codigo_bia ? '• Código BIA: '+sale.codigo_bia+'\n' : '')+
+        (sale.rep ? '• Contacto: '+sale.rep+'\n' : '')+
+        (sale.email ? '• Email cliente: '+sale.email+'\n' : '')+
+        (sale.telefono ? '• Teléfono: '+sale.telefono+'\n' : '')+
+        '• Valor total: '+fmtCOPPlain(sale.valor)+'\n\n'+
+        '────────────────────────────────────────\n'+
+        '  EQUIPOS A DESPACHAR ('+nItems+(nItems===1?' ítem':' ítems')+')\n'+
+        '────────────────────────────────────────\n\n'+
+        (itemsTxt || '(sin ítems registrados)')+'\n\n'+
+        '────────────────────────────────────────\n\n'+
+        (invoiceUrl ? '📎 Factura emitida:\n'+invoiceUrl+'\n\n' : '')+
+        (paymentUrl ? '📎 Comprobante de pago:\n'+paymentUrl+'\n\n──\n\n' : '')+
+        'Procesado por: '+paymentBy+'\n\n'+
+        'Atentamente,\nProveedor Hub — BIA Energy';
+    }
+
+    // Abre Gmail compose con el correo a almacenistas
+    function openAlmacenistasEmail(sale, paymentBy, invoiceUrl, paymentUrl){
+      var fmtCOPPlain = function(n){
+        try { return '$'+(Number(n)||0).toLocaleString('es-CO'); }
+        catch(_) { return '$'+Math.round(Number(n)||0); }
+      };
+      // TO: ambos almacenistas (Bogotá + Barranquilla). Ellos coordinan según ciudad.
+      var to = 'julian.marta@bia.app,agustin.serna@bia.app';
+      // CC: Supply (Laura), Joel, y quien sube el comprobante
+      var ccList = ['laura.gomez@bia.app','joel.nocua@bia.app'];
+      if(paymentBy && ccList.indexOf(paymentBy)===-1) ccList.push(paymentBy);
+      var cc = ccList.join(',');
+      var subject = encodeURIComponent('['+sale.num+'] Solicitud de despacho — '+sale.cliente+' — '+fmtCOPPlain(sale.valor));
+      var body = encodeURIComponent(buildAlmacenistasEmailBody(sale, paymentBy, invoiceUrl, paymentUrl));
+      var gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1'
+        + '&to=' + encodeURIComponent(to)
+        + '&cc=' + encodeURIComponent(cc)
+        + '&su=' + subject
+        + '&body=' + body;
+      window.open(gmailUrl, '_blank');
+    }
+
     window.submitSignedQuote = async function(){
       var file = document.getElementById('signedQuoteFile').files[0];
       var signedBy = (document.getElementById('signedByEmail').value||'').trim();
@@ -1628,6 +1698,19 @@
       }
     };
 
+    // Abre Gmail compose para notificar a almacenistas que ya pueden despachar.
+    // TODO: cuando tengamos API key de Voltio (Retool) + Metabase, automatizar:
+    //   1) marcar equipos como vendidos en Voltio
+    //   2) verificar en Metabase que el inventario quedó como vendido
+    //   3) solo entonces disparar este correo
+    window.notifyAlmacenistas = function(){
+      if(!currentSale) return;
+      var paymentBy = currentSale.payment_by || '';
+      try { if(!paymentBy) paymentBy = localStorage.getItem('ph_user_email') || ''; } catch(_){}
+      openAlmacenistasEmail(currentSale, paymentBy, currentSale.invoice_url, currentSale.payment_proof_url);
+      if(typeof showToast==='function') showToast('Correo a almacenistas abierto — solo dale "Enviar".','success');
+    };
+
     // Copia seriales al portapapeles y abre Voltio en nueva pestaña
     window.copySerialsAndOpenVoltio = function(){
       if(!currentSale) return;
@@ -1716,7 +1799,7 @@
         var updated = SALES_DATA.find(function(s){ return s.num === currentSale.num; });
         if(updated) currentSale = updated;
         renderStep4(currentSale);
-        if(typeof showToast==='function') showToast('Pago confirmado. Ya puedes marcar en Voltio y despachar.','success');
+        if(typeof showToast==='function') showToast('Pago confirmado. Marca los equipos en Voltio y luego notifica a los almacenistas.','success');
       } catch(err){
         console.error('[Sales] Submit payment proof error:', err);
         if(typeof showToast==='function') showToast('Error: '+err.message,'error');
