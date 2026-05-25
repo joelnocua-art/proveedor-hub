@@ -429,7 +429,11 @@ async function sbLoadSales() {
     created_at: r.created_at,
     signed_quote_url: r.signed_quote_url || null,
     signed_at:  r.signed_at || null,
-    signed_by:  r.signed_by || null
+    signed_by:  r.signed_by || null,
+    invoice_url:    r.invoice_url || null,
+    invoice_number: r.invoice_number || null,
+    invoice_at:     r.invoice_at || null,
+    invoice_by:     r.invoice_by || null
   }));
   window._sbData.salesRequests = mapped;
   return mapped;
@@ -573,6 +577,42 @@ async function sbMarkAsSigned(supaId, signedBy, pdfUrl) {
   }).eq('id', supaId);
   if (error) {
     console.error('[Supabase] Mark as signed error:', error);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+// Sube el PDF de la factura emitida al bucket de Storage y devuelve la URL pública
+async function sbUploadInvoice(supaId, num, file) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+  const path = `${num}/${Date.now()}.pdf`;
+  const { data, error } = await sb.storage
+    .from('facturas-emitidas')
+    .upload(path, file, { contentType: 'application/pdf', upsert: true });
+  if (error) {
+    console.error('[Supabase] Upload invoice error:', error);
+    return { ok: false, error: error.message };
+  }
+  const { data: urlData } = sb.storage
+    .from('facturas-emitidas')
+    .getPublicUrl(data.path);
+  return { ok: true, url: urlData.publicUrl };
+}
+
+// Marca la solicitud como factura emitida: status, URL del PDF, número, fecha y quién registró
+async function sbMarkInvoiceEmitted(supaId, invoiceBy, pdfUrl, invoiceNumber) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+  const { error } = await sb.from('sales_requests').update({
+    status:         'factura_emitida',
+    invoice_url:    pdfUrl || null,
+    invoice_number: invoiceNumber || null,
+    invoice_at:     new Date().toISOString(),
+    invoice_by:     invoiceBy || null
+  }).eq('id', supaId);
+  if (error) {
+    console.error('[Supabase] Mark invoice emitted error:', error);
     return { ok: false, error: error.message };
   }
   return { ok: true };
