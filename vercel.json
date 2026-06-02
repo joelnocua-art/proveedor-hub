@@ -37,6 +37,7 @@
     { "source": "/comparativo", "destination": "/compare.html" },
     { "source": "/sku", "destination": "/sku.html" },
     { "source": "/respuesta", "destination": "/respuesta.html" },
-    { "source": "/ventas", "destination": "/sales.html" }
+    { "source": "/ventas", "destination": "/sales.html" },
+    { "source": "/usuarios", "destination": "/usuarios.html" }
   ]
 }

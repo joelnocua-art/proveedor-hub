@@ -85,6 +85,39 @@ function toggleSidebar(forceOpen) {
   overlay?.classList.remove('open');
 }
 
+// Roles permitidos por página
+const PAGE_ROLES = {
+  'home':            ['admin', 'supply', 'sales', 'viewer'],
+  'providers':       ['admin', 'supply'],
+  'provider_detail': ['admin', 'supply'],
+  'new_provider':    ['admin', 'supply'],
+  'quotes':          ['admin', 'supply'],
+  'quote_detail':    ['admin', 'supply'],
+  'compare':         ['admin', 'supply'],
+  'sku':             ['admin', 'supply'],
+  'sales':           ['admin', 'supply', 'sales'],
+  'usuarios':        ['admin', 'supply']
+};
+
+function filterNavByRole(role) {
+  const NAV_ROLES = {
+    'home':         ['admin', 'supply', 'sales', 'viewer'],
+    'providers':    ['admin', 'supply'],
+    'new_provider': ['admin', 'supply'],
+    'quotes':       ['admin', 'supply'],
+    'compare':      ['admin', 'supply'],
+    'sku':          ['admin', 'supply'],
+    'sales':        ['admin', 'supply', 'sales'],
+    'usuarios':     ['admin', 'supply']
+  };
+  document.querySelectorAll('.nav a[data-nav]').forEach(a => {
+    const key = a.getAttribute('data-nav');
+    if (NAV_ROLES[key] && !NAV_ROLES[key].includes(role)) {
+      a.style.display = 'none';
+    }
+  });
+}
+
 function setActiveNav() {
   const page = document.body?.getAttribute('data-page');
   const links = document.querySelectorAll('.nav a[data-nav]');
@@ -119,12 +152,19 @@ function renderUserChip(sbUser) {
     ? `<img src="${escapeHtml(avatar)}" style="width:28px;height:28px;border-radius:50%;margin-right:8px;vertical-align:-8px;object-fit:cover;" />`
     : `<span style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;margin-right:8px;vertical-align:-8px;color:#0a0d1a;">${escapeHtml(initial)}</span>`;
 
+  const roleLabels = { admin: 'Admin', supply: 'Supply', sales: 'Ventas', viewer: 'Solo lectura' };
+  const role = window._userRole || '';
+  const roleTag = role
+    ? `<span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:700;background:rgba(0,229,200,0.12);color:var(--accent);letter-spacing:.5px;">${escapeHtml(roleLabels[role] || role)}</span>`
+    : '';
+
   el.innerHTML = `
     <div style="display:flex;align-items:center;">
       ${avatarHtml}
       <div style="min-width:0;">
         <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(displayName)}</div>
         <div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(displayEmail)}</div>
+        ${roleTag}
       </div>
     </div>
   `;
@@ -2610,6 +2650,27 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // Role-based access control
+    if (sbUser && !isAuthPage && !isPublicPage) {
+      const profile = typeof sbGetProfile === 'function' ? await sbGetProfile() : null;
+      let userRole = profile?.role || null;
+
+      if (!userRole) {
+        const email = (sbUser.email || '').toLowerCase();
+        userRole = email === 'joel.nocua@bia.app' ? 'admin' : 'supply';
+      }
+
+      window._userRole = userRole;
+
+      const allowed = PAGE_ROLES[page];
+      if (allowed && !allowed.includes(userRole)) {
+        window.location.href = userRole === 'sales' ? 'sales.html' : 'home.html';
+        return;
+      }
+
+      filterNavByRole(userRole);
+    }
+
   } else {
     // No Supabase fallback (we migrated completely to Supabase Auth)
     if (!isPublicPage && !isAuthPage) {
@@ -2622,7 +2683,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderUserChip(sbUser);
 
   // Load Supabase data before rendering pages
-  if (typeof sbLoadAll === 'function' && !['login','register','respuesta','404'].includes(page)) {
+  if (typeof sbLoadAll === 'function' && !['login','register','respuesta','404','usuarios'].includes(page)) {
     await sbLoadAll();
   }
 
@@ -2630,6 +2691,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (window._sbData && window._sbData.loaded && window._sbData.skuCatalog) {
     window.skuCatalogData = window._sbData.skuCatalog;
   }
+
+  // Signal to page-specific scripts that auth + Supabase are ready
+  document.dispatchEvent(new CustomEvent('sbReady'));
 
   // Quotes page always starts at Step 1
   // (The user can navigate to Step 4 manually via the "Seguimiento" tab)

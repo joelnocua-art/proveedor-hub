@@ -358,9 +358,38 @@ async function sbSignUp(email, password, fullName) {
   return { data, error };
 }
 
+async function sbGetProfile() {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  if (error || !data) return null;
+  return data;
+}
+
+async function sbListProfiles() {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb.from('profiles').select('*').order('email');
+  if (error) { console.error('[Supabase] List profiles error:', error); return []; }
+  return data || [];
+}
+
+async function sbUpdateProfileRole(userId, role, area) {
+  const sb = getSupabase();
+  if (!sb) return false;
+  const updates = { role, updated_at: new Date().toISOString() };
+  if (area !== undefined) updates.area = area;
+  const { error } = await sb.from('profiles').update(updates).eq('id', userId);
+  if (error) { console.error('[Supabase] Update profile role error:', error); return false; }
+  return true;
+}
+
 async function sbSignOut() {
   const sb = getSupabase();
   if (!sb) return;
+  sessionStorage.removeItem('userRole');
   await sb.auth.signOut();
   window.location.href = 'index.html';
 }

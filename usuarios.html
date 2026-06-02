@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Usuarios - Proveedor Hub</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+<body data-page="usuarios">
+  <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar(false)"></div>
+
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand">
+        <img src="https://i.ibb.co/BfCjKQt/logo-bia-blanco.png" alt="BIA" loading="lazy" />
+        <div class="brand-text">
+          <div class="brand-title">Proveedor Hub</div>
+          <div class="brand-sub">BIA Energy - Operaciones</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="home.html" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>Inicio</a>
+        <a href="providers.html" data-nav="providers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M9 21v-8h6v8"/><path d="M8 9h8"/></svg>Proveedores</a>
+        <a href="new_provider.html" data-nav="new_provider"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Nuevo proveedor</a>
+        <a href="quotes.html" data-nav="quotes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8l4 4v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M8 11h8"/><path d="M8 15h8"/><path d="M8 19h6"/></svg>Cotizaciones</a>
+        <a href="compare.html" data-nav="compare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 16V9"/><path d="M12 16V7"/><path d="M17 16V11"/></svg>Comparativo</a>
+        <a href="sku.html" data-nav="sku"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>SKU</a>
+        <a href="sales.html" data-nav="sales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/></svg>Venta de Activos</a>
+        <a href="usuarios.html" data-nav="usuarios"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Usuarios</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="userChip" class="muted" style="margin: 0 10px 10px 10px;"></div>
+        <button class="btn btn-danger" style="width: 100%;" onclick="logout()">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <div class="content">
+      <header class="topbar">
+        <div class="title">
+          <button class="icon-btn" onclick="toggleSidebar()" aria-label="Abrir menú">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+          </button>
+          <div>
+            <div class="page-title">Gestión de Usuarios</div>
+            <div class="muted" style="margin-top: 2px;">Asigna roles y áreas a los miembros del equipo BIA.</div>
+          </div>
+        </div>
+      </header>
+
+      <main class="main">
+        <div id="usersContainer">
+          <div style="text-align:center;padding:60px 20px;color:var(--text-2);">
+            <div style="font-size:32px;margin-bottom:12px;">⏳</div>
+            <div>Cargando usuarios...</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="supabase-client.js?v=16"></script>
+  <script src="script.js?v=16"></script>
+  <script src="components.js?v=16"></script>
+  <script>
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  const ROLES = [
+    { value: 'supply', label: 'Supply',       color: '#00e5c8' },
+    { value: 'sales',  label: 'Ventas',        color: '#5b6bff' },
+    { value: 'admin',  label: 'Admin',          color: '#ff9f43' },
+    { value: 'viewer', label: 'Solo lectura',   color: '#8088b0' }
+  ];
+
+  const AREAS = ['Supply', 'Ventas', 'Finanzas', 'Operaciones', 'TI', 'Gerencia', 'Otro'];
+
+  function roleColor(role) {
+    return (ROLES.find(r => r.value === role) || {}).color || '#8088b0';
+  }
+
+  function roleLabel(role) {
+    return (ROLES.find(r => r.value === role) || {}).label || role;
+  }
+
+  function initial(name, email) {
+    const src = name || email || '?';
+    return src.trim().charAt(0).toUpperCase();
+  }
+
+  function renderUsers(profiles) {
+    const container = document.getElementById('usersContainer');
+    if (!profiles.length) {
+      container.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-2);"><div style="font-size:32px;margin-bottom:12px;">👤</div><div>No hay usuarios registrados aún.</div></div>';
+      return;
+    }
+
+    const rows = profiles.map(p => {
+      const ini = esc(initial(p.full_name, p.email));
+      const name = esc(p.full_name || p.email?.split('@')[0] || 'Usuario');
+      const email = esc(p.email || '—');
+      const color = roleColor(p.role);
+
+      const roleOpts = ROLES.map(r =>
+        `<option value="${r.value}" ${p.role === r.value ? 'selected' : ''}>${r.label}</option>`
+      ).join('');
+
+      const areaOpts = ['', ...AREAS].map(a =>
+        `<option value="${esc(a)}" ${(p.area || '') === a ? 'selected' : ''}>${a || '— Sin área —'}</option>`
+      ).join('');
+
+      return `
+        <tr data-id="${esc(p.id)}">
+          <td style="padding:14px 16px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:36px;height:36px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">${ini}</div>
+              <div>
+                <div style="font-weight:600;color:var(--text);font-size:13.5px;">${name}</div>
+                <div style="font-size:12px;color:var(--text-2);">${email}</div>
+              </div>
+            </div>
+          </td>
+          <td style="padding:14px 16px;">
+            <select class="input area-select" style="padding:7px 10px;font-size:13px;min-width:130px;" onchange="updateArea('${esc(p.id)}', this.value)">
+              ${areaOpts}
+            </select>
+          </td>
+          <td style="padding:14px 16px;">
+            <select class="input role-select" style="padding:7px 10px;font-size:13px;min-width:130px;border-color:${color}55;color:${color};" onchange="updateRole('${esc(p.id)}', this.value, this)">
+              ${roleOpts}
+            </select>
+          </td>
+          <td style="padding:14px 16px;">
+            <span class="save-status" style="font-size:12px;color:var(--text-3);"></span>
+          </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-weight:700;color:var(--text);font-size:14px;">Miembros registrados <span style="color:var(--text-2);font-weight:400;">(${profiles.length})</span></div>
+          <div style="font-size:12px;color:var(--text-2);">Los cambios se guardan automáticamente al seleccionar.</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:rgba(255,255,255,.03);">
+              <th style="padding:12px 16px;text-align:left;font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;font-weight:600;">Usuario</th>
+              <th style="padding:12px 16px;text-align:left;font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;font-weight:600;">Área</th>
+              <th style="padding:12px 16px;text-align:left;font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;font-weight:600;">Rol</th>
+              <th style="padding:12px 16px;text-align:left;font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;font-weight:600;"></th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody" style="divide-y:1px solid var(--border);">
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:20px;padding:16px 20px;background:rgba(91,107,255,.06);border:1px solid rgba(91,107,255,.2);border-radius:14px;font-size:13px;color:var(--text-2);line-height:1.6;">
+        <strong style="color:var(--text);">Roles disponibles:</strong><br>
+        <span style="color:#ff9f43;">Admin</span> — Acceso total + gestión de usuarios &nbsp;·&nbsp;
+        <span style="color:#00e5c8;">Supply</span> — Acceso total a todos los módulos &nbsp;·&nbsp;
+        <span style="color:#5b6bff;">Ventas</span> — Solo módulo de ventas + dashboard &nbsp;·&nbsp;
+        <span style="color:#8088b0;">Solo lectura</span> — Solo dashboard (rol por defecto)
+      </div>`;
+  }
+
+  async function updateRole(userId, newRole, selectEl) {
+    const row = selectEl.closest('tr');
+    const status = row.querySelector('.save-status');
+    const areaSelect = row.querySelector('.area-select');
+    const area = areaSelect ? areaSelect.value : undefined;
+
+    status.textContent = 'Guardando...';
+    status.style.color = 'var(--text-3)';
+
+    const ok = await sbUpdateProfileRole(userId, newRole, area);
+
+    if (ok) {
+      const color = roleColor(newRole);
+      selectEl.style.borderColor = color + '55';
+      selectEl.style.color = color;
+      status.textContent = '✓ Guardado';
+      status.style.color = 'var(--accent)';
+      setTimeout(() => { status.textContent = ''; }, 2000);
+      // Clear role cache in case the admin changed their own role
+      if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('userRole');
+    } else {
+      status.textContent = '✗ Error';
+      status.style.color = '#ff4d6d';
+    }
+  }
+
+  async function updateArea(userId, newArea) {
+    const row = document.querySelector(`tr[data-id="${userId}"]`);
+    const roleSelect = row ? row.querySelector('.role-select') : null;
+    const role = roleSelect ? roleSelect.value : 'viewer';
+    await sbUpdateProfileRole(userId, role, newArea);
+  }
+
+  // Load users after script.js initializes
+  document.addEventListener('sbReady', async () => {
+    const profiles = await sbListProfiles();
+    renderUsers(profiles);
+  });
+
+  // Fallback: load after 1.5s if event never fires
+  setTimeout(async () => {
+    if (!document.getElementById('usersTableBody')) {
+      const profiles = await sbListProfiles();
+      renderUsers(profiles);
+    }
+  }, 1500);
+  </script>
+</body>
+</html>
