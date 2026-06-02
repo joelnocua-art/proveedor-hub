@@ -95,7 +95,8 @@ const PAGE_ROLES = {
   'quote_detail':    ['admin', 'supply'],
   'compare':         ['admin', 'supply'],
   'sku':             ['admin', 'supply'],
-  'sales':           ['admin', 'supply', 'sales']
+  'sales':           ['admin', 'supply', 'sales'],
+  'usuarios':        ['admin', 'supply']
 };
 
 function filterNavByRole(role) {
@@ -106,7 +107,8 @@ function filterNavByRole(role) {
     'quotes':       ['admin', 'supply'],
     'compare':      ['admin', 'supply'],
     'sku':          ['admin', 'supply'],
-    'sales':        ['admin', 'supply', 'sales']
+    'sales':        ['admin', 'supply', 'sales'],
+    'usuarios':     ['admin', 'supply']
   };
   document.querySelectorAll('.nav a[data-nav]').forEach(a => {
     const key = a.getAttribute('data-nav');
@@ -2679,7 +2681,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderUserChip(sbUser);
 
   // Load Supabase data before rendering pages
-  if (typeof sbLoadAll === 'function' && !['login','register','respuesta','404'].includes(page)) {
+  if (typeof sbLoadAll === 'function' && !['login','register','respuesta','404','usuarios'].includes(page)) {
     await sbLoadAll();
   }
 
@@ -2687,6 +2689,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (window._sbData && window._sbData.loaded && window._sbData.skuCatalog) {
     window.skuCatalogData = window._sbData.skuCatalog;
   }
+
+  // Signal to page-specific scripts that auth + Supabase are ready
+  document.dispatchEvent(new CustomEvent('sbReady'));
 
   // Quotes page always starts at Step 1
   // (The user can navigate to Step 4 manually via the "Seguimiento" tab)

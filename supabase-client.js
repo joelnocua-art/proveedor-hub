@@ -368,6 +368,24 @@ async function sbGetProfile() {
   return data;
 }
 
+async function sbListProfiles() {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb.from('profiles').select('*').order('email');
+  if (error) { console.error('[Supabase] List profiles error:', error); return []; }
+  return data || [];
+}
+
+async function sbUpdateProfileRole(userId, role, area) {
+  const sb = getSupabase();
+  if (!sb) return false;
+  const updates = { role, updated_at: new Date().toISOString() };
+  if (area !== undefined) updates.area = area;
+  const { error } = await sb.from('profiles').update(updates).eq('id', userId);
+  if (error) { console.error('[Supabase] Update profile role error:', error); return false; }
+  return true;
+}
+
 async function sbSignOut() {
   const sb = getSupabase();
   if (!sb) return;
