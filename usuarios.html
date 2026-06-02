@@ -210,28 +210,48 @@
   }
 
   async function loadUsers() {
+    const container = document.getElementById('usersContainer');
     try {
       const resp = await fetch('/api/users');
-      const data = await resp.json();
+      let data;
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await resp.json();
+      } else {
+        const text = await resp.text();
+        container.innerHTML = `<div style="padding:24px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.3);border-radius:14px;color:#ff4d6d;font-size:13px;line-height:1.7;">
+          <strong>⚠️ Error HTTP ${resp.status}</strong><br><br>
+          La función serverless no está respondiendo correctamente.<br><br>
+          <details style="margin-top:8px;"><summary style="cursor:pointer;color:var(--text-2);">Ver respuesta del servidor</summary>
+          <pre style="margin-top:8px;font-size:11px;color:var(--text-3);white-space:pre-wrap;word-break:break-all;">${esc(text.substring(0, 500))}</pre></details><br>
+          <strong style="color:var(--text);">Pasos para solucionar:</strong><br>
+          1. Ve a Vercel → Deployments y verifica que el último deploy fue exitoso.<br>
+          2. Asegúrate de que <code>SUPABASE_SERVICE_ROLE_KEY</code> esté configurada y redespliega.<br>
+          3. En Supabase usa la key de la pestaña <strong>"Legacy anon, service_role API keys"</strong> (empieza con <code>eyJ...</code>).
+        </div>`;
+        return;
+      }
       if (!resp.ok) {
-        document.getElementById('usersContainer').innerHTML =
-          `<div style="padding:30px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.3);border-radius:14px;color:#ff4d6d;font-size:13px;line-height:1.7;">
-            <strong style="font-size:15px;">⚠️ Error al cargar usuarios</strong><br><br>
-            ${esc(data.error || 'Error desconocido')}<br><br>
-            <strong style="color:var(--text);">Solución:</strong> En Supabase → Settings → API Keys, haz clic en la pestaña <strong>"Legacy anon, service_role API keys"</strong> y copia la key <code>service_role</code> (empieza con <code>eyJ...</code>). Pégala en Vercel → Environment Variables → <code>SUPABASE_SERVICE_ROLE_KEY</code>.
-          </div>`;
+        container.innerHTML = `<div style="padding:24px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.3);border-radius:14px;color:#ff4d6d;font-size:13px;line-height:1.7;">
+          <strong>⚠️ Error al cargar usuarios</strong><br><br>
+          ${esc(data.error || 'Error desconocido')}<br><br>
+          <strong style="color:var(--text);">Solución:</strong> En Supabase → Settings → API Keys → pestaña <strong>"Legacy anon, service_role API keys"</strong>, copia la key <code>service_role</code> (empieza con <code>eyJ...</code>) y pégala en Vercel → Environment Variables → <code>SUPABASE_SERVICE_ROLE_KEY</code>. Luego redespliega.
+        </div>`;
         return;
       }
       if (data.warning) {
         const warn = document.createElement('div');
         warn.style.cssText = 'padding:12px 16px;background:rgba(255,180,0,.08);border:1px solid rgba(255,180,0,.25);border-radius:10px;color:#ffb400;font-size:12px;margin-bottom:16px;';
         warn.textContent = '⚠️ ' + data.warning;
-        document.getElementById('usersContainer').prepend(warn);
+        container.innerHTML = '';
+        container.appendChild(warn);
       }
       renderUsers(data.users || []);
     } catch (err) {
-      document.getElementById('usersContainer').innerHTML =
-        '<div style="text-align:center;padding:60px 20px;color:#ff4d6d;"><div style="font-size:32px;margin-bottom:12px;">⚠️</div><div>Error de red al contactar la API.</div></div>';
+      container.innerHTML = `<div style="padding:24px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.3);border-radius:14px;color:#ff4d6d;font-size:13px;">
+        <strong>⚠️ Error de red:</strong> ${esc(err.message)}<br><br>
+        Verifica que el deployment de Vercel esté activo y que la URL <code>/api/users</code> exista.
+      </div>`;
     }
   }
 
