@@ -358,9 +358,20 @@ async function sbSignUp(email, password, fullName) {
   return { data, error };
 }
 
+async function sbGetProfile() {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  if (error || !data) return null;
+  return data;
+}
+
 async function sbSignOut() {
   const sb = getSupabase();
   if (!sb) return;
+  sessionStorage.removeItem('userRole');
   await sb.auth.signOut();
   window.location.href = 'index.html';
 }
