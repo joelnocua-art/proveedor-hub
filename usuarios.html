@@ -175,7 +175,12 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, role, area: area || null })
     });
-    return resp.ok;
+    let msg = null;
+    try {
+      const data = await resp.json();
+      if (!resp.ok) msg = data.error || JSON.stringify(data);
+    } catch(e) { msg = 'Respuesta inválida del servidor'; }
+    return { ok: resp.ok, error: msg };
   }
 
   async function updateRole(userId, newRole, selectEl) {
@@ -187,7 +192,7 @@
     status.textContent = 'Guardando...';
     status.style.color = 'var(--text-3)';
 
-    const ok = await apiSaveRole(userId, newRole, area);
+    const { ok, error } = await apiSaveRole(userId, newRole, area);
 
     if (ok) {
       const color = roleColor(newRole);
@@ -197,8 +202,9 @@
       status.style.color = 'var(--accent)';
       setTimeout(() => { status.textContent = ''; }, 2000);
     } else {
-      status.textContent = '✗ Error';
+      status.innerHTML = `<span title="${esc(error || 'Error desconocido')}">✗ Error</span>`;
       status.style.color = '#ff4d6d';
+      console.error('[usuarios] Error guardando rol:', error);
     }
   }
 
