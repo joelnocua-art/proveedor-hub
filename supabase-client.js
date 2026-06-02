@@ -361,11 +361,17 @@ async function sbSignUp(email, password, fullName) {
 async function sbGetProfile() {
   const sb = getSupabase();
   if (!sb) return null;
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return null;
-  const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).single();
-  if (error || !data) return null;
-  return data;
+  // getUser() hace llamada de red → metadata siempre actualizada
+  const { data: { user }, error } = await sb.auth.getUser();
+  if (error || !user) return null;
+  const meta = user.user_metadata || {};
+  return {
+    id: user.id,
+    email: user.email,
+    full_name: meta.full_name || '',
+    role: meta.role || null,
+    area: meta.area || null
+  };
 }
 
 async function sbListProfiles() {
