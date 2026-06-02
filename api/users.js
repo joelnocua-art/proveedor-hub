@@ -26,8 +26,21 @@ export default async function handler(req, res) {
       // Listar usuarios de auth.users via Admin API
       const authResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=500`, { headers });
       if (!authResp.ok) {
-        const err = await authResp.text();
-        return res.status(500).json({ error: 'Error al listar usuarios: ' + err.substring(0, 300) });
+        const errText = await authResp.text();
+        // Si falla el admin API (key format inválido), intentar solo con profiles
+        const profFallback = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=*`, {
+          headers: { ...headers, 'Prefer': 'return=representation' }
+        });
+        if (profFallback.ok) {
+          const profs = await profFallback.json();
+          const users = (Array.isArray(profs) ? profs : []).map(p => ({
+            id: p.id, email: p.email || '', full_name: p.full_name || '',
+            avatar_url: null, created_at: p.created_at, last_sign_in: null,
+            role: p.role || null, area: p.area || null
+          }));
+          return res.status(200).json({ users, warning: 'Admin API no disponible — usando solo perfiles. Actualiza SUPABASE_SERVICE_ROLE_KEY con la key JWT (eyJ...) desde Legacy API Keys en Supabase.' });
+        }
+        return res.status(500).json({ error: 'Auth Admin API falló (' + authResp.status + '): ' + errText.substring(0, 200) + ' — Usa la service_role JWT key (eyJ...) desde la pestaña "Legacy anon, service_role API keys" en Supabase.' });
       }
       const authData = await authResp.json();
       const authUsers = authData.users || authData || [];
