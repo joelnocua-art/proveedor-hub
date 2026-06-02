@@ -2655,7 +2655,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       let userRole = sessionStorage.getItem('userRole');
       if (!userRole) {
         const profile = typeof sbGetProfile === 'function' ? await sbGetProfile() : null;
-        userRole = profile?.role || 'viewer';
+        // Si no hay perfil (tabla aún no creada o usuario sin perfil), acceso completo
+        userRole = profile?.role || 'supply';
         sessionStorage.setItem('userRole', userRole);
       }
       window._userRole = userRole;
