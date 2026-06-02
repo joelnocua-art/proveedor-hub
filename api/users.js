@@ -91,26 +91,40 @@ export default async function handler(req, res) {
       const email = authUser?.email || '';
       const fullName = authUser?.user_metadata?.full_name || authUser?.raw_user_meta_data?.full_name || '';
 
-      // Upsert en profiles (crea si no existe, actualiza si existe)
-      const upsertResp = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Prefer': 'resolution=merge-duplicates,return=representation'
-        },
-        body: JSON.stringify({
-          id: userId,
-          email,
-          full_name: fullName,
-          role,
-          area: area || null,
-          updated_at: new Date().toISOString()
-        })
-      });
+      const payload = {
+        role,
+        area: area || null,
+        updated_at: new Date().toISOString()
+      };
 
-      if (!upsertResp.ok) {
-        const err = await upsertResp.text();
-        return res.status(500).json({ error: 'Error al actualizar perfil: ' + err.substring(0, 300) });
+      // Try PATCH first (update existing profile)
+      const patchResp = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`,
+        {
+          method: 'PATCH',
+          headers: { ...headers, 'Prefer': 'return=representation' },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      if (!patchResp.ok) {
+        const err = await patchResp.text();
+        return res.status(500).json({ error: 'Error al actualizar perfil (PATCH): ' + err.substring(0, 300) });
+      }
+
+      const patched = await patchResp.json();
+
+      // If no rows updated, profile doesn't exist yet — INSERT it
+      if (!Array.isArray(patched) || patched.length === 0) {
+        const insertResp = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+          method: 'POST',
+          headers: { ...headers, 'Prefer': 'return=representation' },
+          body: JSON.stringify({ id: userId, email, full_name: fullName, ...payload })
+        });
+        if (!insertResp.ok) {
+          const err = await insertResp.text();
+          return res.status(500).json({ error: 'Error al crear perfil (INSERT): ' + err.substring(0, 300) });
+        }
       }
 
       return res.status(200).json({ ok: true });
