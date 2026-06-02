@@ -96,7 +96,7 @@ const PAGE_ROLES = {
   'compare':         ['admin', 'supply'],
   'sku':             ['admin', 'supply'],
   'sales':           ['admin', 'supply', 'sales'],
-  'usuarios':        ['admin', 'supply']
+  'usuarios':        ['admin']
 };
 
 function filterNavByRole(role) {
@@ -108,7 +108,7 @@ function filterNavByRole(role) {
     'compare':      ['admin', 'supply'],
     'sku':          ['admin', 'supply'],
     'sales':        ['admin', 'supply', 'sales'],
-    'usuarios':     ['admin', 'supply']
+    'usuarios':     ['admin']
   };
   document.querySelectorAll('.nav a[data-nav]').forEach(a => {
     const key = a.getAttribute('data-nav');

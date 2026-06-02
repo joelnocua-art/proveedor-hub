@@ -88,21 +88,23 @@
     return src.trim().charAt(0).toUpperCase();
   }
 
-  function renderUsers(profiles) {
+  function renderUsers(users) {
     const container = document.getElementById('usersContainer');
-    if (!profiles.length) {
+    if (!users.length) {
       container.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-2);"><div style="font-size:32px;margin-bottom:12px;">👤</div><div>No hay usuarios registrados aún.</div></div>';
       return;
     }
 
-    const rows = profiles.map(p => {
+    const rows = users.map(p => {
       const ini = esc(initial(p.full_name, p.email));
       const name = esc(p.full_name || p.email?.split('@')[0] || 'Usuario');
       const email = esc(p.email || '—');
-      const color = roleColor(p.role);
+      const currentRole = p.role || 'viewer';
+      const color = roleColor(currentRole);
+      const lastLogin = p.last_sign_in ? new Date(p.last_sign_in).toLocaleDateString('es-CO') : 'Nunca';
 
       const roleOpts = ROLES.map(r =>
-        `<option value="${r.value}" ${p.role === r.value ? 'selected' : ''}>${r.label}</option>`
+        `<option value="${r.value}" ${currentRole === r.value ? 'selected' : ''}>${r.label}</option>`
       ).join('');
 
       const areaOpts = ['', ...AREAS].map(a =>
@@ -117,6 +119,7 @@
               <div>
                 <div style="font-weight:600;color:var(--text);font-size:13.5px;">${name}</div>
                 <div style="font-size:12px;color:var(--text-2);">${email}</div>
+                <div style="font-size:10px;color:var(--text-3);margin-top:2px;">Último login: ${lastLogin}</div>
               </div>
             </div>
           </td>
@@ -166,16 +169,25 @@
       </div>`;
   }
 
+  async function apiSaveRole(userId, role, area) {
+    const resp = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, role, area: area || null })
+    });
+    return resp.ok;
+  }
+
   async function updateRole(userId, newRole, selectEl) {
     const row = selectEl.closest('tr');
     const status = row.querySelector('.save-status');
     const areaSelect = row.querySelector('.area-select');
-    const area = areaSelect ? areaSelect.value : undefined;
+    const area = areaSelect ? areaSelect.value : '';
 
     status.textContent = 'Guardando...';
     status.style.color = 'var(--text-3)';
 
-    const ok = await sbUpdateProfileRole(userId, newRole, area);
+    const ok = await apiSaveRole(userId, newRole, area);
 
     if (ok) {
       const color = roleColor(newRole);
@@ -184,8 +196,6 @@
       status.textContent = '✓ Guardado';
       status.style.color = 'var(--accent)';
       setTimeout(() => { status.textContent = ''; }, 2000);
-      // Clear role cache in case the admin changed their own role
-      if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('userRole');
     } else {
       status.textContent = '✗ Error';
       status.style.color = '#ff4d6d';
@@ -196,21 +206,24 @@
     const row = document.querySelector(`tr[data-id="${userId}"]`);
     const roleSelect = row ? row.querySelector('.role-select') : null;
     const role = roleSelect ? roleSelect.value : 'viewer';
-    await sbUpdateProfileRole(userId, role, newArea);
+    await apiSaveRole(userId, role, newArea);
   }
 
-  // Load users after script.js initializes
-  document.addEventListener('sbReady', async () => {
-    const profiles = await sbListProfiles();
-    renderUsers(profiles);
-  });
-
-  // Fallback: load after 1.5s if event never fires
-  setTimeout(async () => {
-    if (!document.getElementById('usersTableBody')) {
-      const profiles = await sbListProfiles();
-      renderUsers(profiles);
+  async function loadUsers() {
+    try {
+      const resp = await fetch('/api/users');
+      if (!resp.ok) throw new Error('API error');
+      const data = await resp.json();
+      renderUsers(data.users || []);
+    } catch (err) {
+      document.getElementById('usersContainer').innerHTML =
+        '<div style="text-align:center;padding:60px 20px;color:#ff4d6d;"><div style="font-size:32px;margin-bottom:12px;">⚠️</div><div>Error al cargar usuarios. Verifica que SUPABASE_SERVICE_ROLE_KEY esté configurada en Vercel.</div></div>';
     }
+  }
+
+  document.addEventListener('sbReady', loadUsers);
+  setTimeout(() => {
+    if (!document.getElementById('usersTableBody')) loadUsers();
   }, 1500);
   </script>
 </body>
