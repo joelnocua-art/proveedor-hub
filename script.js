@@ -153,7 +153,7 @@ function renderUserChip(sbUser) {
     : `<span style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;margin-right:8px;vertical-align:-8px;color:#0a0d1a;">${escapeHtml(initial)}</span>`;
 
   const roleLabels = { admin: 'Admin', supply: 'Supply', sales: 'Ventas', viewer: 'Solo lectura' };
-  const role = window._userRole || sessionStorage.getItem('userRole') || '';
+  const role = window._userRole || '';
   const roleTag = role
     ? `<span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:700;background:rgba(0,229,200,0.12);color:var(--accent);letter-spacing:.5px;">${escapeHtml(roleLabels[role] || role)}</span>`
     : '';
@@ -2652,13 +2652,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Role-based access control
     if (sbUser && !isAuthPage && !isPublicPage) {
-      let userRole = sessionStorage.getItem('userRole');
+      const profile = typeof sbGetProfile === 'function' ? await sbGetProfile() : null;
+      let userRole = profile?.role || null;
+
       if (!userRole) {
-        const profile = typeof sbGetProfile === 'function' ? await sbGetProfile() : null;
-        // Si no hay perfil (tabla aún no creada o usuario sin perfil), acceso completo
-        userRole = profile?.role || 'supply';
-        sessionStorage.setItem('userRole', userRole);
+        const email = (sbUser.email || '').toLowerCase();
+        userRole = email === 'joel.nocua@bia.app' ? 'admin' : 'supply';
       }
+
       window._userRole = userRole;
 
       const allowed = PAGE_ROLES[page];
