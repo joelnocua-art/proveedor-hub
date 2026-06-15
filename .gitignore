@@ -26,3 +26,5 @@ exports/
 bia_dump*.json
 bia_knowledge_base*.csv
 *_dump.json
+KB_BIA_*.xlsx
+*_wms_*.csv
