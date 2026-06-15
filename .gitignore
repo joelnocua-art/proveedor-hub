@@ -21,3 +21,8 @@ package-lock.json
 
 # Don't track localStorage exports
 exports/
+
+# Don't track data dumps from Supabase (contienen precios y data comercial)
+bia_dump*.json
+bia_knowledge_base*.csv
+*_dump.json
