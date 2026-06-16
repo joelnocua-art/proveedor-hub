@@ -36,7 +36,7 @@ def _env(key, default=None):
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     return os.environ.get(key, default)
 
-METABASE_URL    = (_env("METABASE_URL") or "").rstrip("/")
+METABASE_URL    = (_env("METABASE_URL") or "https://bia.metabaseapp.com").rstrip("/")
 API_KEY         = _env("METABASE_API_KEY") or ""
 DB_ID           = int(_env("METABASE_DB_ID") or 1)
 SKU_TABLE       = _env("METABASE_SKU_TABLE")    or "sku_catalog"
@@ -46,7 +46,7 @@ PROV_TABLE      = _env("METABASE_PROV_TABLE")   or "providers"
 OUTPUT_XLSX     = ROOT / (_env("OUTPUT_XLSX") or "KB_BIA_Proveedores.xlsx")
 KB_DATA_JSON    = ROOT / "scripts" / "kb_data_cache.json"
 
-if not METABASE_URL or not API_KEY:
+if not API_KEY:
     print("❌ Faltan METABASE_URL o METABASE_API_KEY en .env o variables de entorno")
     print("   Crea el archivo .env con las credenciales (ver .env.example)")
     sys.exit(1)
