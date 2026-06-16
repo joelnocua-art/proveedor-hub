@@ -34,6 +34,59 @@ rows = D['rows']; inv_by_sku = D['inv_by_sku']
 sku_type = D['sku_type']; sku_name = D['sku_name']
 lead_times = D['lead_times']; offers_by_sku = D['offers_by_sku']
 
+# ── Proveedores (contactos) — de la cache si existe, si no de providers.json ──
+import re as _re
+providers_data = D.get('providers')
+if not providers_data:
+    _pj = ROOT / "providers.json"
+    providers_data = json.load(open(_pj)) if _pj.exists() else []
+
+# ── Parser de especificaciones técnicas desde el nombre del SKU ──
+def parse_tc(sku):
+    out = {'relacion':'', 'ubicacion':'', 'clase':'', 'burden':'', 'tension':''}
+    m = _re.search(r'TC\s+([\d.,\-]+/\d+)', sku)
+    if m: out['relacion'] = m.group(1)
+    for u in ['Barra Pasante','Exterior','Interior']:
+        if u.lower() in sku.lower(): out['ubicacion']=u; break
+    m = _re.search(r'(?:clase|C)\s*(0[.,]\d+\s*[sS]?)', sku)
+    if m: out['clase'] = m.group(1).replace(' ','')
+    m = _re.search(r'(?:B|burden)\s*([\d.,]+)\s*VA', sku, _re.I)
+    if m: out['burden'] = m.group(1)+' VA'
+    m = _re.search(r'(?:^|[\s,])T\s*([\d.,]+)\s*(?:kV|kv)?', sku)
+    if m: out['tension'] = m.group(1)+' kV'
+    else:
+        m = _re.search(r'([\d.,]+)\s*kV', sku, _re.I)
+        if m: out['tension'] = m.group(1)+' kV'
+    return out
+
+def parse_tp(sku):
+    out = {'relacion':'', 'ubicacion':'', 'clase':'', 'burden':'', 'tension':''}
+    m = _re.search(r'TP\s+([\d.,√/\s]+?)\s*V\b', sku)
+    if m: out['relacion'] = _re.sub(r'\s+','',m.group(1))+' V'
+    m = _re.search(r'([\d.,]+)\s*VA', sku)
+    if m: out['burden'] = m.group(1)+' VA'
+    for u in ['Exterior','Interior']:
+        if u.lower() in sku.lower(): out['ubicacion']=u; break
+    m = _re.search(r'([\d.,]+)\s*kV', sku, _re.I)
+    if m: out['tension'] = m.group(1)+' kV'
+    return out
+
+def parse_medidor(sku):
+    out = {'marca':'', 'conexion':'', 'clase':''}
+    su = sku.lower()
+    if 'semi' in su: out['conexion']='Semidirecta'
+    elif 'indirect' in su: out['conexion']='Indirecta'
+    elif 'direct' in su: out['conexion']='Directa'
+    elif 'cor' in su: out['conexion']='Por transformador'
+    m = _re.search(r'C[.\s]?\s*(0[.,]\d+\s*[sS]?)', sku)
+    if m: out['clase'] = m.group(1).replace(' ','')
+    else:
+        m = _re.search(r'C\.\s*([13])\b', sku)
+        if m: out['clase'] = m.group(1)
+    for marca in ['LandisGYR','Landis','INHEMETER','Hexing','Itron']:
+        if marca.lower() in su: out['marca']=marca; break
+    return out
+
 # ════════════════════════════════════════════════════════════════
 # CERTIFICACIONES INVESTIGADAS (por proveedor)
 # Fuente: investigación web jun-2026 (CIDET, ONAC, SICERCO, sitios oficiales)
@@ -115,6 +168,9 @@ guide=[
     ("💰 Proveedor + Barato","Por cada equipo, quién lo vende más barato y el ahorro vs el más caro."),
     ("🚚 Lead Times","Tiempo de entrega promedio por proveedor (el más rápido y el más lento)."),
     ("📦 Inventario","Cuánto tenemos hoy por tipo: asignado, disponible, vencido y días que alcanza."),
+    ("🔌 Especificaciones","Specs técnicas por equipo: relación, clase, burden, tensión, conexión."),
+    ("🔄 Equivalencias","Equipos intercambiables (mismas specs) y qué proveedores los ofrecen."),
+    ("📞 Contactos","Representante, celular, correo y web de cada proveedor."),
     ("📝 Pendiente Jarri","Normativa CREG 038 / RETIE 2024 / Homologado. Ya pre-llenado lo investigado."),
     ("📈 Insights","Top equipos, alertas de stock crítico y resumen para decisiones rápidas."),
     ("",""),
@@ -122,6 +178,9 @@ guide=[
     ("","Preguntas como '¿proveedor más barato del medidor INHEMETER?' → Hoja 💰"),
     ("","'¿para cuántos días alcanza el stock de medidores?' → Hoja 📦"),
     ("","'¿cuánto se demora SELDA en entregar?' → Hoja 🚚"),
+    ("","'¿qué clase de exactitud tiene el TC 300/5?' → Hoja 🔌"),
+    ("","'¿qué reemplaza al TC 300/5 si no hay stock?' → Hoja 🔄"),
+    ("","'¿cómo contacto a PROELCO?' → Hoja 📞"),
     ("","'¿este proveedor cumple CREG 038 / RETIE?' → Hoja 📝"),
     ("",""),
     ("ESTADO DE LOS DATOS",""),
@@ -529,13 +588,141 @@ ws.merge_cells("A62:O62")
 print("Buscador OK")
 
 # ════════════════════════════════════════════════════════════════
+# HOJA — ESPECIFICACIONES TÉCNICAS (parseadas del nombre del SKU)
+# ════════════════════════════════════════════════════════════════
+ws=wb.create_sheet("🔌 Especificaciones")
+ws.sheet_view.showGridLines=False
+COLS=[("Tipo",14),("Referencia / Modelo",50),("Relación",16),("Ubicación",14),
+      ("Clase Exactitud",14),("Burden",11),("Tensión",11),("Marca",14),("Conexión",16)]
+banner(ws,"  🔌 Especificaciones Técnicas por Equipo","  Relación, clase, burden y tensión · extraído del nombre del SKU · para preguntas técnicas",len(COLS))
+for i,(n,w) in enumerate(COLS,1):
+    ws.cell(3,i,n); ws.column_dimensions[get_column_letter(i)].width=w
+style_header(ws,len(COLS),3)
+rr=4
+spec_rows=[]
+for sid,name in sku_name.items():
+    cat=sku_type.get(sid,'Otros'); t=TIPO_SIMPLE.get(cat,cat)
+    if cat=='Transformador De Corriente' or cat=='Transformador De Corriente BM':
+        p=parse_tc(name); spec_rows.append((t,name,p['relacion'],p['ubicacion'],p['clase'],p['burden'],p['tension'],'',''))
+    elif cat=='Transformador De Potencial':
+        p=parse_tp(name); spec_rows.append((t,name,p['relacion'],p['ubicacion'],p['clase'],p['burden'],p['tension'],'',''))
+    elif cat=='Medidor':
+        p=parse_medidor(name); spec_rows.append((t,name,'','',p['clase'],'','',p['marca'],p['conexion']))
+torder={'Medidor':0,'TPS':1,'TC':2}
+spec_rows.sort(key=lambda x:(torder.get(x[0],9),x[1]))
+for d in spec_rows:
+    for ci,v in enumerate(d,1):
+        cc=ws.cell(rr,ci,v if v!='' else None); cc.border=border_all; cc.font=font(10)
+        cc.alignment=left if ci==2 else center
+    rr+=1
+slast=rr-1
+tab=Table(displayName="Specs",ref=f"A3:I{slast}")
+tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
+ws.add_table(tab)
+ws.freeze_panes="A4"
+ws.cell(slast+2,1,"Nota: specs extraídas automáticamente del nombre del SKU. Celdas vacías = no especificado en el nombre.").font=font(9,False,"7A8094")
+ws.merge_cells(start_row=slast+2,end_row=slast+2,start_column=1,end_column=9)
+print("Especificaciones OK:",slast-3,"SKUs")
+
+# ════════════════════════════════════════════════════════════════
+# HOJA — CONTACTOS POR PROVEEDOR (de providers.json)
+# ════════════════════════════════════════════════════════════════
+ws=wb.create_sheet("📞 Contactos")
+ws.sheet_view.showGridLines=False
+COLS=[("Empresa",28),("Representante",22),("Celular / Tel.",16),("Correo",30),
+      ("Ciudad",14),("Página Web",28),("Estado",12),("Servicios / Productos",40)]
+banner(ws,"  📞 Contactos por Proveedor","  Para responder: '¿cómo contacto a X?' · representante, celular, correo y web",len(COLS))
+for i,(n,w) in enumerate(COLS,1):
+    ws.cell(3,i,n); ws.column_dimensions[get_column_letter(i)].width=w
+style_header(ws,len(COLS),3)
+rr=4
+provs=sorted(providers_data, key=lambda p:(p.get('empresa') or '').lower())
+for p in provs:
+    vals=[p.get('empresa',''),p.get('representante',''),p.get('celular_telefono',''),
+          p.get('correo_electronico',''),p.get('ciudad',''),p.get('pagina_web',''),
+          p.get('estado',''),p.get('servicios_productos','')]
+    for ci,v in enumerate(vals,1):
+        cc=ws.cell(rr,ci,v if v else None); cc.border=border_all; cc.font=font(10)
+        cc.alignment=left if ci in (1,4,6,8) else center
+    rr+=1
+clast=rr-1
+tab=Table(displayName="Contactos",ref=f"A3:H{clast}")
+tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
+ws.add_table(tab)
+ws.freeze_panes="A4"
+# Estado ACTIVO en verde
+ws.conditional_formatting.add(f"G4:G{clast}",CellIsRule(operator='equal',formula=['"ACTIVO"'],fill=fill(GREEN_LT),font=font(10,True,GREEN)))
+print("Contactos OK:",clast-3,"proveedores")
+
+# ════════════════════════════════════════════════════════════════
+# HOJA — EQUIVALENCIAS DE SKU (auto-agrupadas por specs)
+# ════════════════════════════════════════════════════════════════
+ws=wb.create_sheet("🔄 Equivalencias")
+ws.sheet_view.showGridLines=False
+COLS=[("Tipo",12),("Grupo Equivalente (specs)",34),("# Opciones",11),
+      ("Referencias intercambiables",62),("Proveedores que lo ofrecen",40)]
+banner(ws,"  🔄 Equivalencias de SKU","  Equipos intercambiables (mismas specs). Para: '¿qué reemplaza al TC 300/5 si no hay stock?'",len(COLS))
+for i,(n,w) in enumerate(COLS,1):
+    ws.cell(3,i,n); ws.column_dimensions[get_column_letter(i)].width=w
+style_header(ws,len(COLS),3)
+# Agrupar TC/TP por (relación + clase + burden), medidores por (conexión + clase)
+groups=defaultdict(list)
+for sid,name in sku_name.items():
+    cat=sku_type.get(sid,'Otros'); t=TIPO_SIMPLE.get(cat,cat)
+    if cat in ('Transformador De Corriente','Transformador De Corriente BM'):
+        p=parse_tc(name)
+        if p['relacion']:
+            key=('TC',f"{p['relacion']} · clase {p['clase'] or '?'} · {p['burden'] or '?'}")
+            groups[key].append((sid,name))
+    elif cat=='Transformador De Potencial':
+        p=parse_tp(name)
+        if p['relacion']:
+            key=('TPS',f"{p['relacion']} · {p['burden'] or '?'}")
+            groups[key].append((sid,name))
+    elif cat=='Medidor':
+        p=parse_medidor(name)
+        if p['conexion']:
+            key=('Medidor',f"{p['conexion']} · clase {p['clase'] or '?'}")
+            groups[key].append((sid,name))
+# Solo grupos con 2+ opciones (realmente intercambiables)
+rr=4
+eq_groups=[(k,v) for k,v in groups.items() if len(v)>=2]
+torder={'Medidor':0,'TPS':1,'TC':2}
+eq_groups.sort(key=lambda x:(torder.get(x[0][0],9),-len(x[1])))
+for (tipo,spec),items in eq_groups:
+    refs=" · ".join(sorted(set(n for _,n in items)))
+    provset=set()
+    for sid,_ in items:
+        for o in offers_by_sku.get(sid,[]):
+            if o.get('price'): provset.add(o['provider'])
+    provs_str=" · ".join(sorted(provset)) if provset else "—"
+    ws.cell(rr,1,tipo).alignment=center; ws.cell(rr,1).font=font(10,True)
+    ws.cell(rr,2,spec).alignment=left; ws.cell(rr,2).font=font(10)
+    ws.cell(rr,3,len(set(n for _,n in items))).alignment=center; ws.cell(rr,3).font=font(10,True,TEAL)
+    ws.cell(rr,4,refs).alignment=left; ws.cell(rr,4).font=font(10)
+    ws.cell(rr,5,provs_str).alignment=left; ws.cell(rr,5).font=font(10)
+    for ci in range(1,6): ws.cell(rr,ci).border=border_all
+    rr+=1
+elast=rr-1
+if elast>=4:
+    tab=Table(displayName="Equivalencias",ref=f"A3:E{elast}")
+    tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
+    ws.add_table(tab)
+ws.freeze_panes="A4"
+ws.cell(elast+2,1,"Nota: agrupado por specs iguales (relación/clase/burden para TC-TP; conexión/clase para medidores). Solo grupos con 2+ opciones.").font=font(9,False,"7A8094")
+ws.merge_cells(start_row=elast+2,end_row=elast+2,start_column=1,end_column=5)
+print("Equivalencias OK:",elast-3,"grupos")
+
+# ════════════════════════════════════════════════════════════════
 # REORDENAR + COLORES DE PESTAÑA
 # ════════════════════════════════════════════════════════════════
 order=["📘 Inicio","🔎 Buscador","📋 Catálogo Maestro","💰 Proveedor + Barato",
-       "🚚 Lead Times","📦 Inventario","📝 Pendiente Jarri","📈 Insights"]
+       "🚚 Lead Times","📦 Inventario","🔌 Especificaciones","🔄 Equivalencias",
+       "📞 Contactos","📝 Pendiente Jarri","📈 Insights"]
 wb._sheets.sort(key=lambda s: order.index(s.title) if s.title in order else 99)
 colors={"📘 Inicio":NAVY,"🔎 Buscador":GOLD,"📋 Catálogo Maestro":TEAL,
         "💰 Proveedor + Barato":GREEN,"🚚 Lead Times":"5B6BFF","📦 Inventario":"8855CC",
+        "🔌 Especificaciones":"00A0C8","🔄 Equivalencias":"E8A13A","📞 Contactos":"2EA56A",
         "📝 Pendiente Jarri":RED,"📈 Insights":NAVY}
 for s in wb._sheets:
     if s.title in colors: s.sheet_properties.tabColor=colors[s.title]
