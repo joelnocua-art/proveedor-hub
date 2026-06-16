@@ -23,11 +23,55 @@ ROOT = Path(__file__).parent.parent
 _ap = argparse.ArgumentParser(add_help=False)
 _ap.add_argument("--data", default=None)
 _ap.add_argument("--out",  default=None)
+_ap.add_argument("--homol", default=None)
 _args, _ = _ap.parse_known_args()
 
 _data_path = _args.data or (ROOT / "scripts" / "kb_data_cache.json")
 if not Path(_data_path).exists():
     _data_path = "/tmp/kb_data.json"
+
+# Archivo de homologación (opcional — enriquece specs y equivalencias)
+_HOMOL_PATH = (_args.homol or
+               ROOT / "scripts" / "Homologacion_SKU.xlsx" or
+               "/root/.claude/uploads/48015ea5-7370-52d6-b01d-1052fbe0a75b/5d4fef51-Homologaci_n_SKU_2.0.xlsx")
+_homol_wb = None
+_homol_sku_attrs = {}   # {sku_id_str: {critic, avail_contractor, req_calib, req_conf}}
+_homol_rows = []        # [{relacion, burden, nt, tipo, skus:[(id,nombre),...], faltante}]
+try:
+    from openpyxl import load_workbook as _lwb
+    _homol_wb = _lwb(str(_HOMOL_PATH))
+    # --- SKUs sheet → atributos extra ---
+    _ws_skus = _homol_wb['SKUs']
+    for _r in range(2, _ws_skus.max_row+1):
+        _sid = _ws_skus.cell(_r,1).value
+        if _sid is None: continue
+        _homol_sku_attrs[str(int(_sid))] = {
+            'critic':     bool(_ws_skus.cell(_r,5).value),
+            'avail_cont': bool(_ws_skus.cell(_r,6).value),
+            'req_calib':  bool(_ws_skus.cell(_r,12).value),
+            'req_conf':   bool(_ws_skus.cell(_r,13).value),
+        }
+    # --- Homologación sheet → tabla de equivalencias ---
+    _ws_hom = _homol_wb['Homologación']
+    for _r in range(2, _ws_hom.max_row+1):
+        _rel = _ws_hom.cell(_r,1).value
+        if not _rel: continue
+        _skus = []
+        for _ci in [(5,6),(7,8),(9,10)]:
+            _id = _ws_hom.cell(_r,_ci[0]).value
+            _nm = _ws_hom.cell(_r,_ci[1]).value
+            if _id and _nm: _skus.append((str(int(_id)), str(_nm)))
+        _homol_rows.append({
+            'relacion': str(_rel),
+            'burden':   _ws_hom.cell(_r,2).value,
+            'nt':       _ws_hom.cell(_r,3).value,
+            'tipo':     _ws_hom.cell(_r,4).value or '',
+            'skus':     _skus,
+            'faltante': str(_ws_hom.cell(_r,12).value or ''),
+        })
+    print(f"Homologación cargada: {len(_homol_sku_attrs)} SKUs, {len(_homol_rows)} filas")
+except Exception as _e:
+    print(f"  (sin archivo de homologación: {_e})")
 
 D = json.load(open(_data_path))
 rows = D['rows']; inv_by_sku = D['inv_by_sku']
@@ -169,7 +213,7 @@ guide=[
     ("🚚 Lead Times","Tiempo de entrega promedio por proveedor (el más rápido y el más lento)."),
     ("📦 Inventario","Cuánto tenemos hoy por tipo: asignado, disponible, vencido y días que alcanza."),
     ("🔌 Especificaciones","Specs técnicas por equipo: relación, clase, burden, tensión, conexión."),
-    ("🔄 Equivalencias","Equipos intercambiables (mismas specs) y qué proveedores los ofrecen."),
+    ("🔄 Homologación","Alternativas oficiales por relación/burden. Si no hay stock del SKU ideal, usar las de la fila."),
     ("📞 Contactos","Representante, celular, correo y web de cada proveedor."),
     ("📝 Pendiente Jarri","Normativa CREG 038 / RETIE 2024 / Homologado. Ya pre-llenado lo investigado."),
     ("📈 Insights","Top equipos, alertas de stock crítico y resumen para decisiones rápidas."),
@@ -179,7 +223,7 @@ guide=[
     ("","'¿para cuántos días alcanza el stock de medidores?' → Hoja 📦"),
     ("","'¿cuánto se demora SELDA en entregar?' → Hoja 🚚"),
     ("","'¿qué clase de exactitud tiene el TC 300/5?' → Hoja 🔌"),
-    ("","'¿qué reemplaza al TC 300/5 si no hay stock?' → Hoja 🔄"),
+    ("","'¿qué reemplaza al TC 300/5 si no hay stock?' → Hoja 🔄 (homologación oficial)"),
     ("","'¿cómo contacto a PROELCO?' → Hoja 📞"),
     ("","'¿este proveedor cumple CREG 038 / RETIE?' → Hoja 📝"),
     ("",""),
@@ -592,9 +636,10 @@ print("Buscador OK")
 # ════════════════════════════════════════════════════════════════
 ws=wb.create_sheet("🔌 Especificaciones")
 ws.sheet_view.showGridLines=False
-COLS=[("Tipo",14),("Referencia / Modelo",50),("Relación",16),("Ubicación",14),
-      ("Clase Exactitud",14),("Burden",11),("Tensión",11),("Marca",14),("Conexión",16)]
-banner(ws,"  🔌 Especificaciones Técnicas por Equipo","  Relación, clase, burden y tensión · extraído del nombre del SKU · para preguntas técnicas",len(COLS))
+COLS=[("Tipo",14),("Referencia / Modelo",50),("Relación",14),("Ubicación",13),
+      ("Clase Exactitud",13),("Burden",10),("Tensión",10),("Marca",14),("Conexión",15),
+      ("Crítico",9),("Disp. Contratista",14),("Req. Calibración",14),("Req. Conformidad",14)]
+banner(ws,"  🔌 Especificaciones Técnicas por Equipo","  Relación, clase, burden, tensión · Crítico, Calibración, Conformidad (del archivo de homologación)",len(COLS))
 for i,(n,w) in enumerate(COLS,1):
     ws.cell(3,i,n); ws.column_dimensions[get_column_letter(i)].width=w
 style_header(ws,len(COLS),3)
@@ -602,12 +647,17 @@ rr=4
 spec_rows=[]
 for sid,name in sku_name.items():
     cat=sku_type.get(sid,'Otros'); t=TIPO_SIMPLE.get(cat,cat)
-    if cat=='Transformador De Corriente' or cat=='Transformador De Corriente BM':
-        p=parse_tc(name); spec_rows.append((t,name,p['relacion'],p['ubicacion'],p['clase'],p['burden'],p['tension'],'',''))
+    attrs=_homol_sku_attrs.get(sid,{})
+    crit='Sí' if attrs.get('critic') else ('No' if attrs else '')
+    avail='Sí' if attrs.get('avail_cont') else ('No' if attrs else '')
+    rcal='Sí' if attrs.get('req_calib') else ('No' if attrs else '')
+    rcon='Sí' if attrs.get('req_conf') else ('No' if attrs else '')
+    if cat in ('Transformador De Corriente','Transformador De Corriente BM'):
+        p=parse_tc(name); spec_rows.append((t,name,p['relacion'],p['ubicacion'],p['clase'],p['burden'],p['tension'],'','',crit,avail,rcal,rcon))
     elif cat=='Transformador De Potencial':
-        p=parse_tp(name); spec_rows.append((t,name,p['relacion'],p['ubicacion'],p['clase'],p['burden'],p['tension'],'',''))
+        p=parse_tp(name); spec_rows.append((t,name,p['relacion'],p['ubicacion'],p['clase'],p['burden'],p['tension'],'','',crit,avail,rcal,rcon))
     elif cat=='Medidor':
-        p=parse_medidor(name); spec_rows.append((t,name,'','',p['clase'],'','',p['marca'],p['conexion']))
+        p=parse_medidor(name); spec_rows.append((t,name,'','',p['clase'],'','',p['marca'],p['conexion'],crit,avail,rcal,rcon))
 torder={'Medidor':0,'TPS':1,'TC':2}
 spec_rows.sort(key=lambda x:(torder.get(x[0],9),x[1]))
 for d in spec_rows:
@@ -616,12 +666,17 @@ for d in spec_rows:
         cc.alignment=left if ci==2 else center
     rr+=1
 slast=rr-1
-tab=Table(displayName="Specs",ref=f"A3:I{slast}")
+tab=Table(displayName="Specs",ref=f"A3:{get_column_letter(len(COLS))}{slast}")
 tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
 ws.add_table(tab)
 ws.freeze_panes="A4"
-ws.cell(slast+2,1,"Nota: specs extraídas automáticamente del nombre del SKU. Celdas vacías = no especificado en el nombre.").font=font(9,False,"7A8094")
-ws.merge_cells(start_row=slast+2,end_row=slast+2,start_column=1,end_column=9)
+# Colorear Sí/No en columnas Crítico (J), Req.Calib (L), Req.Conf (M)
+for col in ("J","L","M"):
+    ws.conditional_formatting.add(f"{col}4:{col}{slast}",CellIsRule(operator='equal',formula=['"Sí"'],fill=fill(RED_LT),font=font(10,True,RED)))
+    ws.conditional_formatting.add(f"{col}4:{col}{slast}",CellIsRule(operator='equal',formula=['"No"'],fill=fill(GREEN_LT),font=font(10,True,GREEN)))
+ws.conditional_formatting.add(f"K4:K{slast}",CellIsRule(operator='equal',formula=['"Sí"'],fill=fill(GREEN_LT),font=font(10,True,GREEN)))
+ws.cell(slast+2,1,"Fuentes: specs parseadas del nombre del SKU · Crítico/Calibración/Conformidad del archivo Homologación_SKU.xlsx").font=font(9,False,"7A8094")
+ws.merge_cells(start_row=slast+2,end_row=slast+2,start_column=1,end_column=len(COLS))
 print("Especificaciones OK:",slast-3,"SKUs")
 
 # ════════════════════════════════════════════════════════════════
@@ -655,74 +710,65 @@ ws.conditional_formatting.add(f"G4:G{clast}",CellIsRule(operator='equal',formula
 print("Contactos OK:",clast-3,"proveedores")
 
 # ════════════════════════════════════════════════════════════════
-# HOJA — EQUIVALENCIAS DE SKU (auto-agrupadas por specs)
+# HOJA — HOMOLOGACIÓN DE SKU (datos reales del archivo oficial)
 # ════════════════════════════════════════════════════════════════
-ws=wb.create_sheet("🔄 Equivalencias")
+ws=wb.create_sheet("🔄 Homologación")
 ws.sheet_view.showGridLines=False
-COLS=[("Tipo",12),("Grupo Equivalente (specs)",34),("# Opciones",11),
-      ("Referencias intercambiables",62),("Proveedores que lo ofrecen",40)]
-banner(ws,"  🔄 Equivalencias de SKU","  Equipos intercambiables (mismas specs). Para: '¿qué reemplaza al TC 300/5 si no hay stock?'",len(COLS))
+COLS=[("Relación",12),("Burden",9),("NT (kV)",9),("Tipo",10),
+      ("SKU Principal",12),("Nombre SKU Principal",46),
+      ("Alternativa 2",12),("Nombre Alternativa 2",44),
+      ("Alternativa 3",12),("Nombre Alternativa 3",44),
+      ("SKU Faltante",42)]
+banner(ws,"  🔄 Homologación de SKU — Alternativas Oficiales",
+       "  Si un SKU no tiene stock, usar las alternativas de la misma fila · fuente: Homologación_SKU.xlsx",
+       len(COLS))
 for i,(n,w) in enumerate(COLS,1):
     ws.cell(3,i,n); ws.column_dimensions[get_column_letter(i)].width=w
 style_header(ws,len(COLS),3)
-# Agrupar TC/TP por (relación + clase + burden), medidores por (conexión + clase)
-groups=defaultdict(list)
-for sid,name in sku_name.items():
-    cat=sku_type.get(sid,'Otros'); t=TIPO_SIMPLE.get(cat,cat)
-    if cat in ('Transformador De Corriente','Transformador De Corriente BM'):
-        p=parse_tc(name)
-        if p['relacion']:
-            key=('TC',f"{p['relacion']} · clase {p['clase'] or '?'} · {p['burden'] or '?'}")
-            groups[key].append((sid,name))
-    elif cat=='Transformador De Potencial':
-        p=parse_tp(name)
-        if p['relacion']:
-            key=('TPS',f"{p['relacion']} · {p['burden'] or '?'}")
-            groups[key].append((sid,name))
-    elif cat=='Medidor':
-        p=parse_medidor(name)
-        if p['conexion']:
-            key=('Medidor',f"{p['conexion']} · clase {p['clase'] or '?'}")
-            groups[key].append((sid,name))
-# Solo grupos con 2+ opciones (realmente intercambiables)
 rr=4
-eq_groups=[(k,v) for k,v in groups.items() if len(v)>=2]
-torder={'Medidor':0,'TPS':1,'TC':2}
-eq_groups.sort(key=lambda x:(torder.get(x[0][0],9),-len(x[1])))
-for (tipo,spec),items in eq_groups:
-    refs=" · ".join(sorted(set(n for _,n in items)))
-    provset=set()
-    for sid,_ in items:
-        for o in offers_by_sku.get(sid,[]):
-            if o.get('price'): provset.add(o['provider'])
-    provs_str=" · ".join(sorted(provset)) if provset else "—"
-    ws.cell(rr,1,tipo).alignment=center; ws.cell(rr,1).font=font(10,True)
-    ws.cell(rr,2,spec).alignment=left; ws.cell(rr,2).font=font(10)
-    ws.cell(rr,3,len(set(n for _,n in items))).alignment=center; ws.cell(rr,3).font=font(10,True,TEAL)
-    ws.cell(rr,4,refs).alignment=left; ws.cell(rr,4).font=font(10)
-    ws.cell(rr,5,provs_str).alignment=left; ws.cell(rr,5).font=font(10)
-    for ci in range(1,6): ws.cell(rr,ci).border=border_all
+for hr in _homol_rows:
+    skus=hr['skus']  # lista de (id, nombre)
+    s1id=skus[0][0] if len(skus)>0 else ''; s1nm=skus[0][1] if len(skus)>0 else ''
+    s2id=skus[1][0] if len(skus)>1 else ''; s2nm=skus[1][1] if len(skus)>1 else ''
+    s3id=skus[2][0] if len(skus)>2 else ''; s3nm=skus[2][1] if len(skus)>2 else ''
+    fat=hr['faltante'] if hr['faltante'] not in ('-','None','') else ''
+    vals=[hr['relacion'],hr['burden'],hr['nt'],hr['tipo'],
+          s1id or None,s1nm or None,
+          s2id or None,s2nm or None,
+          s3id or None,s3nm or None,
+          fat or None]
+    for ci,v in enumerate(vals,1):
+        cc=ws.cell(rr,ci,v); cc.border=border_all; cc.font=font(10)
+        cc.alignment=left if ci in (6,8,10,11) else center
+    # Colorear fila: azul si tiene 3 alternativas, teal si 2, blanco si 1
+    nbg=TEAL_LT if len(skus)>=2 else None
+    if nbg:
+        for ci in range(1,len(vals)+1):
+            ws.cell(rr,ci).fill=fill(nbg)
     rr+=1
 elast=rr-1
 if elast>=4:
-    tab=Table(displayName="Equivalencias",ref=f"A3:E{elast}")
+    tab=Table(displayName="Homologacion",ref=f"A3:{get_column_letter(len(COLS))}{elast}")
     tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
     ws.add_table(tab)
 ws.freeze_panes="A4"
-ws.cell(elast+2,1,"Nota: agrupado por specs iguales (relación/clase/burden para TC-TP; conexión/clase para medidores). Solo grupos con 2+ opciones.").font=font(9,False,"7A8094")
-ws.merge_cells(start_row=elast+2,end_row=elast+2,start_column=1,end_column=5)
-print("Equivalencias OK:",elast-3,"grupos")
+# Highlight filas sin ningún SKU disponible (SKU Faltante ≠ vacío → amarillo)
+ws.conditional_formatting.add(f"K4:K{elast}",
+    CellIsRule(operator='notEqual',formula=['""'],fill=fill(GOLD_LT),font=font(10,False,GOLD)))
+ws.cell(elast+2,1,"Verde claro = 2+ alternativas disponibles · Amarillo en columna K = SKU ideal aún no existe en catálogo").font=font(9,False,"7A8094")
+ws.merge_cells(start_row=elast+2,end_row=elast+2,start_column=1,end_column=len(COLS))
+print("Homologación OK:",elast-3,"combinaciones")
 
 # ════════════════════════════════════════════════════════════════
 # REORDENAR + COLORES DE PESTAÑA
 # ════════════════════════════════════════════════════════════════
 order=["📘 Inicio","🔎 Buscador","📋 Catálogo Maestro","💰 Proveedor + Barato",
-       "🚚 Lead Times","📦 Inventario","🔌 Especificaciones","🔄 Equivalencias",
+       "🚚 Lead Times","📦 Inventario","🔌 Especificaciones","🔄 Homologación",
        "📞 Contactos","📝 Pendiente Jarri","📈 Insights"]
 wb._sheets.sort(key=lambda s: order.index(s.title) if s.title in order else 99)
 colors={"📘 Inicio":NAVY,"🔎 Buscador":GOLD,"📋 Catálogo Maestro":TEAL,
         "💰 Proveedor + Barato":GREEN,"🚚 Lead Times":"5B6BFF","📦 Inventario":"8855CC",
-        "🔌 Especificaciones":"00A0C8","🔄 Equivalencias":"E8A13A","📞 Contactos":"2EA56A",
+        "🔌 Especificaciones":"00A0C8","🔄 Homologación":"E8A13A","📞 Contactos":"2EA56A",
         "📝 Pendiente Jarri":RED,"📈 Insights":NAVY}
 for s in wb._sheets:
     if s.title in colors: s.sheet_properties.tabColor=colors[s.title]

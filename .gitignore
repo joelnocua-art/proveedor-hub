@@ -28,3 +28,4 @@ bia_knowledge_base.csv
 *_wms_*.csv
 scripts/kb_data_cache.json
 .env
+scripts/Homologacion_SKU.xlsx
