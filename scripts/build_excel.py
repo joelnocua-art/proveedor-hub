@@ -299,16 +299,14 @@ order=['Medidor','TPS','TC','Celda Medidor','Banco Condensador','Condensador']
 ordered=[t for t in order if t in type_stats]+[t for t in type_stats if t not in order]
 for t in ordered:
     s=type_stats[t]
-    cdp=round(s['asignado']/180,2) if s['asignado'] else 0
-    dias=round(s['disponible']/cdp,0) if cdp else 0
     ws.cell(rr,1,t).alignment=left; ws.cell(rr,1).font=font(11,True)
     ws.cell(rr,2,s['total']).alignment=center
     ws.cell(rr,3,s['asignado']).alignment=center
     ws.cell(rr,4,s['disponible']).alignment=center
     ws.cell(rr,5,s['vencido']).alignment=center
     ws.cell(rr,6,s['pend']).alignment=center
-    ws.cell(rr,7,cdp).alignment=center
-    cd=ws.cell(rr,8,dias if dias else "—"); cd.alignment=center; cd.font=font(11,True)
+    cg=ws.cell(rr,7,f'=C{rr}/180'); cg.alignment=center; cg.number_format='0.00'
+    ch=ws.cell(rr,8,f'=IF(G{rr}=0,"—",ROUND(D{rr}/G{rr},0))'); ch.alignment=center; ch.font=font(11,True); ch.number_format='#,##0'
     for ci in range(1,9):
         cc=ws.cell(rr,ci); cc.border=border_all
         if not cc.font.bold: cc.font=font(11)
@@ -332,14 +330,14 @@ det=[]
 for sid,iv in inv_by_sku.items():
     if iv['total']==0: continue
     cat=sku_type.get(sid,'Otros'); t=TIPO_SIMPLE.get(cat,cat)
-    cdp=round(iv['asignado']/180,3) if iv['asignado'] else 0
-    dias=round(iv['disponible']/cdp,0) if cdp else ''
-    det.append((t,sku_name.get(sid,'?'),iv['asignado'],iv['disponible'],iv['vencido'],iv.get('pend_cert',0),cdp,dias))
+    det.append((t,sku_name.get(sid,'?'),iv['asignado'],iv['disponible'],iv['vencido'],iv.get('pend_cert',0)))
 det.sort(key=lambda x:-(x[2]+x[3]))
 for d in det:
     for ci,v in enumerate(d,1):
         cc=ws.cell(rr,ci,v if v!='' else None); cc.border=border_all; cc.font=font(10)
         cc.alignment=left if ci==2 else center
+    cg=ws.cell(rr,7,f'=C{rr}/180'); cg.border=border_all; cg.font=font(10); cg.alignment=center; cg.number_format='0.000'
+    ch=ws.cell(rr,8,f'=IF(G{rr}=0,"",ROUND(D{rr}/G{rr},0))'); ch.border=border_all; ch.font=font(10); ch.alignment=center; ch.number_format='#,##0'
     rr+=1
 dlast=rr-1
 tab=Table(displayName="InvDetalle",ref=f"A{hr}:H{dlast}")
