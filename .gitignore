@@ -21,3 +21,10 @@ package-lock.json
 
 # Don't track localStorage exports
 exports/
+
+# Commercial data — generated files, not source
+KB_BIA_*.xlsx
+bia_knowledge_base.csv
+*_wms_*.csv
+scripts/kb_data_cache.json
+.env
