@@ -67,12 +67,13 @@ def banner(ws,title,subtitle,ncols):
 # Orden y colores de TODAS las pestañas (incluye las nuevas)
 TAB_ORDER=["📘 Inicio","🔎 Buscador","📋 Catálogo Maestro","💰 Proveedor + Barato",
            "🚚 Lead Times","📦 Inventario","🔌 Especificaciones","🔄 Homologación",
-           "🏢 Homologación x Operador","🤝 Condiciones Comerciales","📞 Contactos",
+           "🏢 Homologación x Operador","🤝 Condiciones Comerciales","🕒 Histórico de Precios","📞 Contactos",
            "📝 Pendiente Jarri","📈 Insights"]
 TAB_COLORS={"📘 Inicio":NAVY,"🔎 Buscador":GOLD,"📋 Catálogo Maestro":TEAL,
             "💰 Proveedor + Barato":GREEN,"🚚 Lead Times":"5B6BFF","📦 Inventario":"8855CC",
             "🔌 Especificaciones":"00A0C8","🔄 Homologación":"E8A13A",
             "🏢 Homologación x Operador":"C8553A","🤝 Condiciones Comerciales":"B8860B",
+            "🕒 Histórico de Precios":"7B5EA7",
             "📞 Contactos":"2EA56A","📝 Pendiente Jarri":RED,"📈 Insights":NAVY}
 
 # ════════════════════════════════════════════════════════════════
@@ -381,10 +382,167 @@ def build_condiciones(wb):
     ws.merge_cells(start_row=last+2,end_row=last+2,start_column=1,end_column=len(COLS))
     print(f"🤝 Condiciones Comerciales OK: {len(prov_rows)} proveedores")
 
+# ════════════════════════════════════════════════════════════════
+# HOJA 🕒 — HISTÓRICO DE PRECIOS
+# Sección A: filas SKU×Proveedor con precio actual + columnas para anterior.
+# Sección B: proveedores sin lista de precios cargada en BIA.
+# ════════════════════════════════════════════════════════════════
+
+# Fechas conocidas de listas de precios (evita depender solo del parser de obs)
+_PRICE_DATE_HINTS = {
+    "PROELCO":  "Feb-2026",
+    "ADLER":    "Sep-2025",
+    "LAUMAYER": "Feb-2026",
+}
+
+def build_historico(wb):
+    import re
+    from openpyxl.formatting.rule import CellIsRule
+    title="🕒 Histórico de Precios"
+    if title in wb.sheetnames: del wb[title]
+    ws=wb.create_sheet(title)
+    ws.sheet_view.showGridLines=False
+
+    D=_load_kb_data(); provs=_load_providers()
+    offers=D.get('offers_by_sku',{})
+
+    # SKU name/familia index from cache
+    skus_raw=(D.get('skus') or D.get('sku_catalog') or [])
+    sku_by_id={str(s.get('id') or s.get('sku_id') or ''):s for s in skus_raw
+               if (s.get('id') or s.get('sku_id'))}
+
+    # Fecha parser from observations field
+    _MES={'enero':'Ene','febrero':'Feb','marzo':'Mar','abril':'Abr','mayo':'May',
+          'junio':'Jun','julio':'Jul','agosto':'Ago','septiembre':'Sep','sept':'Sep',
+          'octubre':'Oct','noviembre':'Nov','diciembre':'Dic',
+          'ene':'Ene','feb':'Feb','mar':'Mar','abr':'Abr','may':'May',
+          'jun':'Jun','jul':'Jul','ago':'Ago','sep':'Sep','oct':'Oct',
+          'nov':'Nov','dic':'Dic'}
+    def _parse_fecha(obs):
+        m=re.search(
+            r'(ene\w*|feb\w*|mar\w*|abr\w*|may\w*|jun\w*|jul\w*|ago\w*|sep\w*|'
+            r'oct\w*|nov\w*|dic\w*|enero|febrero|marzo|abril|mayo|junio|julio|agosto|'
+            r'septiembre|octubre|noviembre|diciembre)\w*[\s.,_-]+(\d{4})',
+            (obs or '').lower())
+        if m:
+            k=m.group(1)[:3]
+            return f"{_MES.get(k,k.capitalize())}-{m.group(2)}"
+        return None
+
+    # Provider info index: normed → {empresa, tipo, fecha, obs}
+    prov_info={}
+    for p in provs:
+        emp=p.get('empresa','')
+        if not emp or emp.upper()=='PRUEBA': continue
+        n=_norm(emp); obs=p.get('observaciones','')
+        fecha=next((v for k,v in _PRICE_DATE_HINTS.items() if k in n or n in k),None)
+        if not fecha: fecha=_parse_fecha(obs)
+        if not fecha: fecha="Por cargar"
+        prov_info[n]={'empresa':emp,'tipo':_tipo_from_sp(p.get('servicios_productos','')),'fecha':fecha,'obs':obs}
+
+    def get_pi(pn):
+        n=_norm(pn)
+        if n in prov_info: return prov_info[n]
+        for k,v in prov_info.items():
+            if k and (k in n or n in k): return v
+        return {'empresa':pn,'tipo':'—','fecha':'Por cargar','obs':''}
+
+    # Build offer rows
+    raw_rows=[]; seen_prov=set()
+    for sku_id_str,offer_list in offers.items():
+        sku=sku_by_id.get(str(sku_id_str),{})
+        sku_name=(sku.get('name') or sku.get('nombre') or sku.get('descripcion') or f"SKU {sku_id_str}")
+        familia=(sku.get('family') or sku.get('familia') or sku.get('categoria') or '—')
+        for offer in offer_list:
+            pn=offer.get('provider',''); precio=offer.get('price',0)
+            if not precio or not pn: continue
+            if any(x in pn.upper() for x in ('PRUEB','TEST')): continue
+            try: precio_num=float(str(precio).replace(',','').replace('$','').strip())
+            except: continue
+            if precio_num<=0: continue
+            pi=get_pi(pn); seen_prov.add(_norm(pn))
+            raw_rows.append((pi['empresa'],pi['tipo'],str(sku_id_str),sku_name,familia,precio_num,pi['fecha']))
+
+    raw_rows.sort(key=lambda r:(r[0],r[2].zfill(10)))
+
+    # Providers without prices
+    no_price=[]
+    for p in provs:
+        emp=p.get('empresa','')
+        if not emp or emp.upper()=='PRUEBA': continue
+        n=_norm(emp)
+        if n in seen_prov: continue
+        if any(n in sn or sn in n for sn in seen_prov): continue
+        no_price.append((emp,_tipo_from_sp(p.get('servicios_productos','')),
+                         (p.get('observaciones') or '').strip()))
+    no_price.sort(key=lambda r:r[0])
+
+    COLS=[("Proveedor",28),("Tipo de Proveedor",20),
+          ("SKU ID",10),("Descripción SKU",42),("Familia / Categoría",20),
+          ("Precio Actual (COP)",16),("Fecha Lista Act.",14),
+          ("Precio Anterior (COP)",16),("Fecha Lista Ant.",14),
+          ("Variación (COP)",14),("Variación %",11),("Notas",26)]
+
+    banner(ws,"  🕒 Histórico de Precios por Proveedor",
+           f"  {len(raw_rows)} precios · {len(seen_prov)} proveedores con lista · {len(no_price)} sin lista · jun-2026",
+           len(COLS))
+    for i,(n,w) in enumerate(COLS,1):
+        ws.cell(3,i,n); ws.column_dimensions[get_column_letter(i)].width=w
+    style_header(ws,len(COLS),3)
+
+    rr=4; cur_prov=None
+    for empresa,tipo,sku_id,sku_name,familia,precio,fecha in raw_rows:
+        new_prov=(empresa!=cur_prov)
+        if new_prov: cur_prov=empresa
+        row=[empresa if new_prov else None,
+             tipo    if new_prov else None,
+             sku_id,sku_name,familia,
+             precio,fecha,
+             None,"—",   # precio anterior (blank), fecha anterior
+             f'=IF(OR(H{rr}=0,H{rr}=""),"—",F{rr}-H{rr})',
+             f'=IF(OR(H{rr}=0,H{rr}=""),"—",ROUND((F{rr}-H{rr})/H{rr}*100,1))',
+             None]
+        for ci,v in enumerate(row,1):
+            cc=ws.cell(rr,ci); cc.value=v; cc.border=border_all
+            cc.font=font(10,new_prov and ci<=2)
+            if ci==6:  cc.number_format='#,##0';  cc.alignment=center
+            elif ci==8: cc.number_format='#,##0';  cc.alignment=center;  cc.font=font(10,False,"A0A8BB")
+            elif ci in (10,11): cc.number_format=('#,##0' if ci==10 else '0.0'); cc.alignment=center; cc.font=font(10,False,"A0A8BB")
+            elif ci in (1,2,4,5,12): cc.alignment=left
+            else: cc.alignment=center
+        rr+=1
+
+    # Section B — Sin lista de precios
+    if no_price:
+        for ci in range(1,len(COLS)+1):
+            cc=ws.cell(rr,ci); cc.fill=fill(GOLD_LT); cc.border=border_all
+            if ci==1:
+                cc.value=f"▼  SIN LISTA DE PRECIOS CARGADA EN BIA ({len(no_price)} proveedores)  ▼"
+                cc.font=font(10,True,GOLD); cc.alignment=left
+        ws.merge_cells(start_row=rr,end_row=rr,start_column=1,end_column=len(COLS))
+        rr+=1
+        for emp,tipo,obs in no_price:
+            row=[emp,tipo,"—","Sin lista de precios cargada en BIA","—",None,"Por cargar",None,"—","—","—",obs]
+            for ci,v in enumerate(row,1):
+                cc=ws.cell(rr,ci); cc.value=v; cc.border=border_all
+                cc.font=font(10,False,"A0A8BB")
+                cc.alignment=left if ci in (1,2,4,12) else center
+            rr+=1
+
+    last=rr-1
+    ws.freeze_panes="A4"
+
+    nota=(f"BIA jun-2026 · {len(raw_rows)} precios de {len(seen_prov)} proveedores · "
+          f"{len(no_price)} sin lista · 'Precio Anterior' y 'Fecha Ant.' se completan al recibir nuevas listas.")
+    ws.cell(last+2,1,nota).font=font(9,False,"7A8094")
+    ws.merge_cells(start_row=last+2,end_row=last+2,start_column=1,end_column=len(COLS))
+    print(f"🕒 Histórico de Precios OK: {len(raw_rows)} precios · {len(seen_prov)} con lista · {len(no_price)} sin lista")
+
 # ─── REGISTRO DE HOJAS ────────────────────────────────────────────
 BUILDERS={
     "operador": build_operador,
     "condiciones": build_condiciones,
+    "historico": build_historico,
 }
 
 def reorder_and_color(wb):
