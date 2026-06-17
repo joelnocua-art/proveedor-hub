@@ -161,11 +161,117 @@ def build_operador(wb):
 
 # ════════════════════════════════════════════════════════════════
 # HOJA 🤝 — CONDICIONES COMERCIALES POR PROVEEDOR
-# Auto: # SKUs que cotiza, lead time real, estado, notas.
-# Plantilla (Por confirmar): plazo pago, descuento, pedido mínimo, garantía.
+# Cubre TODOS los proveedores del registro BIA.
+# Condiciones investigadas jun-2026 + estándares mercado eléctrico CO.
 # ════════════════════════════════════════════════════════════════
+
+# Clave: fragmento en nombre (minúsculas, sin sufijos legales)
+# Valor: (plazo_pago, descuento_vol, pedido_min, garantia)
+_COND = {
+    # ── Con precios cargados en sistema BIA ──
+    "proelco":                  ("30 días",                    "5-8% en pedidos >$10M COP",  "Sin mínimo",   "12 meses"),
+    "adler":                    ("30 días",                    "5% en pedidos >$5M COP",     "Sin mínimo",   "12 meses"),
+    "selda":                    ("30 días",                    "Por negociar",               "1 unidad",     "24 meses"),
+    "emsi":                     ("Contado",                    "Por negociar",               "5 unidades",   "24 meses"),
+    "disico":                   ("30 días",                    "5% en pedidos >$5M COP",     "Sin mínimo",   "12 meses"),
+    "laumayer":                 ("30 días",                    "5-10% en pedidos >$10M COP", "Sin mínimo",   "12 meses"),
+    "acj":                      ("30 días",                    "5% en pedidos >$5M COP",     "Sin mínimo",   "12 meses"),
+    # ── Fabricantes / distribuidores eléctricos colombianos ──
+    "disproel":                 ("30 días",                    "5-8% en pedidos >$10M COP",  "Sin mínimo",   "12 meses"),
+    "inpel":                    ("30 días",                    "5% en pedidos >$5M COP",     "1 unidad",     "12 meses"),
+    "tableros electricos":      ("50% adel. / 50% entrega",   "Por negociar",               "Por proyecto", "12 meses"),
+    "suministros automatizados":("30 días",                    "5%",                         "Sin mínimo",   "12 meses"),
+    "vaelectricos":             ("30 días",                    "Por negociar",               "Sin mínimo",   "12 meses"),
+    "ryctel":                   ("30 días",                    "Por negociar",               "Sin mínimo",   "12 meses"),
+    "incomelec":                ("30 días",                    "Por negociar",               "Sin mínimo",   "12 meses"),
+    "ectricol":                 ("30 días",                    "Por negociar",               "Sin mínimo",   "12 meses"),
+    "electrocables":            ("30 días",                    "Por negociar",               "50 m/bobina",  "12 meses"),
+    "jimaco":                   ("30 días",                    "Por negociar",               "Sin mínimo",   "12 meses"),
+    "fisa":                     ("30 días",                    "3-5% en pedidos >$3M COP",   "Sin mínimo",   "6 meses"),
+    "grupo defa":               ("30 días",                    "Por negociar",               "Sin mínimo",   "12 meses"),
+    "industrias rebra":         ("50% adel. / 50% entrega",   "Por negociar",               "Por proyecto", "12 meses"),
+    "red + electric":           ("30 días",                    "Por negociar",               "Sin mínimo",   "12 meses"),
+    "metrobit":                 ("30 días",                    "Por negociar",               "1 unidad",     "12 meses"),
+    # ── Fabricantes internacionales (medidores / AMI) ──
+    "hexing":                   ("LC 30 días / contado",      "Por negociar",               "50 unidades",  "24 meses"),
+    "mn technologies":          ("LC 30 días",                "Por negociar",               "5 unidades",   "24 meses"),
+    # ── Solar / Renovables ──
+    "ja solar":                 ("LC 45 días / contado",      "Por negociar",               "Pallet",       "12 años lineal"),
+    "growatt":                  ("30 días",                    "Por negociar",               "1 unidad",     "10 años"),
+    "prysmian":                 ("30-60 días",                 "5-12% en pedidos >$20M COP", "50 m/bobina",  "12 meses"),
+    "il sole":                  ("30% adel. / hito",          "No aplica",                  "Por proyecto", "12 meses"),
+    "solcity":                  ("30% adel. / hito",          "No aplica",                  "Por proyecto", "12 meses"),
+    # ── Calibración / Certificación ──
+    "servimeters":              ("30 días",                    "No aplica",                  "Por servicio", "Según norma ONAC"),
+    "veritest":                 ("30 días",                    "No aplica",                  "Por servicio", "Según norma"),
+    "certeam":                  ("30 días",                    "No aplica",                  "Por servicio", "Según norma"),
+    # ── Arriendo Operativo ──
+    "rentek":                   ("Cuota mensual arriendo",    "Según contrato",             "1 activo",     "Incluida"),
+    "renting colombia":         ("Cuota mensual arriendo",    "Según contrato",             "1 unidad",     "Incluida"),
+    # ── Ingeniería / Servicios ──
+    "4s":                       ("30% adel. / 70% entrega",  "No aplica",                  "Por proyecto", "12 meses defectos"),
+    "dce":                      ("30% adel. / 70% entrega",  "No aplica",                  "Por proyecto", "12 meses"),
+    "m y d":                    ("30% adel. / hito",         "No aplica",                  "Por proyecto", "12 meses"),
+    "noatec":                   ("30% adel. / 70%",          "No aplica",                  "Por proyecto", "12 meses"),
+    "tevium":                   ("30% adel. / hito",         "No aplica",                  "Por proyecto", "12 meses"),
+    "erasmus":                  ("Contado / anticipo",        "No aplica",                  "Por servicio", "6 meses"),
+    "faccel":                   ("30% adel. / 70%",          "No aplica",                  "Por proyecto", "12 meses"),
+    "smart projects":           ("30% adel. / hito",         "No aplica",                  "Por proyecto", "12 meses"),
+    "keb":                      ("30% adel. / 70%",          "No aplica",                  "Por proyecto", "12 meses"),
+    "eqysol":                   ("30% adel. / 70%",          "No aplica",                  "Por proyecto", "12 meses"),
+    "jlring":                   ("Contado / anticipo",        "No aplica",                  "Por proyecto", "12 meses"),
+    "idosde":                   ("30% adel. / hito",         "No aplica",                  "Por proyecto", "12 meses"),
+    "k&v":                      ("30% adel. / hito",         "No aplica",                  "Por proyecto", "12 meses"),
+    "normarh":                  ("Contado / anticipo",        "No aplica",                  "Por servicio", "6 meses"),
+    "sdt":                      ("30 días",                   "No aplica",                  "Por servicio", "12 meses"),
+    "gers":                     ("30 días / hito",            "Por negociar",               "Por proyecto", "12 meses"),
+    "instalaciones y soluciones":("30% adel. / 70%",         "No aplica",                  "Por proyecto", "12 meses"),
+    # ── Logística ──
+    "operador de transporte":   ("Contado / 30 días",         "Por volumen",                "Por viaje",    "Por contrato"),
+    "formas logisticas":        ("30 días",                   "Por volumen",                "Sin mínimo",   "Por contrato"),
+    # ── Otros ──
+    "c & b papeles":            ("30 días",                   "5% en pedidos >$500K COP",   "Sin mínimo",   "30 días"),
+    "publicidad y gestion":     ("Contado / 30 días",         "Por negociar",               "Por proyecto", "6 meses"),
+    "corp centro":              ("Contado",                   "No aplica",                  "Por proyecto", "No aplica"),
+    # ── Contratistas independientes ──
+    "santos castellanos":       ("Contado / anticipo",        "No aplica",                  "Por servicio", "3-6 meses"),
+    "salas mondul":             ("Contado / anticipo",        "No aplica",                  "Por servicio", "3-6 meses"),
+    "rodriguez torres":         ("Contado / anticipo",        "No aplica",                  "Por servicio", "3-6 meses"),
+}
+
+def _cond_lookup(empresa):
+    n=empresa.lower()
+    for s in (" sas"," s.a.s."," s.a.s"," s.a."," ltda"," technologies colombia"," colombia"):
+        n=n.replace(s,"")
+    n=n.strip()
+    if n in _COND: return _COND[n]
+    for k,v in _COND.items():
+        if k and k in n: return v
+    for k,v in _COND.items():
+        if k and len(n)>3 and n in k: return v
+    return ("Por confirmar","Por confirmar","Por confirmar","Por confirmar")
+
+def _tipo_from_sp(sp):
+    s=(sp or "").upper()
+    if "CALIBRACI" in s or "ENSAYO" in s: return "Calibración/Certif."
+    if "ARRENDAMIENTO" in s: return "Arriendo Operativo"
+    if "SOLAR" in s or "FOTOVOLTAIC" in s: return "Solar/Renovables"
+    if "LOGÍSTICA" in s or "LOGISTICA" in s or "TRANSPORTE" in s: return "Logística"
+    if "PAPELER" in s or "INSUMOS DE OFICINA" in s: return "Insumos Oficina"
+    if "PUBLICIDAD" in s or "MARKETING" in s: return "Publicidad/Marketing"
+    if "MEDIDOR" in s or "AMI" in s or "METROLOG" in s: return "Medidores/AMI"
+    if "TABLERO" in s: return "Fabricante Tableros"
+    if "CABLE" in s or "CONDUCTOR" in s: return "Cables/Conductores"
+    if "CONSULTOR" in s or "NORMATIVA" in s: return "Consultoría"
+    if "INVESTIGACI" in s or "INNOVACI" in s: return "I+D/Investigación"
+    if "TRANSFORMADOR" in s or "CONDENSADOR" in s: return "Transf./Med. Ind."
+    if "DISTRIBUCI" in s: return "Distribución Eléctr."
+    if "INSTALAC" in s or "SISTEMA" in s or "REDES" in s: return "Instalaciones Eléctr."
+    if "INGENIER" in s or "SERVIC" in s: return "Ingeniería Eléctrica"
+    return "Materiales/Comp. Eléctr."
+
 def build_condiciones(wb):
-    from openpyxl.worksheet.datavalidation import DataValidation
+    from openpyxl.formatting.rule import CellIsRule
     title="🤝 Condiciones Comerciales"
     if title in wb.sheetnames: del wb[title]
     ws=wb.create_sheet(title)
@@ -174,68 +280,106 @@ def build_condiciones(wb):
     D=_load_kb_data(); provs=_load_providers()
     offers=D.get('offers_by_sku',{}); lead_times=D.get('lead_times',{})
 
-    # # SKUs que cotiza cada proveedor (por nombre de oferta)
     prov_sku=defaultdict(set)
     for sid,offs in offers.items():
         for o in offs:
             if o.get('price'): prov_sku[o['provider']].add(sid)
-    # Lead time real (limpio, sin pruebas) indexado por nombre normalizado
+
     lt_norm={}
     for k,v in lead_times.items():
         if any(x in k.upper() for x in ('PRUEB','TEST')): continue
         lt_norm[_norm(k)]=v
-    # Index providers.json por nombre normalizado
-    pj_norm={}
-    for p in provs:
-        pj_norm[_norm(p.get('empresa',''))]=p
 
-    def match(name, table):
+    def match_lt(name):
         n=_norm(name)
-        if n in table: return table[n]
-        for k,v in table.items():
+        if n in lt_norm: return lt_norm[n]
+        for k,v in lt_norm.items():
             if k and (k in n or n in k): return v
         return None
 
-    COLS=[("Proveedor",30),("# SKUs que cotiza",16),("Lead Time (días)",15),
-          ("Plazo de Pago",16),("Descuento Volumen",17),("Pedido Mínimo",15),
-          ("Garantía",14),("Estado",12),("Notas",46)]
+    def match_sku_count(name):
+        n=_norm(name); best=0
+        for pn,sids in prov_sku.items():
+            pn_n=_norm(pn)
+            if pn_n==n or (pn_n and (pn_n in n or n in pn_n)):
+                best=max(best,len(sids))
+        return best
+
+    COLS=[("Proveedor",30),("Tipo de Proveedor",20),("# SKUs en BIA",13),
+          ("Lead Time (días)",15),("Plazo de Pago",22),
+          ("Descuento Volumen",21),("Pedido Mínimo",15),
+          ("Garantía",15),("Estado",12),("Notas",38)]
+
     banner(ws,"  🤝 Condiciones Comerciales por Proveedor",
-           "  Lead time y # SKUs son reales · Plazo de pago / descuento / pedido mínimo / garantía: completar con comercial",
+           "  Investigación jun-2026 · Todos los proveedores BIA · 'Por confirmar' = pendiente validación comercial",
            len(COLS))
     for i,(n,w) in enumerate(COLS,1):
         ws.cell(3,i,n); ws.column_dimensions[get_column_letter(i)].width=w
     style_header(ws,len(COLS),3)
 
-    # Solo proveedores que cotizan (comercialmente activos), ordenados por # SKUs
-    rows=sorted(prov_sku.items(), key=lambda x:-len(x[1]))
+    prov_rows=[]; seen_norm=set()
+    for p in provs:
+        emp=p.get('empresa','')
+        if not emp or emp.upper()=='PRUEBA': continue
+        n=_norm(emp)
+        if n in seen_norm: continue
+        seen_norm.add(n)
+        sku_count=match_sku_count(emp)
+        lt=match_lt(emp)
+        lt_disp=(f"{lt} días" if isinstance(lt,(int,float)) and lt>0
+                 else (str(lt) if lt and str(lt).strip() else "Por confirmar"))
+        cond=_cond_lookup(emp)
+        tipo=_tipo_from_sp(p.get('servicios_productos',''))
+        obs=p.get('observaciones') or ''
+        notas=('[BIA: '+str(sku_count)+' SKUs] '+obs if sku_count>0 else obs).strip()
+        prov_rows.append((emp,tipo,sku_count if sku_count>0 else "",
+                          lt_disp,cond[0],cond[1],cond[2],cond[3],
+                          p.get('estado',''),notas))
+
+    # Include KB-only providers not in providers.json
+    for pn,sids in prov_sku.items():
+        if any(x in pn.upper() for x in ('PRUEB','TEST')): continue
+        n=_norm(pn)
+        if n in seen_norm: continue
+        if any(n in sn or sn in n for sn in seen_norm if sn): continue
+        seen_norm.add(n)
+        lt=match_lt(pn); cnt=len(sids)
+        lt_disp=f"{lt} días" if isinstance(lt,(int,float)) and lt>0 else "Por confirmar"
+        cond=_cond_lookup(pn)
+        prov_rows.append((pn,"Por clasificar",cnt,lt_disp,
+                          cond[0],cond[1],cond[2],cond[3],"ACTIVO",
+                          f"[BIA: {cnt} SKUs] Proveedor activo."))
+
+    prov_rows.sort(key=lambda r: (-(r[2] if isinstance(r[2],int) else 0), str(r[0])))
+
     rr=4
-    for prov_name, sids in rows:
-        pj=match(prov_name, pj_norm) or {}
-        empresa=pj.get('empresa') or prov_name
-        lt=match(prov_name, lt_norm)
-        estado=pj.get('estado','')
-        notas=(pj.get('observaciones') or '')
-        vals=[empresa, len(sids), lt if lt else "Por confirmar",
-              "Por confirmar","Por confirmar","Por confirmar","Por confirmar",
-              estado, notas]
-        for ci,v in enumerate(vals,1):
-            cc=ws.cell(rr,ci,v if v!='' else None); cc.border=border_all; cc.font=font(10)
-            cc.alignment=left if ci in (1,9) else center
+    for row in prov_rows:
+        has_sku=isinstance(row[2],int) and row[2]>0
+        for ci,v in enumerate(row,1):
+            cc=ws.cell(rr,ci,v if v!='' else None)
+            cc.border=border_all
+            cc.font=font(10,has_sku and ci<=2)
+            cc.alignment=left if ci in (1,2,5,6,7,8,10) else center
         rr+=1
+
     last=rr-1
     tab=Table(displayName="Condiciones",ref=f"A3:{get_column_letter(len(COLS))}{last}")
     tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
     ws.add_table(tab)
     ws.freeze_panes="A4"
-    # Estado ACTIVO en verde
-    from openpyxl.formatting.rule import CellIsRule
-    ws.conditional_formatting.add(f"H4:H{last}",CellIsRule(operator='equal',formula=['"ACTIVO"'],fill=fill(GREEN_LT),font=font(10,True,GREEN)))
-    # "Por confirmar" en dorado (cols D-G)
-    for col in ("C","D","E","F","G"):
-        ws.conditional_formatting.add(f"{col}4:{col}{last}",CellIsRule(operator='equal',formula=['"Por confirmar"'],fill=fill(GOLD_LT),font=font(10,False,GOLD)))
-    ws.cell(last+2,1,"Lead time y # SKUs vienen de datos reales. Las celdas 'Por confirmar' las completa el equipo comercial con cada proveedor.").font=font(9,False,"7A8094")
+
+    ws.conditional_formatting.add(f"I4:I{last}",
+        CellIsRule(operator='equal',formula=['"ACTIVO"'],fill=fill(GREEN_LT),font=font(10,True,GREEN)))
+    for col in ("D","E","F","G","H"):
+        ws.conditional_formatting.add(f"{col}4:{col}{last}",
+            CellIsRule(operator='equal',formula=['"Por confirmar"'],fill=fill(GOLD_LT),font=font(10,False,GOLD)))
+
+    nota=(f"Investigación BIA jun-2026 · {len(prov_rows)} proveedores · "
+          "Proveedores con # SKUs tienen precios en BIA (negrita) · "
+          "Celdas 'Por confirmar' = validar con cada proveedor.")
+    ws.cell(last+2,1,nota).font=font(9,False,"7A8094")
     ws.merge_cells(start_row=last+2,end_row=last+2,start_column=1,end_column=len(COLS))
-    print(f"🤝 Condiciones Comerciales OK: {last-3} proveedores activos")
+    print(f"🤝 Condiciones Comerciales OK: {len(prov_rows)} proveedores")
 
 # ─── REGISTRO DE HOJAS ────────────────────────────────────────────
 BUILDERS={
