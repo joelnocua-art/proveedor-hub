@@ -599,11 +599,11 @@ def build_calibracion(wb):
     D=_load_kb_data(); raw=D.get('calib_data',[])
     if not raw:
         banner(ws,"  📅 Vencimientos de Calibración",
-               "  Sin datos — Carga el CSV con: python3 scripts/calib_from_csv.py --csv data_calib/calibraciones_meta.csv",8)
+               "  Sin datos — Carga el CSV con: python3 scripts/calib_from_csv.py --csv data_calib/calibraciones_meta.csv",9)
         msg=ws.cell(4,1,"⚠  No hay datos de calibración cargados. "
                     "Descarga el CSV de la card #75406 en Metabase y córrelo con calib_from_csv.py")
         msg.font=font(11,True,GOLD); msg.alignment=left
-        ws.merge_cells(start_row=4,end_row=4,start_column=1,end_column=8)
+        ws.merge_cells(start_row=4,end_row=4,start_column=1,end_column=9)
         print("📅 Calibraciones: sin datos — cargar CSV"); return
 
     # ── Normalizar filas ──
@@ -616,135 +616,154 @@ def build_calibracion(wb):
         tipo=_tipo_equipo(desc, categoria)
         cant=int(_to_num(_get(r,'cantidad_equipos','cantidad','count')))
         vu=_to_num(_get(r,'valor_unitario','valor_unit','unitario'))
-        sub=_to_num(_get(r,'subtotal'))
-        iva=_to_num(_get(r,'iva'))
-        total=_to_num(_get(r,'costo_total_con_iva','costo_total','total_con_iva'))
-        if total==0: total=sub+iva
         codigo=_get(r,'codigo','código','sku') or ''
         items.append(dict(anio=anio,mes=mes,tipo=tipo,categoria=str(categoria),
                           codigo=str(codigo),desc=str(desc),vu=vu,cant=cant,
-                          sub=sub,iva=iva,total=total))
+                          label=f"{_MESES_ES[mes-1]} {anio}"))
 
     items.sort(key=lambda x:(x['anio'],x['mes'],
                {'TC':0,'TP':1,'Medidor':2}.get(x['tipo'],9),x['codigo']))
 
-    # ── Pivot {(anio,mes):{tipo:{cnt,costo}}} ──
-    pivot=defaultdict(lambda:defaultdict(lambda:{'cnt':0,'costo':0.0}))
-    for it in items:
-        cell=pivot[(it['anio'],it['mes'])][it['tipo']]
-        cell['cnt']+=it['cant']; cell['costo']+=it['total']
     all_tipos=sorted({it['tipo'] for it in items},
                      key=lambda x:{'TC':0,'TP':1,'Medidor':2}.get(x,9))
-    periods=sorted(pivot.keys())
+    # períodos en orden
+    seen=set(); periods=[]
+    for it in items:
+        k=(it['anio'],it['mes'])
+        if k not in seen: seen.add(k); periods.append(k)
+    P=len(periods); N=len(items)
+
+    # IVA configurable (celda nombrada lógica): usamos 19% inline
+    IVA_RATE=0.19
 
     TIPO_COL={'TC':TEAL,'TP':GOLD,'Medidor':'5B6BFF'}
     TIPO_LT ={'TC':TEAL_LT,'TP':GOLD_LT,'Medidor':'E8ECFF'}
 
-    # ════ SECCIÓN 1 · RESUMEN MENSUAL (pivot) ════
+    # ── Layout determinístico (para referencias de fórmulas) ──
+    # Pivot: header=3, datos 4..3+P, total=4+P
+    pv_hdr=3; pv_data0=4; pv_total=4+P
+    # Detalle: título, header, datos
+    det_title=pv_total+2
+    det_hdr=det_title+1
+    det_d0=det_hdr+1
+    det_d1=det_d0+N-1
+    # Columnas detalle: A=Mes B=Tipo C=Cat D=Cod E=Desc F=VU G=Cant H=Sub I=IVA J=Total
+    A=f"$A${det_d0}:$A${det_d1}"   # label mes
+    Bt=f"$B${det_d0}:$B${det_d1}"  # tipo
+    Gc=f"$G${det_d0}:$G${det_d1}"  # cantidad
+    Jt=f"$J${det_d0}:$J${det_d1}"  # total c/IVA
+
+    # ════ SECCIÓN 1 · RESUMEN MENSUAL (con fórmulas SUMIFS) ════
     pcols=[("Mes / Año",16)]
     for t in all_tipos: pcols+=[(f"{t}  N°",9),(f"{t}  Costo c/IVA",16)]
     pcols+=[("TOTAL Equipos",13),("TOTAL Costo c/IVA",18)]
     ncols=len(pcols)
 
-    g_total_costo=sum(it['total'] for it in items)
-    g_total_cant =sum(it['cant'] for it in items)
     banner(ws,"  📅 Vencimientos de Calibración por Tipo de Equipo",
-           f"  {g_total_cant:,} equipos · ${g_total_costo:,.0f} COP (c/IVA) · {len(periods)} meses · Fuente: Metabase card #75406",
+           f"  {N} líneas · {P} meses · fórmulas vivas (SUMIFS al detalle) · Fuente: Metabase card #75406",
            ncols)
     for i,(n,w) in enumerate(pcols,1):
-        ws.cell(3,i,n); ws.column_dimensions[get_column_letter(i)].width=w
-    style_header(ws,ncols,3)
+        ws.cell(pv_hdr,i,n); ws.column_dimensions[get_column_letter(i)].width=w
+    style_header(ws,ncols,pv_hdr)
     ci=2
     for t in all_tipos:
         tc=TIPO_COL.get(t,"888888")
-        ws.cell(3,ci).fill=fill(tc); ws.cell(3,ci+1).fill=fill(tc); ci+=2
+        ws.cell(pv_hdr,ci).fill=fill(tc); ws.cell(pv_hdr,ci+1).fill=fill(tc); ci+=2
 
-    rr=4
-    gt_cnt=defaultdict(int); gt_costo=defaultdict(float)
+    # Mapa tipo → letras de columna (N° y Costo) en el pivot
+    tipo_cols={}
+    ci=2
+    for t in all_tipos:
+        tipo_cols[t]=(get_column_letter(ci),get_column_letter(ci+1)); ci+=2
+    cntL=[tipo_cols[t][0] for t in all_tipos]
+    cosL=[tipo_cols[t][1] for t in all_tipos]
+    totEqL=get_column_letter(ncols-1); totCoL=get_column_letter(ncols)
+
+    rr=pv_data0
     for (anio,mes) in periods:
-        md=pivot[(anio,mes)]
-        t_cnt=sum(v['cnt'] for v in md.values())
-        t_costo=sum(v['costo'] for v in md.values())
         diff=(anio*12+mes)-(today.year*12+today.month)
         if diff<0:   rf,rt="F0F0F0","999999"
         elif diff==0:rf,rt=RED_LT,RED
         elif diff==1:rf,rt=GOLD_LT,GOLD
         else:        rf,rt=None,TXT
-        mc=ws.cell(rr,1,f"{_MESES_ES[mes-1]} {anio}")
-        mc.font=font(10,True,rt); mc.alignment=center; mc.border=border_all
+        lbl=f"{_MESES_ES[mes-1]} {anio}"
+        mc=ws.cell(rr,1,lbl); mc.font=font(10,True,rt); mc.alignment=center; mc.border=border_all
         if rf: mc.fill=fill(rf)
         ci=2
         for t in all_tipos:
-            td=md.get(t,{'cnt':0,'costo':0.0})
-            gt_cnt[t]+=td['cnt']; gt_costo[t]+=td['costo']
-            for sc,(val,nf) in enumerate([(td['cnt'] or None,'#,##0'),(td['costo'] or None,'#,##0')]):
-                cc=ws.cell(rr,ci+sc,val); cc.border=border_all
-                cc.font=font(10,False,rt); cc.alignment=center
-                if val: cc.number_format=nf
+            # N° equipos = SUMIFS(cantidad, mes=label, tipo=t)
+            f_cnt=f'=SUMIFS({Gc},{A},$A{rr},{Bt},"{t}")'
+            # Costo c/IVA = SUMIFS(total, mes=label, tipo=t)
+            f_cos=f'=SUMIFS({Jt},{A},$A{rr},{Bt},"{t}")'
+            for sc,(f_,nf) in enumerate([(f_cnt,'#,##0'),(f_cos,'#,##0')]):
+                cc=ws.cell(rr,ci+sc,f_); cc.border=border_all
+                cc.font=font(10,False,rt); cc.alignment=center; cc.number_format=nf
                 if rf: cc.fill=fill(rf)
-                elif val: cc.fill=fill(TIPO_LT.get(t,"F4F4F4"))
+                else:  cc.fill=fill(TIPO_LT.get(t,"F4F4F4"))
             ci+=2
-        for sc,(val,nf) in enumerate([(t_cnt,'#,##0'),(t_costo,'#,##0')]):
-            cc=ws.cell(rr,ncols-1+sc,val or None); cc.border=border_all
-            cc.font=font(10,True,rt); cc.alignment=center
-            if val: cc.number_format=nf
+        # TOTAL Equipos / Costo = suma de columnas de tipo en la fila
+        f_teq="="+"+".join(f"{L}{rr}" for L in cntL)
+        f_tco="="+"+".join(f"{L}{rr}" for L in cosL)
+        for sc,(f_,nf) in enumerate([(f_teq,'#,##0'),(f_tco,'#,##0')]):
+            cc=ws.cell(rr,ncols-1+sc,f_); cc.border=border_all
+            cc.font=font(10,True,rt); cc.alignment=center; cc.number_format=nf
             if rf: cc.fill=fill(rf)
         rr+=1
-    # Fila TOTAL
-    tc0=ws.cell(rr,1,"TOTAL"); tc0.fill=fill(NAVY); tc0.font=font(10,True,WHITE)
-    tc0.alignment=center; tc0.border=border_all
-    ci=2
-    for t in all_tipos:
-        for sc,(val,nf) in enumerate([(gt_cnt[t],'#,##0'),(gt_costo[t],'#,##0')]):
-            cc=ws.cell(rr,ci+sc,val or None); cc.fill=fill(TEAL); cc.font=font(10,True,WHITE)
-            cc.alignment=center; cc.border=border_all
-            if val: cc.number_format=nf
-        ci+=2
-    for sc,(val,nf) in enumerate([(g_total_cant,'#,##0'),(g_total_costo,'#,##0')]):
-        cc=ws.cell(rr,ncols-1+sc,val); cc.fill=fill(TEAL); cc.font=font(11,True,WHITE)
-        cc.alignment=center; cc.border=border_all; cc.number_format=nf
-    pivot_last=rr
-    rr+=2
 
-    # ════ SECCIÓN 2 · DETALLE POR PRODUCTO ════
-    dcols=[("Mes",10),("Tipo",10),("Categoría",11),("Código",9),
+    # Fila TOTAL = SUM de cada columna sobre los meses
+    tc0=ws.cell(pv_total,1,"TOTAL"); tc0.fill=fill(NAVY); tc0.font=font(10,True,WHITE)
+    tc0.alignment=center; tc0.border=border_all
+    for c in range(2,ncols+1):
+        L=get_column_letter(c)
+        cc=ws.cell(pv_total,c,f"=SUM({L}{pv_data0}:{L}{pv_total-1})")
+        cc.fill=fill(TEAL); cc.font=font(11 if c>=ncols-1 else 10,True,WHITE)
+        cc.alignment=center; cc.border=border_all; cc.number_format='#,##0'
+
+    # ════ SECCIÓN 2 · DETALLE POR PRODUCTO (con fórmulas) ════
+    dcols=[("Mes / Año",16),("Tipo",10),("Categoría",11),("Código",9),
            ("Descripción",28),("Valor Unit. COP",15),("Cantidad",10),
-           ("Subtotal COP",15),("IVA COP",13),("Total c/IVA COP",16)]
-    hdr=ws.cell(rr,1,"  📋 Detalle por Producto y Mes")
-    hdr.fill=fill(NAVY); hdr.font=font(11,True,WHITE); hdr.alignment=left
-    ws.merge_cells(start_row=rr,end_row=rr,start_column=1,end_column=len(dcols))
-    for c in range(1,len(dcols)+1): ws.cell(rr,c).border=border_all
-    rr+=1; det_hdr=rr
+           ("Subtotal COP",15),("IVA 19% COP",13),("Total c/IVA COP",16)]
+    ht=ws.cell(det_title,1,"  📋 Detalle por Producto y Mes  ·  Subtotal=Valor×Cant · IVA=Subtotal×19% · Total=Subtotal+IVA")
+    ht.fill=fill(NAVY); ht.font=font(11,True,WHITE); ht.alignment=left
+    ws.merge_cells(start_row=det_title,end_row=det_title,start_column=1,end_column=len(dcols))
+    for c in range(1,len(dcols)+1): ws.cell(det_title,c).border=border_all
     for i,(n,w) in enumerate(dcols,1):
-        ws.cell(rr,i,n)
-        if ncols<i: ws.column_dimensions[get_column_letter(i)].width=w
-    style_header(ws,len(dcols),rr)
-    rr+=1
+        ws.cell(det_hdr,i,n)
+        if i>ncols: ws.column_dimensions[get_column_letter(i)].width=w
+    style_header(ws,len(dcols),det_hdr)
+
+    rr=det_d0
     for it in items:
-        vals=[f"{_MESES_ES[it['mes']-1][:3]} {it['anio']}",it['tipo'],it['categoria'],
-              it['codigo'],it['desc'],it['vu'],it['cant'],it['sub'],it['iva'],it['total']]
-        for ci2,v in enumerate(vals,1):
-            cc=ws.cell(rr,ci2,v); cc.border=border_all; cc.font=font(10)
-            cc.alignment=left if ci2 in (3,5) else center
-            if ci2 in (6,8,9,10): cc.number_format='#,##0'
-            if ci2==7: cc.number_format='#,##0'
-            if ci2==2:
-                t=it['tipo']
-                cc.fill=fill(TIPO_LT.get(t,"F4F4F4")); cc.font=font(10,True,TIPO_COL.get(t,TXT))
+        ws.cell(rr,1,it['label']).alignment=center
+        ws.cell(rr,2,it['tipo'])
+        ws.cell(rr,3,it['categoria']).alignment=left
+        ws.cell(rr,4,it['codigo']).alignment=center
+        ws.cell(rr,5,it['desc']).alignment=left
+        cvu=ws.cell(rr,6,it['vu']); cvu.number_format='#,##0'; cvu.alignment=center
+        cct=ws.cell(rr,7,it['cant']); cct.number_format='#,##0'; cct.alignment=center
+        # Fórmulas:
+        csub=ws.cell(rr,8,f"=F{rr}*G{rr}"); csub.number_format='#,##0'; csub.alignment=center
+        civa=ws.cell(rr,9,f"=ROUND(H{rr}*{IVA_RATE},0)"); civa.number_format='#,##0'; civa.alignment=center
+        ctot=ws.cell(rr,10,f"=H{rr}+I{rr}"); ctot.number_format='#,##0'; ctot.alignment=center
+        for c in range(1,11):
+            cc=ws.cell(rr,c); cc.border=border_all
+            if c==2:
+                cc.fill=fill(TIPO_LT.get(it['tipo'],"F4F4F4")); cc.font=font(10,True,TIPO_COL.get(it['tipo'],TXT)); cc.alignment=center
+            else:
+                cc.font=font(10)
         rr+=1
-    det_last=rr-1
-    if det_last>det_hdr:
-        tab=Table(displayName="DetCalib",ref=f"A{det_hdr}:{get_column_letter(len(dcols))}{det_last}")
+    if det_d1>=det_d0:
+        tab=Table(displayName="DetCalib",ref=f"A{det_hdr}:{get_column_letter(len(dcols))}{det_d1}")
         tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
         ws.add_table(tab)
 
     ws.freeze_panes="A4"
-    nota=(f"🔴 Mes actual · 🟡 Próximo mes · ⬜ Futuro · ▦ Pasado (gris) · "
-          f"Fuente: Metabase card #75406 · {g_total_cant:,} equipos · "
-          f"${g_total_costo:,.0f} COP costo total con IVA")
-    ws.cell(det_last+2,1,nota).font=font(9,False,"7A8094")
-    ws.merge_cells(start_row=det_last+2,end_row=det_last+2,start_column=1,end_column=max(ncols,len(dcols)))
-    print(f"📅 Calibraciones OK: {len(periods)} meses · {g_total_cant:,} equipos · ${g_total_costo:,.0f} COP c/IVA")
+    nota=("🔴 Mes actual · 🟡 Próximo mes · ⬜ Futuro · ▦ Pasado (gris)  ·  "
+          "Resumen arriba = SUMIFS al detalle · Detalle = fórmulas Subtotal/IVA/Total  ·  "
+          "Fuente: Metabase card #75406 (IVA 19%)")
+    ws.cell(det_d1+2,1,nota).font=font(9,False,"7A8094")
+    ws.merge_cells(start_row=det_d1+2,end_row=det_d1+2,start_column=1,end_column=max(ncols,len(dcols)))
+    print(f"📅 Calibraciones OK (con fórmulas): {P} meses · {N} líneas · detalle filas {det_d0}-{det_d1}")
 
 
 
