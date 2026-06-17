@@ -760,15 +760,27 @@ ws.merge_cells(start_row=elast+2,end_row=elast+2,start_column=1,end_column=len(C
 print("Homologación OK:",elast-3,"combinaciones")
 
 # ════════════════════════════════════════════════════════════════
+# HOJAS ESTÁTICAS (datos curados, no vienen de Metabase)
+# Reutiliza los builders de add_sheet.py — fuente única de la data.
+# ════════════════════════════════════════════════════════════════
+try:
+    import add_sheet as _addsheet
+    for _name, _builder in _addsheet.BUILDERS.items():
+        _builder(wb)
+except Exception as _e:
+    print(f"  (hojas estáticas omitidas: {_e})")
+
+# ════════════════════════════════════════════════════════════════
 # REORDENAR + COLORES DE PESTAÑA
 # ════════════════════════════════════════════════════════════════
 order=["📘 Inicio","🔎 Buscador","📋 Catálogo Maestro","💰 Proveedor + Barato",
        "🚚 Lead Times","📦 Inventario","🔌 Especificaciones","🔄 Homologación",
-       "📞 Contactos","📝 Pendiente Jarri","📈 Insights"]
+       "🏢 Homologación x Operador","📞 Contactos","📝 Pendiente Jarri","📈 Insights"]
 wb._sheets.sort(key=lambda s: order.index(s.title) if s.title in order else 99)
 colors={"📘 Inicio":NAVY,"🔎 Buscador":GOLD,"📋 Catálogo Maestro":TEAL,
         "💰 Proveedor + Barato":GREEN,"🚚 Lead Times":"5B6BFF","📦 Inventario":"8855CC",
-        "🔌 Especificaciones":"00A0C8","🔄 Homologación":"E8A13A","📞 Contactos":"2EA56A",
+        "🔌 Especificaciones":"00A0C8","🔄 Homologación":"E8A13A",
+        "🏢 Homologación x Operador":"C8553A","📞 Contactos":"2EA56A",
         "📝 Pendiente Jarri":RED,"📈 Insights":NAVY}
 for s in wb._sheets:
     if s.title in colors: s.sheet_properties.tabColor=colors[s.title]
