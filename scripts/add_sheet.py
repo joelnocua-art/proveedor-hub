@@ -541,47 +541,48 @@ def build_historico(wb):
 
 # ════════════════════════════════════════════════════════════════
 # HOJA 📅 — CALIBRACIONES
-# Fuente: Metabase card METABASE_CALIB_CARD (campo calib_data en cache).
-# Pivot: Mes × Tipo Equipo (TC/TP/Medidor) con N° equipos y costo total.
+# Fuente: card Metabase #75406 (CSV agregado mes × producto).
+#   Columnas: mes, categoria, codigo, descripcion, valor_unitario,
+#   cantidad_equipos, total_equipos_mes, subtotal, iva,
+#   costo_total_con_iva ($), costo_total_mes ($)
+# Se nutre de calib_data (cache) — vía sync_calibracion.py o calib_from_csv.py
 # ════════════════════════════════════════════════════════════════
 
 _MESES_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio',
            'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-def _detect_calib_cols(sample):
-    c=list((sample or {}).keys()); cl=[k.lower() for k in c]
-    def find(*kws):
-        for kw in kws:
-            for i,k in enumerate(cl):
-                if kw in k: return c[i]
-        return None
-    return {
-        'fecha':    find('vencimiento','vcmt','calib_date','fecha_calib','proxima','next_calib',
-                         'expir','fecha_v','vence','calibra','fecha'),
-        'tipo':     find('tipo_equipo','tipo_medida','categoria_equipo','tipo','categoria',
-                         'class','equipo','clase','tipo_e'),
-        'cant':     find('cantidad','count','qty','cant','num_equip','n_equip','equipos'),
-        'costo':    find('costo_calib','costo_total','costo','valor_calib','valor','tarifa',
-                         'precio_calib','precio','cost','monto'),
-        'serie':    find('serial','serie','id_equipo','numero_serie','nro_serie',
-                         'cod_equipo','codigo','equipo_id','id'),
-        'ubicacion':find('ubicacion','instalacion','punto_medida','contrato','cliente',
-                         'site','location','direccion','punto'),
-        'estado':   find('estado_calibracion','estado_equipo','estado','status'),
-    }
+def _to_num(v):
+    """Convierte '942,659.00' o '$26,405' → float."""
+    if v is None: return 0.0
+    if isinstance(v,(int,float)): return float(v)
+    s=str(v).replace('$','').replace(' ','').strip()
+    if not s: return 0.0
+    s=s.replace(',','')  # coma = separador de miles
+    try: return float(s)
+    except: return 0.0
 
-def _norm_tipo_eq(v):
-    v2=(str(v) or '').upper().strip()
-    if any(x in v2 for x in ('CORRIENTE','TC ',' TC','TRANSF. C','TRANSFORMADOR C')): return 'TC'
-    if any(x in v2 for x in ('POTENCIAL','TP ',' TP','TRANSF. P','TRANSFORMADOR P')): return 'TP'
-    if any(x in v2 for x in ('MEDIDOR','CELDA','METER')): return 'Medidor'
-    if v2 in ('TC','TP'): return v2
-    return v2.split()[0][:10] if v2 else 'Otro'
+def _get(row, *names):
+    """Devuelve el primer valor cuya clave contenga alguno de los nombres."""
+    keys=list(row.keys()); kl=[k.lower() for k in keys]
+    for nm in names:
+        for i,k in enumerate(kl):
+            if nm in k: return row[keys[i]]
+    return None
 
-def _extract_mes_anio(v):
+def _tipo_equipo(desc, categoria):
+    """TC / TP / Medidor a partir de la descripción (o categoría)."""
+    d=(str(desc) or '').upper()
+    if d.startswith('TC') or ' TC' in d or 'CORRIENTE' in d: return 'TC'
+    if d.startswith('TP') or ' TP' in d or 'POTENCIAL' in d: return 'TP'
+    if 'MEDIDOR' in d or 'MEDID' in d: return 'Medidor'
+    c=(str(categoria) or '').upper()
+    if 'MEDIDOR' in c: return 'Medidor'
+    return (d.split()[0][:10] if d else 'Otro')
+
+def _mes_anio(v):
     import re as _re
     s=str(v or '').strip()
-    m=_re.match(r'(\d{4})-(\d{1,2})',s)
+    m=_re.match(r'(\d{4})[-/](\d{1,2})',s)
     if m: return int(m.group(2)),int(m.group(1))
     m=_re.match(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})',s)
     if m: return int(m.group(2)),int(m.group(3))
@@ -589,180 +590,163 @@ def _extract_mes_anio(v):
 
 def build_calibracion(wb):
     import datetime
-    from openpyxl.formatting.rule import CellIsRule
     title="📅 Calibraciones"
     if title in wb.sheetnames: del wb[title]
     ws=wb.create_sheet(title)
     ws.sheet_view.showGridLines=False
-
-    D=_load_kb_data(); raw=D.get('calib_data',[])
     today=datetime.date.today()
 
+    D=_load_kb_data(); raw=D.get('calib_data',[])
     if not raw:
         banner(ws,"  📅 Vencimientos de Calibración",
-               "  Sin datos — Configura METABASE_CALIB_CARD=75406 en .env y ejecuta metabase_sync.py",8)
-        msg=ws.cell(4,1,"⚠  No hay datos de calibración en el cache. "
-                    "Agrega METABASE_CALIB_CARD=75406 a tu .env y corre: python3 scripts/metabase_sync.py")
+               "  Sin datos — Carga el CSV con: python3 scripts/calib_from_csv.py --csv data_calib/calibraciones_meta.csv",8)
+        msg=ws.cell(4,1,"⚠  No hay datos de calibración cargados. "
+                    "Descarga el CSV de la card #75406 en Metabase y córrelo con calib_from_csv.py")
         msg.font=font(11,True,GOLD); msg.alignment=left
         ws.merge_cells(start_row=4,end_row=4,start_column=1,end_column=8)
-        print("📅 Calibraciones: sin datos en cache — ejecutar metabase_sync.py"); return
+        print("📅 Calibraciones: sin datos — cargar CSV"); return
 
-    cm=_detect_calib_cols(raw[0])
+    # ── Normalizar filas ──
+    items=[]
+    for r in raw:
+        mes,anio=_mes_anio(_get(r,'mes','fecha','periodo'))
+        if not mes: continue
+        desc=_get(r,'descripcion','desc') or ''
+        categoria=_get(r,'categoria','categoría','clase') or ''
+        tipo=_tipo_equipo(desc, categoria)
+        cant=int(_to_num(_get(r,'cantidad_equipos','cantidad','count')))
+        vu=_to_num(_get(r,'valor_unitario','valor_unit','unitario'))
+        sub=_to_num(_get(r,'subtotal'))
+        iva=_to_num(_get(r,'iva'))
+        total=_to_num(_get(r,'costo_total_con_iva','costo_total','total_con_iva'))
+        if total==0: total=sub+iva
+        codigo=_get(r,'codigo','código','sku') or ''
+        items.append(dict(anio=anio,mes=mes,tipo=tipo,categoria=str(categoria),
+                          codigo=str(codigo),desc=str(desc),vu=vu,cant=cant,
+                          sub=sub,iva=iva,total=total))
 
-    # ── Construir pivot {(anio,mes): {tipo: {cnt,costo}}} ──
+    items.sort(key=lambda x:(x['anio'],x['mes'],
+               {'TC':0,'TP':1,'Medidor':2}.get(x['tipo'],9),x['codigo']))
+
+    # ── Pivot {(anio,mes):{tipo:{cnt,costo}}} ──
     pivot=defaultdict(lambda:defaultdict(lambda:{'cnt':0,'costo':0.0}))
-    for row in raw:
-        tipo=_norm_tipo_eq(row.get(cm['tipo'] or '__',  '') if cm['tipo']  else '')
-        mes,anio=_extract_mes_anio(row.get(cm['fecha'] or '__','') if cm['fecha'] else '')
-        if not mes or not anio: continue
-        cnt=1
-        if cm['cant']:
-            try: cnt=int(row.get(cm['cant'],1) or 1)
-            except: cnt=1
-        costo=0.0
-        if cm['costo']:
-            try: costo=float(str(row.get(cm['costo'],0) or 0).replace(',','').replace('$','').strip())
-            except: costo=0.0
-        pivot[(anio,mes)][tipo]['cnt']  +=cnt
-        pivot[(anio,mes)][tipo]['costo']+=costo
-
-    all_tipos=sorted({t for p in pivot.values() for t in p},
+    for it in items:
+        cell=pivot[(it['anio'],it['mes'])][it['tipo']]
+        cell['cnt']+=it['cant']; cell['costo']+=it['total']
+    all_tipos=sorted({it['tipo'] for it in items},
                      key=lambda x:{'TC':0,'TP':1,'Medidor':2}.get(x,9))
-    all_periods=sorted(pivot.keys())
+    periods=sorted(pivot.keys())
 
-    # ── Columnas del pivot ──
     TIPO_COL={'TC':TEAL,'TP':GOLD,'Medidor':'5B6BFF'}
     TIPO_LT ={'TC':TEAL_LT,'TP':GOLD_LT,'Medidor':'E8ECFF'}
+
+    # ════ SECCIÓN 1 · RESUMEN MENSUAL (pivot) ════
     pcols=[("Mes / Año",16)]
-    for t in all_tipos: pcols+=[(f"{t}  N°",10),(f"{t}  Costo COP",16)]
-    pcols+=[("TOTAL  N°",10),("TOTAL  Costo COP",16)]
+    for t in all_tipos: pcols+=[(f"{t}  N°",9),(f"{t}  Costo c/IVA",16)]
+    pcols+=[("TOTAL Equipos",13),("TOTAL Costo c/IVA",18)]
     ncols=len(pcols)
 
+    g_total_costo=sum(it['total'] for it in items)
+    g_total_cant =sum(it['cant'] for it in items)
     banner(ws,"  📅 Vencimientos de Calibración por Tipo de Equipo",
-           f"  {len(raw)} equipos · {len(all_periods)} períodos · Fuente: Metabase card #75406 · actualizado al sincronizar",
+           f"  {g_total_cant:,} equipos · ${g_total_costo:,.0f} COP (c/IVA) · {len(periods)} meses · Fuente: Metabase card #75406",
            ncols)
     for i,(n,w) in enumerate(pcols,1):
         ws.cell(3,i,n); ws.column_dimensions[get_column_letter(i)].width=w
     style_header(ws,ncols,3)
-
-    # Color tipo en encabezado
-    col_idx=2
+    ci=2
     for t in all_tipos:
         tc=TIPO_COL.get(t,"888888")
-        ws.cell(3,col_idx).fill=fill(tc); ws.cell(3,col_idx+1).fill=fill(tc)
-        col_idx+=2
-    ws.cell(3,ncols-1).fill=fill(NAVY); ws.cell(3,ncols).fill=fill(NAVY)
+        ws.cell(3,ci).fill=fill(tc); ws.cell(3,ci+1).fill=fill(tc); ci+=2
 
     rr=4
-    grand_cnt=0; grand_costo=0.0
-    grand_t_cnt=defaultdict(int); grand_t_costo=defaultdict(float)
-
-    for (anio,mes) in all_periods:
-        mdata=pivot[(anio,mes)]
-        t_cnt =sum(v['cnt']   for v in mdata.values())
-        t_costo=sum(v['costo'] for v in mdata.values())
-        grand_cnt+=t_cnt; grand_costo+=t_costo
-
-        # Color por proximidad
-        p=datetime.date(anio,mes,1)
+    gt_cnt=defaultdict(int); gt_costo=defaultdict(float)
+    for (anio,mes) in periods:
+        md=pivot[(anio,mes)]
+        t_cnt=sum(v['cnt'] for v in md.values())
+        t_costo=sum(v['costo'] for v in md.values())
         diff=(anio*12+mes)-(today.year*12+today.month)
         if diff<0:   rf,rt="F0F0F0","999999"
         elif diff==0:rf,rt=RED_LT,RED
         elif diff==1:rf,rt=GOLD_LT,GOLD
         else:        rf,rt=None,TXT
-
         mc=ws.cell(rr,1,f"{_MESES_ES[mes-1]} {anio}")
         mc.font=font(10,True,rt); mc.alignment=center; mc.border=border_all
         if rf: mc.fill=fill(rf)
-
-        col_idx=2
+        ci=2
         for t in all_tipos:
-            td=mdata.get(t,{'cnt':0,'costo':0.0})
-            grand_t_cnt[t]+=td['cnt']; grand_t_costo[t]+=td['costo']
-            tlt=TIPO_LT.get(t,"F4F4F4")
-            for sc,(val,nf) in enumerate([(td['cnt'] or None,None),(td['costo'] or None,'#,##0')]):
-                cc=ws.cell(rr,col_idx+sc,val); cc.border=border_all
+            td=md.get(t,{'cnt':0,'costo':0.0})
+            gt_cnt[t]+=td['cnt']; gt_costo[t]+=td['costo']
+            for sc,(val,nf) in enumerate([(td['cnt'] or None,'#,##0'),(td['costo'] or None,'#,##0')]):
+                cc=ws.cell(rr,ci+sc,val); cc.border=border_all
                 cc.font=font(10,False,rt); cc.alignment=center
-                if nf and val: cc.number_format=nf
+                if val: cc.number_format=nf
                 if rf: cc.fill=fill(rf)
-                elif val: cc.fill=fill(tlt)
-            col_idx+=2
-
-        # TOTAL columna
-        for ci2,(val,nf,bd) in enumerate([(t_cnt or None,None,False),(t_costo or None,'#,##0',False)]):
-            cc=ws.cell(rr,ncols-1+ci2,val); cc.border=border_all
+                elif val: cc.fill=fill(TIPO_LT.get(t,"F4F4F4"))
+            ci+=2
+        for sc,(val,nf) in enumerate([(t_cnt,'#,##0'),(t_costo,'#,##0')]):
+            cc=ws.cell(rr,ncols-1+sc,val or None); cc.border=border_all
             cc.font=font(10,True,rt); cc.alignment=center
-            if nf and val: cc.number_format=nf
+            if val: cc.number_format=nf
             if rf: cc.fill=fill(rf)
         rr+=1
-
     # Fila TOTAL
-    ws.cell(rr,1,"TOTAL").fill=fill(NAVY); ws.cell(rr,1).font=font(10,True,WHITE)
-    ws.cell(rr,1).alignment=center; ws.cell(rr,1).border=border_all
-    col_idx=2
+    tc0=ws.cell(rr,1,"TOTAL"); tc0.fill=fill(NAVY); tc0.font=font(10,True,WHITE)
+    tc0.alignment=center; tc0.border=border_all
+    ci=2
     for t in all_tipos:
-        for sc,(val,nf) in enumerate([(grand_t_cnt[t],None),(grand_t_costo[t],'#,##0')]):
-            cc=ws.cell(rr,col_idx+sc,val or None)
-            cc.fill=fill(TEAL); cc.font=font(10,True,WHITE)
+        for sc,(val,nf) in enumerate([(gt_cnt[t],'#,##0'),(gt_costo[t],'#,##0')]):
+            cc=ws.cell(rr,ci+sc,val or None); cc.fill=fill(TEAL); cc.font=font(10,True,WHITE)
             cc.alignment=center; cc.border=border_all
-            if nf and val: cc.number_format=nf
-        col_idx+=2
-    ws.cell(rr,ncols-1,grand_cnt).fill=fill(TEAL); ws.cell(rr,ncols-1).font=font(11,True,WHITE)
-    ws.cell(rr,ncols-1).alignment=center; ws.cell(rr,ncols-1).border=border_all
-    ws.cell(rr,ncols,grand_costo).fill=fill(TEAL); ws.cell(rr,ncols).font=font(11,True,WHITE)
-    ws.cell(rr,ncols).alignment=center; ws.cell(rr,ncols).border=border_all; ws.cell(rr,ncols).number_format='#,##0'
+            if val: cc.number_format=nf
+        ci+=2
+    for sc,(val,nf) in enumerate([(g_total_cant,'#,##0'),(g_total_costo,'#,##0')]):
+        cc=ws.cell(rr,ncols-1+sc,val); cc.fill=fill(TEAL); cc.font=font(11,True,WHITE)
+        cc.alignment=center; cc.border=border_all; cc.number_format=nf
+    pivot_last=rr
     rr+=2
 
-    # ── Sección detalle ──
-    det_keys=[(k,lbl,w) for k,lbl,w in [
-        ('tipo',     "Tipo Equipo",22),
-        ('serie',    "Serial / ID",20),
-        ('ubicacion',"Ubicación / Contrato",32),
-        ('estado',   "Estado",14),
-        ('fecha',    "Fecha Vencimiento",18),
-        ('costo',    "Costo Calibración COP",20),
-    ] if cm.get(k)]
-
-    if det_keys:
-        ws.cell(rr,1,"  📋 Detalle de Equipos").fill=fill(NAVY)
-        ws.cell(rr,1).font=font(11,True,WHITE); ws.cell(rr,1).alignment=left
-        ws.merge_cells(start_row=rr,end_row=rr,start_column=1,end_column=len(det_keys))
-        for ci in range(1,len(det_keys)+1): ws.cell(rr,ci).border=border_all
-        rr+=1; hdr_row=rr
-
-        for ci,(k,lbl,w) in enumerate(det_keys,1):
-            c=ws.cell(rr,ci,lbl); c.fill=fill(NAVY); c.font=font(10,True,WHITE)
-            c.alignment=center; c.border=border_all
-            ws.column_dimensions[get_column_letter(ci)].width=max(ws.column_dimensions[get_column_letter(ci)].width,w)
+    # ════ SECCIÓN 2 · DETALLE POR PRODUCTO ════
+    dcols=[("Mes",10),("Tipo",10),("Categoría",11),("Código",9),
+           ("Descripción",28),("Valor Unit. COP",15),("Cantidad",10),
+           ("Subtotal COP",15),("IVA COP",13),("Total c/IVA COP",16)]
+    hdr=ws.cell(rr,1,"  📋 Detalle por Producto y Mes")
+    hdr.fill=fill(NAVY); hdr.font=font(11,True,WHITE); hdr.alignment=left
+    ws.merge_cells(start_row=rr,end_row=rr,start_column=1,end_column=len(dcols))
+    for c in range(1,len(dcols)+1): ws.cell(rr,c).border=border_all
+    rr+=1; det_hdr=rr
+    for i,(n,w) in enumerate(dcols,1):
+        ws.cell(rr,i,n)
+        if ncols<i: ws.column_dimensions[get_column_letter(i)].width=w
+    style_header(ws,len(dcols),rr)
+    rr+=1
+    for it in items:
+        vals=[f"{_MESES_ES[it['mes']-1][:3]} {it['anio']}",it['tipo'],it['categoria'],
+              it['codigo'],it['desc'],it['vu'],it['cant'],it['sub'],it['iva'],it['total']]
+        for ci2,v in enumerate(vals,1):
+            cc=ws.cell(rr,ci2,v); cc.border=border_all; cc.font=font(10)
+            cc.alignment=left if ci2 in (3,5) else center
+            if ci2 in (6,8,9,10): cc.number_format='#,##0'
+            if ci2==7: cc.number_format='#,##0'
+            if ci2==2:
+                t=it['tipo']
+                cc.fill=fill(TIPO_LT.get(t,"F4F4F4")); cc.font=font(10,True,TIPO_COL.get(t,TXT))
         rr+=1
+    det_last=rr-1
+    if det_last>det_hdr:
+        tab=Table(displayName="DetCalib",ref=f"A{det_hdr}:{get_column_letter(len(dcols))}{det_last}")
+        tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
+        ws.add_table(tab)
 
-        for row in raw:
-            for ci,(k,lbl,w) in enumerate(det_keys,1):
-                v=row.get(cm[k] or '__','')
-                c=ws.cell(rr,ci,v); c.border=border_all; c.font=font(10)
-                c.alignment=left if ci<=3 else center
-                if k=='costo' and v:
-                    try: c.value=float(str(v).replace(',','').replace('$',''))
-                    except: pass
-                    c.number_format='#,##0'
-            rr+=1
-
-        last_det=rr-1
-        if last_det>hdr_row:
-            det_ncols=len(det_keys)
-            tab=Table(displayName="DetCalib",ref=f"A{hdr_row}:{get_column_letter(det_ncols)}{last_det}")
-            tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
-            ws.add_table(tab)
-
-    last=rr-1
     ws.freeze_panes="A4"
-    nota=(f"🔴 Este mes  🟡 Próximo mes  ⬜ Futuro  ▦ Pasado (gris) · "
-          f"Fuente: Metabase card #75406 · {len(raw)} equipos · "
-          f"${grand_costo:,.0f} COP costo total calibraciones")
-    ws.cell(last+2,1,nota).font=font(9,False,"7A8094")
-    ws.merge_cells(start_row=last+2,end_row=last+2,start_column=1,end_column=max(ncols,6))
-    print(f"📅 Calibraciones OK: {len(all_periods)} períodos · {grand_cnt} equipos · "
-          f"${grand_costo:,.0f} COP total")
+    nota=(f"🔴 Mes actual · 🟡 Próximo mes · ⬜ Futuro · ▦ Pasado (gris) · "
+          f"Fuente: Metabase card #75406 · {g_total_cant:,} equipos · "
+          f"${g_total_costo:,.0f} COP costo total con IVA")
+    ws.cell(det_last+2,1,nota).font=font(9,False,"7A8094")
+    ws.merge_cells(start_row=det_last+2,end_row=det_last+2,start_column=1,end_column=max(ncols,len(dcols)))
+    print(f"📅 Calibraciones OK: {len(periods)} meses · {g_total_cant:,} equipos · ${g_total_costo:,.0f} COP c/IVA")
+
+
 
 # ─── REGISTRO DE HOJAS ────────────────────────────────────────────
 BUILDERS={
