@@ -66,11 +66,12 @@ def banner(ws,title,subtitle,ncols):
 
 # Orden y colores de TODAS las pestañas (incluye las nuevas)
 TAB_ORDER=["📘 Inicio","🔎 Buscador","📋 Catálogo Maestro","💰 Proveedor + Barato",
-           "🚚 Lead Times","📦 Inventario","🔌 Especificaciones","🔄 Homologación",
+           "🚚 Lead Times","📦 Inventario","📅 Calibraciones","🔌 Especificaciones","🔄 Homologación",
            "🏢 Homologación x Operador","🤝 Condiciones Comerciales","🕒 Histórico de Precios","📞 Contactos",
            "📝 Pendiente Jarri","📈 Insights"]
 TAB_COLORS={"📘 Inicio":NAVY,"🔎 Buscador":GOLD,"📋 Catálogo Maestro":TEAL,
             "💰 Proveedor + Barato":GREEN,"🚚 Lead Times":"5B6BFF","📦 Inventario":"8855CC",
+            "📅 Calibraciones":"009688",
             "🔌 Especificaciones":"00A0C8","🔄 Homologación":"E8A13A",
             "🏢 Homologación x Operador":"C8553A","🤝 Condiciones Comerciales":"B8860B",
             "🕒 Histórico de Precios":"7B5EA7",
@@ -538,11 +539,237 @@ def build_historico(wb):
     ws.merge_cells(start_row=last+2,end_row=last+2,start_column=1,end_column=len(COLS))
     print(f"🕒 Histórico de Precios OK: {len(raw_rows)} precios · {len(seen_prov)} con lista · {len(no_price)} sin lista")
 
+# ════════════════════════════════════════════════════════════════
+# HOJA 📅 — CALIBRACIONES
+# Fuente: Metabase card METABASE_CALIB_CARD (campo calib_data en cache).
+# Pivot: Mes × Tipo Equipo (TC/TP/Medidor) con N° equipos y costo total.
+# ════════════════════════════════════════════════════════════════
+
+_MESES_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+           'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+def _detect_calib_cols(sample):
+    c=list((sample or {}).keys()); cl=[k.lower() for k in c]
+    def find(*kws):
+        for kw in kws:
+            for i,k in enumerate(cl):
+                if kw in k: return c[i]
+        return None
+    return {
+        'fecha':    find('vencimiento','vcmt','calib_date','fecha_calib','proxima','next_calib',
+                         'expir','fecha_v','vence','calibra','fecha'),
+        'tipo':     find('tipo_equipo','tipo_medida','categoria_equipo','tipo','categoria',
+                         'class','equipo','clase','tipo_e'),
+        'cant':     find('cantidad','count','qty','cant','num_equip','n_equip','equipos'),
+        'costo':    find('costo_calib','costo_total','costo','valor_calib','valor','tarifa',
+                         'precio_calib','precio','cost','monto'),
+        'serie':    find('serial','serie','id_equipo','numero_serie','nro_serie',
+                         'cod_equipo','codigo','equipo_id','id'),
+        'ubicacion':find('ubicacion','instalacion','punto_medida','contrato','cliente',
+                         'site','location','direccion','punto'),
+        'estado':   find('estado_calibracion','estado_equipo','estado','status'),
+    }
+
+def _norm_tipo_eq(v):
+    v2=(str(v) or '').upper().strip()
+    if any(x in v2 for x in ('CORRIENTE','TC ',' TC','TRANSF. C','TRANSFORMADOR C')): return 'TC'
+    if any(x in v2 for x in ('POTENCIAL','TP ',' TP','TRANSF. P','TRANSFORMADOR P')): return 'TP'
+    if any(x in v2 for x in ('MEDIDOR','CELDA','METER')): return 'Medidor'
+    if v2 in ('TC','TP'): return v2
+    return v2.split()[0][:10] if v2 else 'Otro'
+
+def _extract_mes_anio(v):
+    import re as _re
+    s=str(v or '').strip()
+    m=_re.match(r'(\d{4})-(\d{1,2})',s)
+    if m: return int(m.group(2)),int(m.group(1))
+    m=_re.match(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})',s)
+    if m: return int(m.group(2)),int(m.group(3))
+    return None,None
+
+def build_calibracion(wb):
+    import datetime
+    from openpyxl.formatting.rule import CellIsRule
+    title="📅 Calibraciones"
+    if title in wb.sheetnames: del wb[title]
+    ws=wb.create_sheet(title)
+    ws.sheet_view.showGridLines=False
+
+    D=_load_kb_data(); raw=D.get('calib_data',[])
+    today=datetime.date.today()
+
+    if not raw:
+        banner(ws,"  📅 Vencimientos de Calibración",
+               "  Sin datos — Configura METABASE_CALIB_CARD=75406 en .env y ejecuta metabase_sync.py",8)
+        msg=ws.cell(4,1,"⚠  No hay datos de calibración en el cache. "
+                    "Agrega METABASE_CALIB_CARD=75406 a tu .env y corre: python3 scripts/metabase_sync.py")
+        msg.font=font(11,True,GOLD); msg.alignment=left
+        ws.merge_cells(start_row=4,end_row=4,start_column=1,end_column=8)
+        print("📅 Calibraciones: sin datos en cache — ejecutar metabase_sync.py"); return
+
+    cm=_detect_calib_cols(raw[0])
+
+    # ── Construir pivot {(anio,mes): {tipo: {cnt,costo}}} ──
+    pivot=defaultdict(lambda:defaultdict(lambda:{'cnt':0,'costo':0.0}))
+    for row in raw:
+        tipo=_norm_tipo_eq(row.get(cm['tipo'] or '__',  '') if cm['tipo']  else '')
+        mes,anio=_extract_mes_anio(row.get(cm['fecha'] or '__','') if cm['fecha'] else '')
+        if not mes or not anio: continue
+        cnt=1
+        if cm['cant']:
+            try: cnt=int(row.get(cm['cant'],1) or 1)
+            except: cnt=1
+        costo=0.0
+        if cm['costo']:
+            try: costo=float(str(row.get(cm['costo'],0) or 0).replace(',','').replace('$','').strip())
+            except: costo=0.0
+        pivot[(anio,mes)][tipo]['cnt']  +=cnt
+        pivot[(anio,mes)][tipo]['costo']+=costo
+
+    all_tipos=sorted({t for p in pivot.values() for t in p},
+                     key=lambda x:{'TC':0,'TP':1,'Medidor':2}.get(x,9))
+    all_periods=sorted(pivot.keys())
+
+    # ── Columnas del pivot ──
+    TIPO_COL={'TC':TEAL,'TP':GOLD,'Medidor':'5B6BFF'}
+    TIPO_LT ={'TC':TEAL_LT,'TP':GOLD_LT,'Medidor':'E8ECFF'}
+    pcols=[("Mes / Año",16)]
+    for t in all_tipos: pcols+=[(f"{t}  N°",10),(f"{t}  Costo COP",16)]
+    pcols+=[("TOTAL  N°",10),("TOTAL  Costo COP",16)]
+    ncols=len(pcols)
+
+    banner(ws,"  📅 Vencimientos de Calibración por Tipo de Equipo",
+           f"  {len(raw)} equipos · {len(all_periods)} períodos · Fuente: Metabase card #75406 · actualizado al sincronizar",
+           ncols)
+    for i,(n,w) in enumerate(pcols,1):
+        ws.cell(3,i,n); ws.column_dimensions[get_column_letter(i)].width=w
+    style_header(ws,ncols,3)
+
+    # Color tipo en encabezado
+    col_idx=2
+    for t in all_tipos:
+        tc=TIPO_COL.get(t,"888888")
+        ws.cell(3,col_idx).fill=fill(tc); ws.cell(3,col_idx+1).fill=fill(tc)
+        col_idx+=2
+    ws.cell(3,ncols-1).fill=fill(NAVY); ws.cell(3,ncols).fill=fill(NAVY)
+
+    rr=4
+    grand_cnt=0; grand_costo=0.0
+    grand_t_cnt=defaultdict(int); grand_t_costo=defaultdict(float)
+
+    for (anio,mes) in all_periods:
+        mdata=pivot[(anio,mes)]
+        t_cnt =sum(v['cnt']   for v in mdata.values())
+        t_costo=sum(v['costo'] for v in mdata.values())
+        grand_cnt+=t_cnt; grand_costo+=t_costo
+
+        # Color por proximidad
+        p=datetime.date(anio,mes,1)
+        diff=(anio*12+mes)-(today.year*12+today.month)
+        if diff<0:   rf,rt="F0F0F0","999999"
+        elif diff==0:rf,rt=RED_LT,RED
+        elif diff==1:rf,rt=GOLD_LT,GOLD
+        else:        rf,rt=None,TXT
+
+        mc=ws.cell(rr,1,f"{_MESES_ES[mes-1]} {anio}")
+        mc.font=font(10,True,rt); mc.alignment=center; mc.border=border_all
+        if rf: mc.fill=fill(rf)
+
+        col_idx=2
+        for t in all_tipos:
+            td=mdata.get(t,{'cnt':0,'costo':0.0})
+            grand_t_cnt[t]+=td['cnt']; grand_t_costo[t]+=td['costo']
+            tlt=TIPO_LT.get(t,"F4F4F4")
+            for sc,(val,nf) in enumerate([(td['cnt'] or None,None),(td['costo'] or None,'#,##0')]):
+                cc=ws.cell(rr,col_idx+sc,val); cc.border=border_all
+                cc.font=font(10,False,rt); cc.alignment=center
+                if nf and val: cc.number_format=nf
+                if rf: cc.fill=fill(rf)
+                elif val: cc.fill=fill(tlt)
+            col_idx+=2
+
+        # TOTAL columna
+        for ci2,(val,nf,bd) in enumerate([(t_cnt or None,None,False),(t_costo or None,'#,##0',False)]):
+            cc=ws.cell(rr,ncols-1+ci2,val); cc.border=border_all
+            cc.font=font(10,True,rt); cc.alignment=center
+            if nf and val: cc.number_format=nf
+            if rf: cc.fill=fill(rf)
+        rr+=1
+
+    # Fila TOTAL
+    ws.cell(rr,1,"TOTAL").fill=fill(NAVY); ws.cell(rr,1).font=font(10,True,WHITE)
+    ws.cell(rr,1).alignment=center; ws.cell(rr,1).border=border_all
+    col_idx=2
+    for t in all_tipos:
+        for sc,(val,nf) in enumerate([(grand_t_cnt[t],None),(grand_t_costo[t],'#,##0')]):
+            cc=ws.cell(rr,col_idx+sc,val or None)
+            cc.fill=fill(TEAL); cc.font=font(10,True,WHITE)
+            cc.alignment=center; cc.border=border_all
+            if nf and val: cc.number_format=nf
+        col_idx+=2
+    ws.cell(rr,ncols-1,grand_cnt).fill=fill(TEAL); ws.cell(rr,ncols-1).font=font(11,True,WHITE)
+    ws.cell(rr,ncols-1).alignment=center; ws.cell(rr,ncols-1).border=border_all
+    ws.cell(rr,ncols,grand_costo).fill=fill(TEAL); ws.cell(rr,ncols).font=font(11,True,WHITE)
+    ws.cell(rr,ncols).alignment=center; ws.cell(rr,ncols).border=border_all; ws.cell(rr,ncols).number_format='#,##0'
+    rr+=2
+
+    # ── Sección detalle ──
+    det_keys=[(k,lbl,w) for k,lbl,w in [
+        ('tipo',     "Tipo Equipo",22),
+        ('serie',    "Serial / ID",20),
+        ('ubicacion',"Ubicación / Contrato",32),
+        ('estado',   "Estado",14),
+        ('fecha',    "Fecha Vencimiento",18),
+        ('costo',    "Costo Calibración COP",20),
+    ] if cm.get(k)]
+
+    if det_keys:
+        ws.cell(rr,1,"  📋 Detalle de Equipos").fill=fill(NAVY)
+        ws.cell(rr,1).font=font(11,True,WHITE); ws.cell(rr,1).alignment=left
+        ws.merge_cells(start_row=rr,end_row=rr,start_column=1,end_column=len(det_keys))
+        for ci in range(1,len(det_keys)+1): ws.cell(rr,ci).border=border_all
+        rr+=1; hdr_row=rr
+
+        for ci,(k,lbl,w) in enumerate(det_keys,1):
+            c=ws.cell(rr,ci,lbl); c.fill=fill(NAVY); c.font=font(10,True,WHITE)
+            c.alignment=center; c.border=border_all
+            ws.column_dimensions[get_column_letter(ci)].width=max(ws.column_dimensions[get_column_letter(ci)].width,w)
+        rr+=1
+
+        for row in raw:
+            for ci,(k,lbl,w) in enumerate(det_keys,1):
+                v=row.get(cm[k] or '__','')
+                c=ws.cell(rr,ci,v); c.border=border_all; c.font=font(10)
+                c.alignment=left if ci<=3 else center
+                if k=='costo' and v:
+                    try: c.value=float(str(v).replace(',','').replace('$',''))
+                    except: pass
+                    c.number_format='#,##0'
+            rr+=1
+
+        last_det=rr-1
+        if last_det>hdr_row:
+            det_ncols=len(det_keys)
+            tab=Table(displayName="DetCalib",ref=f"A{hdr_row}:{get_column_letter(det_ncols)}{last_det}")
+            tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
+            ws.add_table(tab)
+
+    last=rr-1
+    ws.freeze_panes="A4"
+    nota=(f"🔴 Este mes  🟡 Próximo mes  ⬜ Futuro  ▦ Pasado (gris) · "
+          f"Fuente: Metabase card #75406 · {len(raw)} equipos · "
+          f"${grand_costo:,.0f} COP costo total calibraciones")
+    ws.cell(last+2,1,nota).font=font(9,False,"7A8094")
+    ws.merge_cells(start_row=last+2,end_row=last+2,start_column=1,end_column=max(ncols,6))
+    print(f"📅 Calibraciones OK: {len(all_periods)} períodos · {grand_cnt} equipos · "
+          f"${grand_costo:,.0f} COP total")
+
 # ─── REGISTRO DE HOJAS ────────────────────────────────────────────
 BUILDERS={
-    "operador": build_operador,
+    "operador":    build_operador,
     "condiciones": build_condiciones,
-    "historico": build_historico,
+    "historico":   build_historico,
+    "calibracion": build_calibracion,
 }
 
 def reorder_and_color(wb):

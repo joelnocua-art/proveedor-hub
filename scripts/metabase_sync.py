@@ -43,6 +43,7 @@ SKU_TABLE       = _env("METABASE_SKU_TABLE")    or "sku_catalog"
 OFFERS_TABLE    = _env("METABASE_OFFERS_TABLE") or "sku_offers"
 INV_TABLE       = _env("METABASE_INV_TABLE")    or "inventory_items"
 PROV_TABLE      = _env("METABASE_PROV_TABLE")   or "providers"
+CALIB_CARD      = int(_env("METABASE_CALIB_CARD") or 75406)
 OUTPUT_XLSX     = ROOT / (_env("OUTPUT_XLSX") or "KB_BIA_Proveedores.xlsx")
 KB_DATA_JSON    = ROOT / "scripts" / "kb_data_cache.json"
 
@@ -137,7 +138,14 @@ def download_data():
     sku_offers   = query_table(OFFERS_TABLE)
     inventory    = query_table(INV_TABLE)
     providers    = query_table(PROV_TABLE)
-    return sku_catalog, sku_offers, inventory, providers
+    calib_raw    = []
+    if CALIB_CARD:
+        try:
+            calib_raw = query_card(CALIB_CARD)
+            print(f"  ✅ Card #{CALIB_CARD} descargada: {len(calib_raw)} equipos")
+        except Exception as e:
+            print(f"  ⚠ Card #{CALIB_CARD} no disponible: {e}")
+    return sku_catalog, sku_offers, inventory, providers, calib_raw
 
 # ──────────────────────────────────────────────────────────────────
 # 3.  TRANSFORMAR → kb_data
@@ -197,7 +205,7 @@ def lookup_lead(prov, lead_times):
         if norm(k) == pn or norm(k) in pn or pn in norm(k): return days
     return ""
 
-def build_kb_data(sku_catalog, sku_offers, inventory, providers):
+def build_kb_data(sku_catalog, sku_offers, inventory, providers, calib_raw=None):
     print("\n🔧 Procesando datos …")
 
     # lead times desde providers
@@ -287,6 +295,7 @@ def build_kb_data(sku_catalog, sku_offers, inventory, providers):
         "sku_name": sku_name_map,
         "lead_times": lead_times,
         "offers_by_sku": dict(offers_by_sku),
+        "calib_data": calib_raw or [],
     }
 
 # ──────────────────────────────────────────────────────────────────
@@ -326,8 +335,8 @@ def main():
     print("  BIA Energy — KB Proveedor Hub · Sync desde Metabase")
     print("=" * 60)
 
-    sku_catalog, sku_offers, inventory, providers = download_data()
-    D = build_kb_data(sku_catalog, sku_offers, inventory, providers)
+    sku_catalog, sku_offers, inventory, providers, calib_raw = download_data()
+    D = build_kb_data(sku_catalog, sku_offers, inventory, providers, calib_raw)
 
     # Guardar cache JSON (útil para regenerar Excel sin volver a descargar)
     KB_DATA_JSON.parent.mkdir(parents=True, exist_ok=True)
