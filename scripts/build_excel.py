@@ -775,13 +775,14 @@ except Exception as _e:
 # ════════════════════════════════════════════════════════════════
 order=["📘 Inicio","🔎 Buscador","📋 Catálogo Maestro","💰 Proveedor + Barato",
        "🚚 Lead Times","📦 Inventario","🔌 Especificaciones","🔄 Homologación",
-       "🏢 Homologación x Operador","📞 Contactos","📝 Pendiente Jarri","📈 Insights"]
+       "🏢 Homologación x Operador","🤝 Condiciones Comerciales","📞 Contactos",
+       "📝 Pendiente Jarri","📈 Insights"]
 wb._sheets.sort(key=lambda s: order.index(s.title) if s.title in order else 99)
 colors={"📘 Inicio":NAVY,"🔎 Buscador":GOLD,"📋 Catálogo Maestro":TEAL,
         "💰 Proveedor + Barato":GREEN,"🚚 Lead Times":"5B6BFF","📦 Inventario":"8855CC",
         "🔌 Especificaciones":"00A0C8","🔄 Homologación":"E8A13A",
-        "🏢 Homologación x Operador":"C8553A","📞 Contactos":"2EA56A",
-        "📝 Pendiente Jarri":RED,"📈 Insights":NAVY}
+        "🏢 Homologación x Operador":"C8553A","🤝 Condiciones Comerciales":"B8860B",
+        "📞 Contactos":"2EA56A","📝 Pendiente Jarri":RED,"📈 Insights":NAVY}
 for s in wb._sheets:
     if s.title in colors: s.sheet_properties.tabColor=colors[s.title]
 

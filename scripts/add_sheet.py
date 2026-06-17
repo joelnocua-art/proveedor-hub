@@ -11,14 +11,33 @@ Uso:
 Hojas disponibles:
     operador   → 🏢 Homologación x Operador
 """
-import argparse
+import argparse, json
 from pathlib import Path
+from collections import defaultdict
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 ROOT = Path(__file__).parent.parent
+
+# ─── Carga de datos (kb_data + providers.json) ───────────────────
+def _load_kb_data():
+    for p in (ROOT/"scripts"/"kb_data_cache.json", Path("/tmp/kb_data.json")):
+        if Path(p).exists():
+            return json.load(open(p))
+    return {}
+
+def _load_providers():
+    pj = ROOT/"providers.json"
+    return json.load(open(pj)) if pj.exists() else []
+
+def _norm(s):
+    """Normaliza nombre de proveedor para hacer matching entre fuentes."""
+    s = (s or "").upper()
+    for tok in [" SAS"," S.A.S."," S.A.S"," S.A."," LTDA"," INGENIERIA"," TEC"," 1 "," - ","-"]:
+        s = s.replace(tok," ")
+    return " ".join(s.split())
 
 # ─── PALETA (igual que build_excel.py) ───────────────────────────
 NAVY="1A2138";TEAL="00B8A0";TEAL_LT="D6F5F0";GOLD="E8A13A";GOLD_LT="FBEFD8"
@@ -48,12 +67,13 @@ def banner(ws,title,subtitle,ncols):
 # Orden y colores de TODAS las pestañas (incluye las nuevas)
 TAB_ORDER=["📘 Inicio","🔎 Buscador","📋 Catálogo Maestro","💰 Proveedor + Barato",
            "🚚 Lead Times","📦 Inventario","🔌 Especificaciones","🔄 Homologación",
-           "🏢 Homologación x Operador","📞 Contactos","📝 Pendiente Jarri","📈 Insights"]
+           "🏢 Homologación x Operador","🤝 Condiciones Comerciales","📞 Contactos",
+           "📝 Pendiente Jarri","📈 Insights"]
 TAB_COLORS={"📘 Inicio":NAVY,"🔎 Buscador":GOLD,"📋 Catálogo Maestro":TEAL,
             "💰 Proveedor + Barato":GREEN,"🚚 Lead Times":"5B6BFF","📦 Inventario":"8855CC",
             "🔌 Especificaciones":"00A0C8","🔄 Homologación":"E8A13A",
-            "🏢 Homologación x Operador":"C8553A","📞 Contactos":"2EA56A",
-            "📝 Pendiente Jarri":RED,"📈 Insights":NAVY}
+            "🏢 Homologación x Operador":"C8553A","🤝 Condiciones Comerciales":"B8860B",
+            "📞 Contactos":"2EA56A","📝 Pendiente Jarri":RED,"📈 Insights":NAVY}
 
 # ════════════════════════════════════════════════════════════════
 # HOJA 🏢 — HOMOLOGACIÓN POR OPERADOR DE RED
@@ -139,9 +159,88 @@ def build_operador(wb):
     ws.merge_cells(start_row=last+2,end_row=last+3,start_column=1,end_column=len(COLS))
     print(f"🏢 Homologación x Operador OK: {len(OPERADORES)} operadores")
 
+# ════════════════════════════════════════════════════════════════
+# HOJA 🤝 — CONDICIONES COMERCIALES POR PROVEEDOR
+# Auto: # SKUs que cotiza, lead time real, estado, notas.
+# Plantilla (Por confirmar): plazo pago, descuento, pedido mínimo, garantía.
+# ════════════════════════════════════════════════════════════════
+def build_condiciones(wb):
+    from openpyxl.worksheet.datavalidation import DataValidation
+    title="🤝 Condiciones Comerciales"
+    if title in wb.sheetnames: del wb[title]
+    ws=wb.create_sheet(title)
+    ws.sheet_view.showGridLines=False
+
+    D=_load_kb_data(); provs=_load_providers()
+    offers=D.get('offers_by_sku',{}); lead_times=D.get('lead_times',{})
+
+    # # SKUs que cotiza cada proveedor (por nombre de oferta)
+    prov_sku=defaultdict(set)
+    for sid,offs in offers.items():
+        for o in offs:
+            if o.get('price'): prov_sku[o['provider']].add(sid)
+    # Lead time real (limpio, sin pruebas) indexado por nombre normalizado
+    lt_norm={}
+    for k,v in lead_times.items():
+        if any(x in k.upper() for x in ('PRUEB','TEST')): continue
+        lt_norm[_norm(k)]=v
+    # Index providers.json por nombre normalizado
+    pj_norm={}
+    for p in provs:
+        pj_norm[_norm(p.get('empresa',''))]=p
+
+    def match(name, table):
+        n=_norm(name)
+        if n in table: return table[n]
+        for k,v in table.items():
+            if k and (k in n or n in k): return v
+        return None
+
+    COLS=[("Proveedor",30),("# SKUs que cotiza",16),("Lead Time (días)",15),
+          ("Plazo de Pago",16),("Descuento Volumen",17),("Pedido Mínimo",15),
+          ("Garantía",14),("Estado",12),("Notas",46)]
+    banner(ws,"  🤝 Condiciones Comerciales por Proveedor",
+           "  Lead time y # SKUs son reales · Plazo de pago / descuento / pedido mínimo / garantía: completar con comercial",
+           len(COLS))
+    for i,(n,w) in enumerate(COLS,1):
+        ws.cell(3,i,n); ws.column_dimensions[get_column_letter(i)].width=w
+    style_header(ws,len(COLS),3)
+
+    # Solo proveedores que cotizan (comercialmente activos), ordenados por # SKUs
+    rows=sorted(prov_sku.items(), key=lambda x:-len(x[1]))
+    rr=4
+    for prov_name, sids in rows:
+        pj=match(prov_name, pj_norm) or {}
+        empresa=pj.get('empresa') or prov_name
+        lt=match(prov_name, lt_norm)
+        estado=pj.get('estado','')
+        notas=(pj.get('observaciones') or '')
+        vals=[empresa, len(sids), lt if lt else "Por confirmar",
+              "Por confirmar","Por confirmar","Por confirmar","Por confirmar",
+              estado, notas]
+        for ci,v in enumerate(vals,1):
+            cc=ws.cell(rr,ci,v if v!='' else None); cc.border=border_all; cc.font=font(10)
+            cc.alignment=left if ci in (1,9) else center
+        rr+=1
+    last=rr-1
+    tab=Table(displayName="Condiciones",ref=f"A3:{get_column_letter(len(COLS))}{last}")
+    tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
+    ws.add_table(tab)
+    ws.freeze_panes="A4"
+    # Estado ACTIVO en verde
+    from openpyxl.formatting.rule import CellIsRule
+    ws.conditional_formatting.add(f"H4:H{last}",CellIsRule(operator='equal',formula=['"ACTIVO"'],fill=fill(GREEN_LT),font=font(10,True,GREEN)))
+    # "Por confirmar" en dorado (cols D-G)
+    for col in ("C","D","E","F","G"):
+        ws.conditional_formatting.add(f"{col}4:{col}{last}",CellIsRule(operator='equal',formula=['"Por confirmar"'],fill=fill(GOLD_LT),font=font(10,False,GOLD)))
+    ws.cell(last+2,1,"Lead time y # SKUs vienen de datos reales. Las celdas 'Por confirmar' las completa el equipo comercial con cada proveedor.").font=font(9,False,"7A8094")
+    ws.merge_cells(start_row=last+2,end_row=last+2,start_column=1,end_column=len(COLS))
+    print(f"🤝 Condiciones Comerciales OK: {last-3} proveedores activos")
+
 # ─── REGISTRO DE HOJAS ────────────────────────────────────────────
 BUILDERS={
     "operador": build_operador,
+    "condiciones": build_condiciones,
 }
 
 def reorder_and_color(wb):
