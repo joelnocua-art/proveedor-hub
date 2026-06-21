@@ -704,3 +704,134 @@ async function sbMarkAsDispatched(supaId, dispatchBy) {
 }
 
 console.log('[Supabase] Client module loaded');
+
+// ═══ CALIBRATION ORDERS ═══════════════════════════════════════════════
+// Tables: calibration_orders
+// Schema: see /sql/calibration_orders.sql
+
+async function sbLoadCalibOrders() {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from('calibration_orders')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { console.warn('[Supabase] CalibOrders load error:', error.message); return []; }
+  return (data || []).map(r => ({
+    _supaId:       r.id,
+    num:           r.numero,
+    mes:           r.mes_programado,
+    tipo:          r.tipo_equipo,
+    cantidad:      r.cantidad_equipos || 0,
+    costo_est:     Number(r.costo_estimado) || 0,
+    proveedor:     r.proveedor_nombre || '',
+    prov_email:    r.proveedor_email || '',
+    prov_contacto: r.proveedor_contacto || '',
+    notas:         r.notas || '',
+    status:        r.status || 'pendiente',
+    cert_url:      r.certificado_url || null,
+    completada_at: r.completada_at || null,
+    completada_by: r.completada_by || null,
+    created_at:    r.created_at,
+    created_by:    r.created_by || null
+  }));
+}
+
+async function sbNextCalibOrderNumber() {
+  const sb = getSupabase();
+  if (!sb) return 'CAL-' + new Date().getFullYear() + '-001';
+  const year = new Date().getFullYear();
+  const prefix = 'CAL-' + year + '-';
+  const { data, error } = await sb
+    .from('calibration_orders')
+    .select('numero')
+    .like('numero', prefix + '%')
+    .order('numero', { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return prefix + '001';
+  const last = data[0].numero;
+  const lastN = parseInt(last.slice(prefix.length), 10) || 0;
+  return prefix + String(lastN + 1).padStart(3, '0');
+}
+
+async function sbInsertCalibOrder(order) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+
+  const numero = order.numero || await sbNextCalibOrderNumber();
+
+  const row = {
+    numero,
+    mes_programado:     order.mes || '',
+    tipo_equipo:        order.tipo || '',
+    cantidad_equipos:   Number(order.cantidad) || 0,
+    costo_estimado:     Number(order.costo_est) || 0,
+    proveedor_nombre:   order.proveedor || '',
+    proveedor_email:    order.prov_email || null,
+    proveedor_contacto: order.prov_contacto || null,
+    notas:              order.notas || null,
+    status:             order.status || 'pendiente',
+    created_by:         order.created_by || null
+  };
+
+  const { data, error } = await sb.from('calibration_orders').insert([row]).select().single();
+  if (error) {
+    console.error('[Supabase] Insert calibOrder error:', error);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true, order: data };
+}
+
+async function sbUpdateCalibOrderStatus(id, status, extra) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false };
+  const updates = { status, ...(extra || {}) };
+  const { error } = await sb.from('calibration_orders').update(updates).eq('id', id);
+  if (error) {
+    console.error('[Supabase] Update calibOrder status error:', error);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+async function sbUploadCalibCertificate(supaId, num, file) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+  const path = `${num}/${Date.now()}.pdf`;
+  const { data, error } = await sb.storage
+    .from('certificados-calibracion')
+    .upload(path, file, { contentType: 'application/pdf', upsert: true });
+  if (error) {
+    console.error('[Supabase] Upload cert error:', error);
+    return { ok: false, error: error.message };
+  }
+  const { data: urlData } = sb.storage.from('certificados-calibracion').getPublicUrl(data.path);
+  return { ok: true, url: urlData.publicUrl };
+}
+
+async function sbMarkCalibCompleted(id, completedBy, certUrl) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: 'Supabase no inicializado' };
+  const { error } = await sb.from('calibration_orders').update({
+    status:          'completada',
+    certificado_url: certUrl || null,
+    completada_at:   new Date().toISOString(),
+    completada_by:   completedBy || null
+  }).eq('id', id);
+  if (error) {
+    console.error('[Supabase] Mark calib completed error:', error);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+async function sbDeleteCalibOrder(id) {
+  const sb = getSupabase();
+  if (!sb) return { ok: false };
+  const { error } = await sb.from('calibration_orders').delete().eq('id', id);
+  if (error) {
+    console.error('[Supabase] Delete calibOrder error:', error);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
