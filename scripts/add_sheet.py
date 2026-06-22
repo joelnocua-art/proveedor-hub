@@ -769,59 +769,92 @@ def build_calibracion(wb):
 
 # ════════════════════════════════════════════════════════════════
 # HOJA 🚚 — LEAD TIMES
-# Sección A: Resumen por tipo (AVERAGEIF/MINIFS/MAXIFS → detalle)
-# Sección B: Detalle por proveedor (Velocidad = fórmula sobre col E)
-# Fuente: datos curados BIA jun-2026 + lead_times de kb_data
+# Fuente de los días: provider_responses.delivery_days (real).
+# _LT_META solo describe categoría/país/condiciones — NUNCA días.
 # ════════════════════════════════════════════════════════════════
 
-# (proveedor_key, tipo, pais, entrega, lt_prom, lt_min, lt_max, stock_inm, ped_min, notas)
-_LT_CURATED = [
-    ("SELDA",             "Medidores/TC/TP",     "Colombia","Nacional",   8,  7, 10,"Parcial",    "1 unidad",     "Certificado CIDET. Stock parcial TC y medidores."),
-    ("PROELCO",           "Distribuidor",        "Colombia","Nacional",   4,  3,  5,"Sí",         "Sin mínimo",   "Bodega local. Entrega inmediata frecuente."),
-    ("ADLER",             "Distribuidor",        "Colombia","Nacional",   6,  5,  8,"Parcial",    "Sin mínimo",   "Distribuidor con catálogo amplio."),
-    ("DISICO",            "Fabricante TC/TP",    "Colombia","Nacional",  12, 10, 15,"Parcial",    "5 unidades",   "Fabricante TCs. Tiempo varía por especificación."),
-    ("LAUMAYER",          "Fabricante Tableros", "Colombia","Nacional",   8,  7, 10,"Parcial",    "Sin mínimo",   "Condensadores y tableros eléctricos."),
-    ("ACJ",               "Distribuidor",        "Colombia","Nacional",   6,  5,  7,"Parcial",    "Sin mínimo",   "Distribución materiales eléctricos."),
-    ("INPEL",             "Distribuidor",        "Colombia","Nacional",   7,  5, 10,"Parcial",    "1 unidad",     "Distribución eléctrica nacional."),
-    ("DISPROEL",          "Distribuidor",        "Colombia","Nacional",   7,  5, 10,"Parcial",    "Sin mínimo",   "Distribución materiales eléctricos."),
-    ("VAELECTRICOS",      "Distribuidor",        "Colombia","Nacional",   7,  5, 10,"Parcial",    "Sin mínimo",   "Materiales eléctricos."),
-    ("JIMACO",            "Distribuidor",        "Colombia","Nacional",   7,  5, 10,"Parcial",    "Sin mínimo",   "Distribución eléctrica."),
-    ("FISA",              "Distribuidor",        "Colombia","Nacional",   5,  3,  7,"Parcial",    "Sin mínimo",   "Materiales y equipos eléctricos."),
-    ("INCOMELEC",         "Distribuidor",        "Colombia","Nacional",   7,  5, 10,"Parcial",    "Sin mínimo",   "Distribución eléctrica."),
-    ("ECTRICOL",          "Distribuidor",        "Colombia","Nacional",   7,  5, 10,"Parcial",    "Sin mínimo",   "Distribución materiales eléctricos."),
-    ("GRUPO DEFA",        "Distribuidor",        "Colombia","Nacional",   7,  5, 10,"Parcial",    "Sin mínimo",   "Materiales eléctricos."),
-    ("RED + ELECTRIC",    "Distribuidor",        "Colombia","Nacional",   7,  5, 10,"Parcial",    "Sin mínimo",   "Materiales eléctricos."),
-    ("METROBIT",          "Importador AMI",      "Europa",  "Importado", 30, 21, 45,"Parcial",    "1 unidad",     "Medidores inteligentes. Representante local."),
-    ("EMSI",              "Importador AMI",      "China",   "Importado", 52, 45, 60,"No",         "5 unidades",   "Marca MICROSTAR. Importación + aduana."),
-    ("HEXING",            "Importador AMI",      "China",   "Importado", 75, 60, 90,"No",         "50 unidades",  "Medidores AMI. LC + flete marítimo."),
-    ("MN TECHNOLOGIES",   "Importador AMI",      "China",   "Importado", 52, 45, 60,"No",         "5 unidades",   "LC 30 días."),
-    ("ELECTROCABLES",     "Cables/Conductores",  "Colombia","Nacional",   5,  3,  7,"Parcial",    "50 m/bobina",  "Conductores eléctricos."),
-    ("PRYSMIAN",          "Cables/Conductores",  "Italia",  "Importado", 10,  7, 15,"Parcial",    "50 m/bobina",  "Distribución local Colombia."),
-    ("JA SOLAR",          "Solar/Renovables",    "China",   "Importado", 75, 60, 90,"No",         "Pallet",       "Paneles fotovoltaicos. LC 45 días + flete."),
-    ("GROWATT",           "Solar/Renovables",    "China",   "Importado", 37, 30, 45,"No",         "1 unidad",     "Inversores. Representante local."),
-    ("IL SOLE",           "Ingeniería Solar",    "Colombia","Nacional",  45, 30, 60,"N/A",        "Por proyecto", "Proyectos solares llave en mano."),
-    ("SOLCITY",           "Ingeniería Solar",    "Colombia","Nacional",  45, 30, 60,"N/A",        "Por proyecto", "Proyectos solares llave en mano."),
-    ("4S",                "Ingeniería",          "Colombia","Nacional",  30, 21, 45,"N/A",        "Por proyecto", "Ingeniería eléctrica integral."),
-    ("DCE",               "Ingeniería",          "Colombia","Nacional",  30, 21, 45,"N/A",        "Por proyecto", "Instalaciones eléctricas industriales."),
-    ("NOATEC",            "Ingeniería",          "Colombia","Nacional",  30, 21, 45,"N/A",        "Por proyecto", "Sistemas de medición y control."),
-    ("TEVIUM",            "Ingeniería",          "Colombia","Nacional",  30, 21, 45,"N/A",        "Por proyecto", "Proyectos AMI/Smart Grid."),
-    ("KEB",               "Ingeniería",          "Colombia","Nacional",  30, 21, 45,"N/A",        "Por proyecto", "Ingeniería eléctrica."),
-    ("FACCEL",            "Ingeniería",          "Colombia","Nacional",  30, 21, 45,"N/A",        "Por proyecto", "Proyectos eléctricos."),
-    ("RYCTEL",            "Ingeniería",          "Colombia","Nacional",  30, 21, 45,"N/A",        "Por proyecto", "Automatización y control."),
-    ("EQYSOL",            "Ingeniería",          "Colombia","Nacional",  30, 21, 45,"N/A",        "Por proyecto", "Proyectos eléctricos industriales."),
-    ("SMART PROJECTS",    "Ingeniería",          "Colombia","Nacional",  30, 21, 45,"N/A",        "Por proyecto", "Ingeniería y proyectos especiales."),
-    ("INDUSTRIAS REBRA",  "Fabricante Tableros", "Colombia","Nacional",  30, 21, 45,"No",         "Por proyecto", "Tableros y paneles a medida."),
-    ("SUMINISTROS AUTOMATIZADOS","Distribuidor", "Colombia","Nacional",   7,  5, 10,"Parcial",    "Sin mínimo",   "Suministros industriales."),
-    ("SERVIMETERS",       "Calibración",         "Colombia","Nacional",  15, 10, 20,"N/A",        "Por servicio", "Calibración ISO 17025. Tiempo según laboratorio."),
-    ("VERITEST",          "Calibración",         "Colombia","Nacional",  15, 10, 20,"N/A",        "Por servicio", "Ensayos y certificaciones."),
-    ("CERTEAM",           "Calibración",         "Colombia","Nacional",  15, 10, 20,"N/A",        "Por servicio", "Certificaciones técnicas."),
-    ("RENTEK",            "Arriendo Operativo",  "Colombia","Nacional",   5,  3,  7,"Parcial",    "1 activo",     "Disponibilidad según flota."),
-    ("RENTING COLOMBIA",  "Arriendo Operativo",  "Colombia","Nacional",   5,  3,  7,"Parcial",    "1 unidad",     "Arriendo de equipos eléctricos."),
-    ("FORMAS LOGÍSTICAS", "Logística",           "Colombia","Nacional",   2,  1,  3,"Sí",         "Sin mínimo",   "Operador logístico. Entrega 24-48h."),
-    ("ERASMUS",           "Consultoría",         "Colombia","Nacional",  15, 10, 20,"N/A",        "Por servicio", "Normativa y consultoría."),
-    ("SDT",               "Consultoría",         "Colombia","Nacional",  15, 10, 20,"N/A",        "Por servicio", "Consultoría técnica especializada."),
-    ("GERS",              "Consultoría",         "Colombia","Nacional",  15, 10, 20,"N/A",        "Por servicio", "Consultoría sistemas de energía."),
-]
+# {clave_norm: (tipo, pais, entrega, stock_inm, ped_min, notas)}
+# Clave = fragmento del nombre (minúsculas, sin sufijos legales)
+_LT_META = {
+    "selda":                    ("Medidores/TC/TP",     "Colombia","Nacional",  "Parcial",  "1 unidad",     "Certificado CIDET. Stock parcial TC y medidores."),
+    "proelco":                  ("Distribuidor",        "Colombia","Nacional",  "Sí",       "Sin mínimo",   "Bodega local. Entrega inmediata frecuente."),
+    "adler":                    ("Distribuidor",        "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Distribuidor con catálogo amplio."),
+    "disico":                   ("Fabricante TC/TP",    "Colombia","Nacional",  "Parcial",  "5 unidades",   "Fabricante TCs. Tiempo varía por especificación."),
+    "laumayer":                 ("Fabricante Tableros", "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Condensadores y tableros eléctricos."),
+    "acj":                      ("Distribuidor",        "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Distribución materiales eléctricos."),
+    "inpel":                    ("Distribuidor",        "Colombia","Nacional",  "Parcial",  "1 unidad",     "Distribución eléctrica nacional."),
+    "disproel":                 ("Distribuidor",        "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Distribución materiales eléctricos."),
+    "vaelectricos":             ("Distribuidor",        "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Materiales eléctricos."),
+    "jimaco":                   ("Distribuidor",        "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Distribución eléctrica."),
+    "fisa":                     ("Distribuidor",        "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Materiales y equipos eléctricos."),
+    "incomelec":                ("Distribuidor",        "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Distribución eléctrica."),
+    "ectricol":                 ("Distribuidor",        "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Distribución materiales eléctricos."),
+    "grupo defa":               ("Distribuidor",        "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Materiales eléctricos."),
+    "red + electric":           ("Distribuidor",        "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Materiales eléctricos."),
+    "suministros automatizados":("Distribuidor",        "Colombia","Nacional",  "Parcial",  "Sin mínimo",   "Suministros industriales."),
+    "metrobit":                 ("Importador AMI",      "Europa",  "Importado", "Parcial",  "1 unidad",     "Medidores inteligentes. Representante local."),
+    "emsi":                     ("Importador AMI",      "China",   "Importado", "No",       "5 unidades",   "Marca MICROSTAR."),
+    "hexing":                   ("Importador AMI",      "China",   "Importado", "No",       "50 unidades",  "Medidores AMI. LC + flete marítimo."),
+    "mn technologies":          ("Importador AMI",      "China",   "Importado", "No",       "5 unidades",   "LC 30 días."),
+    "electrocables":            ("Cables/Conductores",  "Colombia","Nacional",  "Parcial",  "50 m/bobina",  "Conductores eléctricos."),
+    "prysmian":                 ("Cables/Conductores",  "Italia",  "Importado", "Parcial",  "50 m/bobina",  "Distribución local Colombia."),
+    "ja solar":                 ("Solar/Renovables",    "China",   "Importado", "No",       "Pallet",       "Paneles fotovoltaicos. LC 45 días + flete."),
+    "growatt":                  ("Solar/Renovables",    "China",   "Importado", "No",       "1 unidad",     "Inversores. Representante local."),
+    "il sole":                  ("Ingeniería Solar",    "Colombia","Nacional",  "N/A",      "Por proyecto", "Proyectos solares llave en mano."),
+    "solcity":                  ("Ingeniería Solar",    "Colombia","Nacional",  "N/A",      "Por proyecto", "Proyectos solares llave en mano."),
+    "4s":                       ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Ingeniería eléctrica integral."),
+    "dce":                      ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Instalaciones eléctricas industriales."),
+    "noatec":                   ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Sistemas de medición y control."),
+    "tevium":                   ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Proyectos AMI/Smart Grid."),
+    "keb":                      ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Ingeniería eléctrica."),
+    "faccel":                   ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Proyectos eléctricos."),
+    "ryctel":                   ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Automatización y control."),
+    "eqysol":                   ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Proyectos eléctricos industriales."),
+    "smart projects":           ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Ingeniería y proyectos especiales."),
+    "m y d":                    ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Ingeniería y diseño eléctrico."),
+    "jlring":                   ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Ingeniería eléctrica."),
+    "idosde":                   ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Ingeniería eléctrica."),
+    "k&v":                      ("Ingeniería",          "Colombia","Nacional",  "N/A",      "Por proyecto", "Ingeniería y diseño."),
+    "instalaciones y soluciones":("Ingeniería",         "Colombia","Nacional",  "N/A",      "Por proyecto", "Instalaciones eléctricas."),
+    "tableros electricos":      ("Fabricante Tableros", "Colombia","Nacional",  "No",       "Por proyecto", "Tableros a medida."),
+    "industrias rebra":         ("Fabricante Tableros", "Colombia","Nacional",  "No",       "Por proyecto", "Tableros y paneles a medida."),
+    "servimeters":              ("Calibración",         "Colombia","Nacional",  "N/A",      "Por servicio", "Calibración ISO 17025. Tiempo según laboratorio."),
+    "veritest":                 ("Calibración",         "Colombia","Nacional",  "N/A",      "Por servicio", "Ensayos y certificaciones."),
+    "certeam":                  ("Calibración",         "Colombia","Nacional",  "N/A",      "Por servicio", "Certificaciones técnicas."),
+    "rentek":                   ("Arriendo Operativo",  "Colombia","Nacional",  "Parcial",  "1 activo",     "Disponibilidad según flota."),
+    "renting colombia":         ("Arriendo Operativo",  "Colombia","Nacional",  "Parcial",  "1 unidad",     "Arriendo de equipos eléctricos."),
+    "formas logisticas":        ("Logística",           "Colombia","Nacional",  "Sí",       "Sin mínimo",   "Operador logístico. Entrega 24-48h."),
+    "operador de transporte":   ("Logística",           "Colombia","Nacional",  "Sí",       "Por viaje",    "Transporte terrestre y marítimo."),
+    "erasmus":                  ("Consultoría",         "Colombia","Nacional",  "N/A",      "Por servicio", "Normativa y consultoría."),
+    "sdt":                      ("Consultoría",         "Colombia","Nacional",  "N/A",      "Por servicio", "Consultoría técnica especializada."),
+    "gers":                     ("Consultoría",         "Colombia","Nacional",  "N/A",      "Por servicio", "Consultoría sistemas de energía."),
+    "normarh":                  ("Consultoría",         "Colombia","Nacional",  "N/A",      "Por servicio", "Normativa eléctrica."),
+    "corp centro":              ("Consultoría",         "Colombia","Nacional",  "N/A",      "Por servicio", "Centro de innovación sector eléctrico."),
+}
+
+def _lt_meta(name):
+    """Devuelve (tipo, pais, entrega, stock, ped_min, notas) desde _LT_META."""
+    n=(name or "").lower()
+    for s in (" sas"," s.a.s."," s.a.s"," s.a."," ltda"," technologies colombia"," colombia"," ingenieria"," 1 "):
+        n=n.replace(s," ")
+    n=n.strip()
+    if n in _LT_META: return _LT_META[n]
+    for k,v in _LT_META.items():
+        if k and k in n: return v
+    for k,v in _LT_META.items():
+        if k and len(n)>3 and n in k: return v
+    return ("Por clasificar","Colombia","Nacional","Por confirmar","Por confirmar","")
+
+def _lt_days(name, kb_lt):
+    """Busca el lead time real en kb_lt por nombre normalizado."""
+    if not kb_lt: return None
+    n=_norm(name)
+    for k,v in kb_lt.items():
+        if _norm(k)==n: return v
+    for k,v in kb_lt.items():
+        nk=_norm(k)
+        if nk and (nk in n or n in nk): return v
+    return None
 
 def build_lead_times(wb):
     from openpyxl.formatting.rule import ColorScaleRule, CellIsRule
@@ -831,15 +864,16 @@ def build_lead_times(wb):
     ws.sheet_view.showGridLines=False
 
     D=_load_kb_data()
-    kb_lt=D.get('lead_times',{})
+    kb_lt=D.get('lead_times',{})        # {prov_name: avg_days}  ← de provider_responses.delivery_days
+    kb_cnt=D.get('lead_times_count',{}) # {prov_name: n_responses}
     offers=D.get('offers_by_sku',{})
+    provs=_load_providers()
 
-    # SKU count per normalized provider name
+    # SKU count per normalized provider
     prov_sku=defaultdict(set)
     for sid,offs in offers.items():
         for o in offs:
             if o.get('price'): prov_sku[_norm(o['provider'])].add(sid)
-
     def sku_cnt(name):
         n=_norm(name); best=0
         for pn,sids in prov_sku.items():
@@ -847,30 +881,51 @@ def build_lead_times(wb):
                 best=max(best,len(sids))
         return best
 
-    # Merge curated data with any kb_data lead_times not already covered
-    curated_norm={_norm(r[0]) for r in _LT_CURATED}
-    extra=[]
-    for pname,lt_days in kb_lt.items():
+    def resp_cnt(name):
+        n=_norm(name)
+        for k,v in kb_cnt.items():
+            if _norm(k)==n or (n and _norm(k) and (_norm(k) in n or n in _norm(k))):
+                return v
+        return 0
+
+    # Build row list: providers.json como fuente canónica
+    seen=set(); all_rows=[]
+    for p in provs:
+        emp=p.get('empresa','')
+        if not emp or emp.upper()=='PRUEBA': continue
+        n=_norm(emp)
+        if n in seen: continue
+        seen.add(n)
+        days=_lt_days(emp,kb_lt)
+        meta=_lt_meta(emp)
+        all_rows.append((emp.upper(),meta[0],meta[1],meta[2],
+                         days,resp_cnt(emp),meta[3],meta[4],meta[5]))
+
+    # Añadir cualquier proveedor en kb_lt no cubierto por providers.json
+    for pname in kb_lt:
         if any(x in pname.upper() for x in ('PRUEB','TEST')): continue
         n=_norm(pname)
-        if any(n==cn or (n and cn and (n in cn or cn in n)) for cn in curated_norm): continue
-        extra.append((pname.upper(),"Por clasificar","Colombia","Nacional",
-                      int(lt_days),int(lt_days),int(lt_days),
-                      "Por confirmar","Por confirmar","Datos de Metabase, pendiente clasificar."))
+        if any(n==sn or (n and sn and (n in sn or sn in n)) for sn in seen): continue
+        seen.add(n)
+        days=kb_lt[pname]
+        meta=_lt_meta(pname)
+        all_rows.append((pname.upper(),meta[0],meta[1],meta[2],
+                         days,resp_cnt(pname),meta[3],meta[4],meta[5]))
 
-    all_rows=list(_LT_CURATED)+sorted(extra,key=lambda x:x[0])
+    # Ordenar: con dato real primero, luego por tipo, luego alfabético
+    all_rows.sort(key=lambda r:(0 if r[4] is not None else 1, r[1], r[0]))
     N=len(all_rows)
 
-    # Distinct tipos (first-appearance order, then sort for summary)
+    # Distinct tipos (first-appearance)
     seen_t=set(); all_tipos=[]
     for r in all_rows:
         t=r[1]
         if t not in seen_t: seen_t.add(t); all_tipos.append(t)
     T=len(all_tipos)
 
-    NCOLS=12  # detail is widest section
+    NCOLS=12
 
-    # ── Row layout (determinístico para referencias de fórmulas) ──
+    # ── Layout determinístico ──
     sum_title_row=3
     pv_hdr=4; pv_data0=5; pv_total=5+T
     det_title=pv_total+2
@@ -878,23 +933,22 @@ def build_lead_times(wb):
     det_d0=det_hdr+1
     det_d1=det_d0+N-1
 
-    Btyp=f"$B${det_d0}:$B${det_d1}"  # tipo en detalle
-    Eprom=f"$E${det_d0}:$E${det_d1}" # LT prom
-    Fmin =f"$F${det_d0}:$F${det_d1}" # LT mín
-    Gmax =f"$G${det_d0}:$G${det_d1}" # LT máx
+    Btyp=f"$B${det_d0}:$B${det_d1}"  # tipo
+    Eprom=f"$E${det_d0}:$E${det_d1}" # LT real (numérico o vacío)
 
+    n_real=sum(1 for r in all_rows if r[4] is not None)
     banner(ws,"  🚚 Lead Times por Proveedor",
-           f"  {N} proveedores · Resumen con AVERAGEIF/MINIFS/MAXIFS · Velocidad = fórmula · jun-2026",
+           f"  {N} proveedores · {n_real} con dato real (delivery_days) · {N-n_real} sin dato aún · jun-2026",
            NCOLS)
 
     # ════ SECCIÓN 1 — RESUMEN POR TIPO ════
-    st=ws.cell(sum_title_row,1,"  📊 Resumen por Tipo de Proveedor  ·  Fórmulas AVERAGEIF / MINIFS / MAXIFS al detalle")
+    st=ws.cell(sum_title_row,1,"  📊 Resumen por Tipo  ·  AVERAGEIF / COUNTIFS sobre col E (LT Real)  ·  ⏳ = sin pedidos aún")
     st.fill=fill(NAVY); st.font=font(11,True,WHITE); st.alignment=left
     ws.merge_cells(start_row=sum_title_row,end_row=sum_title_row,start_column=1,end_column=NCOLS)
     for c in range(1,NCOLS+1): ws.cell(sum_title_row,c).border=border_all
 
-    SUM_COLS=[("Tipo de Proveedor",22),("# Proveedores",13),
-              ("LT Promedio (días)",17),("LT Mínimo",11),("LT Máximo",11)]
+    SUM_COLS=[("Tipo de Proveedor",22),("# Total",10),
+              ("# Con LT Real",14),("LT Promedio Real (días)",20)]
     for i,(n,w) in enumerate(SUM_COLS,1):
         ws.cell(pv_hdr,i,n); ws.column_dimensions[get_column_letter(i)].width=w
     style_header(ws,len(SUM_COLS),pv_hdr)
@@ -902,34 +956,33 @@ def build_lead_times(wb):
     rr=pv_data0
     for t in all_tipos:
         ws.cell(rr,1,t).alignment=left; ws.cell(rr,1).font=font(10); ws.cell(rr,1).border=border_all
-        f_cnt =f'=COUNTIF({Btyp},A{rr})'
-        f_avg =f'=IFERROR(ROUND(AVERAGEIF({Btyp},A{rr},{Eprom}),1),"—")'
-        f_min =f'=IFERROR(MINIFS({Fmin},{Btyp},A{rr}),"—")'
-        f_max =f'=IFERROR(MAXIFS({Gmax},{Btyp},A{rr}),"—")'
-        for ci,(f_,nf) in enumerate([(f_cnt,'#,##0'),(f_avg,'0.0'),(f_min,'0'),(f_max,'0')],2):
+        f_tot  =f'=COUNTIF({Btyp},A{rr})'
+        f_real =f'=COUNTIFS({Btyp},A{rr},{Eprom},">0")'
+        f_avg  =f'=IFERROR(ROUND(AVERAGEIF({Btyp},A{rr},{Eprom}),1),"Sin dato")'
+        for ci,(f_,nf) in enumerate([(f_tot,'#,##0'),(f_real,'#,##0'),(f_avg,'0.0')],2):
             cc=ws.cell(rr,ci,f_); cc.border=border_all
             cc.font=font(10); cc.alignment=center; cc.number_format=nf
         rr+=1
 
-    # Fila TOTAL del resumen
+    # Fila TOTAL
     tc=ws.cell(pv_total,1,"TOTAL")
     tc.fill=fill(NAVY); tc.font=font(10,True,WHITE); tc.alignment=center; tc.border=border_all
     for ci,(f_,nf) in enumerate([
         (f'=SUM(B{pv_data0}:B{pv_total-1})','#,##0'),
-        (f'=IFERROR(ROUND(AVERAGE({Eprom}),1),"—")','0.0'),
-        (f'=IFERROR(MIN({Fmin}),"—")','0'),
-        (f'=IFERROR(MAX({Gmax}),"—")','0'),
+        (f'=SUM(C{pv_data0}:C{pv_total-1})','#,##0'),
+        (f'=IFERROR(ROUND(AVERAGEIF({Eprom},">0"),1),"Sin dato")','0.0'),
     ],2):
         cc=ws.cell(pv_total,ci,f_); cc.fill=fill(TEAL)
         cc.font=font(10,True,WHITE); cc.alignment=center; cc.border=border_all; cc.number_format=nf
 
     # ════ SECCIÓN 2 — DETALLE POR PROVEEDOR ════
+    # Col E = LT Real (numérico o vacío); Col H = Velocidad (fórmula); Col K = Estado
     DCOLS=[("Proveedor",28),("Tipo",20),("País",12),("Entrega",12),
-           ("LT Prom. (días)",15),("LT Mín.",10),("LT Máx.",10),
-           ("Velocidad",18),("Stock Inm.",12),("Ped. Mínimo",14),
-           ("# SKUs BIA",11),("Notas",38)]
+           ("LT Real (días)",15),("# Respuestas",13),
+           ("Velocidad",22),("Stock Inm.",12),("Ped. Mínimo",14),
+           ("# SKUs BIA",11),("Estado Dato",14),("Notas",36)]
 
-    dt=ws.cell(det_title,1,"  📋 Detalle por Proveedor  ·  Velocidad = fórmula sobre LT Prom. · Verde=Nacional · Rojo=Importado")
+    dt=ws.cell(det_title,1,"  📋 Detalle por Proveedor  ·  Col E = promedio real de delivery_days · Verde=Nacional · Rojo=Importado")
     dt.fill=fill(NAVY); dt.font=font(11,True,WHITE); dt.alignment=left
     ws.merge_cells(start_row=det_title,end_row=det_title,start_column=1,end_column=NCOLS)
     for c in range(1,NCOLS+1): ws.cell(det_title,c).border=border_all
@@ -939,22 +992,32 @@ def build_lead_times(wb):
     style_header(ws,len(DCOLS),det_hdr)
 
     rr=det_d0
-    for prov,tipo,pais,entrega,lt_prom,lt_min,lt_max,stock,ped_min,notas in all_rows:
+    for prov,tipo,pais,entrega,days,nresp,stock,ped_min,notas in all_rows:
         skus=sku_cnt(prov)
+        real=days is not None
+
         ws.cell(rr,1,prov).alignment=left
         ws.cell(rr,2,tipo).alignment=left
         ws.cell(rr,3,pais).alignment=center
         cen=ws.cell(rr,4,entrega); cen.alignment=center
-        cp=ws.cell(rr,5,lt_prom); cp.alignment=center; cp.number_format='#,##0'
-        cn=ws.cell(rr,6,lt_min);  cn.alignment=center; cn.number_format='#,##0'
-        cx=ws.cell(rr,7,lt_max);  cx.alignment=center; cx.number_format='#,##0'
-        # Fórmula de velocidad (referencia a columna E)
-        fv=f'=IF(E{rr}<=5,"🟢 Muy rápido",IF(E{rr}<=15,"🟡 Medio","🔴 Lento"))'
-        cv=ws.cell(rr,8,fv); cv.alignment=center
-        ws.cell(rr,9,stock).alignment=center
-        ws.cell(rr,10,ped_min).alignment=left
-        ws.cell(rr,11,skus if skus>0 else "—").alignment=center
+        # Col E: numérico si tenemos dato real, vacío si no
+        if real:
+            cp=ws.cell(rr,5,days); cp.alignment=center; cp.number_format='#,##0'
+        else:
+            ws.cell(rr,5,None)
+        # Col F: # respuestas
+        ws.cell(rr,6,nresp if nresp else None).alignment=center
+        # Col G: fórmula Velocidad — evalúa E directamente
+        fv=f'=IF(E{rr}="","⏳ Sin dato",IF(E{rr}<=5,"🟢 Muy rápido",IF(E{rr}<=15,"🟡 Medio","🔴 Lento")))'
+        ws.cell(rr,7,fv).alignment=center
+        ws.cell(rr,8,stock).alignment=center
+        ws.cell(rr,9,ped_min).alignment=left
+        ws.cell(rr,10,skus if skus>0 else "—").alignment=center
+        # Col K: estado visible
+        est="✅ Real" if real else "⏳ Por consultar"
+        ck=ws.cell(rr,11,est); ck.alignment=center
         ws.cell(rr,12,notas).alignment=left
+
         for ci in range(1,13):
             cc=ws.cell(rr,ci); cc.border=border_all
             if not cc.font.bold: cc.font=font(10)
@@ -963,6 +1026,11 @@ def build_lead_times(wb):
             cen.fill=fill(GREEN_LT); cen.font=font(10,True,GREEN)
         elif entrega=="Importado":
             cen.fill=fill(RED_LT); cen.font=font(10,False,RED)
+        # Color Estado
+        if real:
+            ck.fill=fill(GREEN_LT); ck.font=font(10,True,GREEN)
+        else:
+            ck.fill=fill(GOLD_LT); ck.font=font(10,False,GOLD)
         rr+=1
 
     if det_d1>=det_d0:
@@ -970,25 +1038,26 @@ def build_lead_times(wb):
         tab.tableStyleInfo=TableStyleInfo(name="TableStyleLight9",showRowStripes=True)
         ws.add_table(tab)
 
+    # Color scale solo sobre celdas con dato (blancos quedan sin color)
     ws.conditional_formatting.add(f"E{det_d0}:E{det_d1}",
         ColorScaleRule(start_type='min',start_color=GREEN_LT,
                        mid_type='percentile',mid_value=50,mid_color=GOLD_LT,
                        end_type='max',end_color=RED_LT))
-    ws.conditional_formatting.add(f"I{det_d0}:I{det_d1}",
+    ws.conditional_formatting.add(f"H{det_d0}:H{det_d1}",
         CellIsRule(operator='equal',formula=['"Sí"'],fill=fill(GREEN_LT),font=font(10,True,GREEN)))
-    ws.conditional_formatting.add(f"I{det_d0}:I{det_d1}",
+    ws.conditional_formatting.add(f"H{det_d0}:H{det_d1}",
         CellIsRule(operator='equal',formula=['"No"'],fill=fill(RED_LT),font=font(10,False,RED)))
-    ws.conditional_formatting.add(f"I{det_d0}:I{det_d1}",
+    ws.conditional_formatting.add(f"H{det_d0}:H{det_d1}",
         CellIsRule(operator='equal',formula=['"Parcial"'],fill=fill(GOLD_LT),font=font(10,False,GOLD)))
 
     ws.freeze_panes="A5"
 
-    nota=("🟢 Muy rápido ≤5 días · 🟡 Medio 6-15 días · 🔴 Lento >15 días  ·  "
-          "Velocidad = fórmula sobre LT Prom. (col. E)  ·  "
-          "LT: días hábiles aprox. · Verde=Nacional / Rojo=Importado · jun-2026")
+    nota=(f"✅ Verde = LT calculado del promedio real de tus pedidos (delivery_days en provider_responses)  ·  "
+          f"⏳ Amarillo = sin respuestas reales aún  ·  "
+          f"Velocidad: 🟢≤5 · 🟡6-15 · 🔴>15 días  ·  jun-2026")
     ws.cell(det_d1+2,1,nota).font=font(9,False,"7A8094")
     ws.merge_cells(start_row=det_d1+2,end_row=det_d1+2,start_column=1,end_column=NCOLS)
-    print(f"🚚 Lead Times OK: {N} proveedores · {T} tipos · detalle filas {det_d0}-{det_d1}")
+    print(f"🚚 Lead Times OK: {N} proveedores · {n_real} con LT real · {N-n_real} sin dato · filas {det_d0}-{det_d1}")
 
 
 # ─── REGISTRO DE HOJAS ────────────────────────────────────────────

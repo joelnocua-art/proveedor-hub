@@ -43,6 +43,7 @@ SKU_TABLE       = _env("METABASE_SKU_TABLE")    or "sku_catalog"
 OFFERS_TABLE    = _env("METABASE_OFFERS_TABLE") or "sku_offers"
 INV_TABLE       = _env("METABASE_INV_TABLE")    or "inventory_items"
 PROV_TABLE      = _env("METABASE_PROV_TABLE")   or "providers"
+PRESP_TABLE     = _env("METABASE_PRESP_TABLE")  or "provider_responses"
 CALIB_CARD      = int(_env("METABASE_CALIB_CARD") or 75406)
 OUTPUT_XLSX     = ROOT / (_env("OUTPUT_XLSX") or "KB_BIA_Proveedores.xlsx")
 KB_DATA_JSON    = ROOT / "scripts" / "kb_data_cache.json"
@@ -138,6 +139,12 @@ def download_data():
     sku_offers   = query_table(OFFERS_TABLE)
     inventory    = query_table(INV_TABLE)
     providers    = query_table(PROV_TABLE)
+    try:
+        prov_responses = query_table(PRESP_TABLE)
+        print(f"  ✅ provider_responses: {len(prov_responses)} respuestas")
+    except Exception as e:
+        print(f"  ⚠ provider_responses no disponible: {e}")
+        prov_responses = []
     calib_raw    = []
     if CALIB_CARD:
         try:
@@ -145,7 +152,7 @@ def download_data():
             print(f"  ✅ Card #{CALIB_CARD} descargada: {len(calib_raw)} equipos")
         except Exception as e:
             print(f"  ⚠ Card #{CALIB_CARD} no disponible: {e}")
-    return sku_catalog, sku_offers, inventory, providers, calib_raw
+    return sku_catalog, sku_offers, inventory, providers, prov_responses, calib_raw
 
 # ──────────────────────────────────────────────────────────────────
 # 3.  TRANSFORMAR → kb_data
@@ -205,17 +212,28 @@ def lookup_lead(prov, lead_times):
         if norm(k) == pn or norm(k) in pn or pn in norm(k): return days
     return ""
 
-def build_kb_data(sku_catalog, sku_offers, inventory, providers, calib_raw=None):
+def build_kb_data(sku_catalog, sku_offers, inventory, providers, prov_responses=None, calib_raw=None):
     print("\n🔧 Procesando datos …")
 
-    # lead times desde providers
+    # Lead times reales: promedio de delivery_days por proveedor en provider_responses
+    # (NO usar providers.it — ese campo es un índice de fila, no días de entrega)
     lead_times = {}
-    for pr in providers:
-        pname = (pr.get("name") or pr.get("provider") or "").upper().strip()
-        lt = pr.get("lead_time") or pr.get("lead_time_dias") or pr.get("it")
-        if pname and lt:
-            try: lead_times[pname] = int(lt)
-            except: pass
+    if prov_responses:
+        _lt_sums = defaultdict(list)
+        for resp in prov_responses:
+            pname = (resp.get("provider") or "").upper().strip()
+            days  = resp.get("delivery_days")
+            if pname and days is not None:
+                try: _lt_sums[pname].append(int(days))
+                except: pass
+        lead_times_count = {}
+        for pname, vals in _lt_sums.items():
+            if vals:
+                lead_times[pname] = round(sum(vals) / len(vals))
+                lead_times_count[pname] = len(vals)
+        print(f"  → Lead times reales: {len(lead_times)} proveedores ({sum(len(v) for v in _lt_sums.values())} respuestas)")
+    else:
+        lead_times_count = {}
 
     # sku index
     sku_type = {}
@@ -294,6 +312,7 @@ def build_kb_data(sku_catalog, sku_offers, inventory, providers, calib_raw=None)
         "sku_type": sku_type,
         "sku_name": sku_name_map,
         "lead_times": lead_times,
+        "lead_times_count": lead_times_count,
         "offers_by_sku": dict(offers_by_sku),
         "calib_data": calib_raw or [],
     }
@@ -335,8 +354,8 @@ def main():
     print("  BIA Energy — KB Proveedor Hub · Sync desde Metabase")
     print("=" * 60)
 
-    sku_catalog, sku_offers, inventory, providers, calib_raw = download_data()
-    D = build_kb_data(sku_catalog, sku_offers, inventory, providers, calib_raw)
+    sku_catalog, sku_offers, inventory, providers, prov_responses, calib_raw = download_data()
+    D = build_kb_data(sku_catalog, sku_offers, inventory, providers, prov_responses, calib_raw)
 
     # Guardar cache JSON (útil para regenerar Excel sin volver a descargar)
     KB_DATA_JSON.parent.mkdir(parents=True, exist_ok=True)
