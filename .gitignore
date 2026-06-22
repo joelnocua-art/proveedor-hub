@@ -37,3 +37,4 @@ data_calib/*.csv
 
 # Hoja generada (puede contener datos)
 Calibraciones.xlsx
+LeadTimes.xlsx
