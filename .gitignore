@@ -34,3 +34,6 @@ scripts/kb_data_cache.json
 .env
 scripts/Homologacion_SKU.xlsx
 data_calib/*.csv
+
+# Hoja generada (puede contener datos)
+Calibraciones.xlsx
