@@ -639,18 +639,38 @@ def build_calibracion(wb):
     TIPO_COL={'TC':TEAL,'TP':GOLD,'Medidor':'5B6BFF'}
     TIPO_LT ={'TC':TEAL_LT,'TP':GOLD_LT,'Medidor':'E8ECFF'}
 
+    # ── Tipos de equipo distintos (por código) para la tablita resumen ──
+    # Agrupa por código real (5496, 5497…) → cada SKU/equipo es una fila.
+    equipos=[]; vistos=set()
+    for it in items:
+        k=it['codigo'] or it['desc']
+        if k in vistos: continue
+        vistos.add(k)
+        equipos.append(dict(codigo=it['codigo'],desc=it['desc'],
+                            tipo=it['tipo'],categoria=it['categoria'],vu=it['vu']))
+    NE=len(equipos)
+
     # ── Layout determinístico (para referencias de fórmulas) ──
-    # Pivot: header=3, datos 4..3+P, total=4+P
+    # Pivot mensual: header=3, datos 4..3+P, total=4+P
     pv_hdr=3; pv_data0=4; pv_total=4+P
+    # Tablita por tipo de equipo: título, header, datos, total
+    bt_title=pv_total+2
+    bt_hdr=bt_title+1
+    bt_d0=bt_hdr+1
+    bt_d1=bt_d0+NE-1
+    bt_total=bt_d1+1
     # Detalle: título, header, datos
-    det_title=pv_total+2
+    det_title=bt_total+2
     det_hdr=det_title+1
     det_d0=det_hdr+1
     det_d1=det_d0+N-1
     # Columnas detalle: A=Mes B=Tipo C=Cat D=Cod E=Desc F=VU G=Cant H=Sub I=IVA J=Total
     A=f"$A${det_d0}:$A${det_d1}"   # label mes
     Bt=f"$B${det_d0}:$B${det_d1}"  # tipo
+    Dc=f"$D${det_d0}:$D${det_d1}"  # código
     Gc=f"$G${det_d0}:$G${det_d1}"  # cantidad
+    Hs=f"$H${det_d0}:$H${det_d1}"  # subtotal
+    Ii=f"$I${det_d0}:$I${det_d1}"  # iva
     Jt=f"$J${det_d0}:$J${det_d1}"  # total c/IVA
 
     # ════ SECCIÓN 1 · RESUMEN MENSUAL (con fórmulas SUMIFS) ════
@@ -718,6 +738,54 @@ def build_calibracion(wb):
         cc=ws.cell(pv_total,c,f"=SUM({L}{pv_data0}:{L}{pv_total-1})")
         cc.fill=fill(TEAL); cc.font=font(11 if c>=ncols-1 else 10,True,WHITE)
         cc.alignment=center; cc.border=border_all; cc.number_format='#,##0'
+
+    # ════ SECCIÓN 1b · RESUMEN POR TIPO DE EQUIPO (tablita, fórmulas SUMIFS) ════
+    # Una fila por código/SKU (TC Baja, TC Media, TP Media, Medidor…), agregando
+    # TODOS los meses. Valor unitario = costo de calibrar 1 equipo de ese tipo.
+    bcols=[("Código",9),("Tipo",10),("Equipo / Descripción",28),
+           ("Valor Unit. COP",15),("Total Equipos",13),
+           ("Subtotal COP",15),("IVA 19% COP",13),("Total c/IVA COP",16)]
+    nbc=len(bcols)
+    bh=ws.cell(bt_title,1,"  🔧 Resumen por Tipo de Equipo  ·  costo unitario de calibración × equipos a vencer (todos los meses)")
+    bh.fill=fill(NAVY); bh.font=font(11,True,WHITE); bh.alignment=left
+    ws.merge_cells(start_row=bt_title,end_row=bt_title,start_column=1,end_column=nbc)
+    for c in range(1,nbc+1): ws.cell(bt_title,c).border=border_all
+    for i,(n,w) in enumerate(bcols,1):
+        ws.cell(bt_hdr,i,n)
+        ws.column_dimensions[get_column_letter(i)].width=w
+    style_header(ws,nbc,bt_hdr)
+
+    rr=bt_d0
+    for e in equipos:
+        cod=e['codigo']
+        ws.cell(rr,1,cod).alignment=center
+        ct=ws.cell(rr,2,e['tipo'])
+        ws.cell(rr,3,e['desc']).alignment=left
+        cvu=ws.cell(rr,4,e['vu']); cvu.number_format='#,##0'; cvu.alignment=center
+        # Total equipos a vencer = SUMIFS(cantidad detalle, código = este código)
+        cte=ws.cell(rr,5,f'=SUMIFS({Gc},{Dc},$A{rr})'); cte.number_format='#,##0'; cte.alignment=center
+        # Subtotal/IVA/Total = SUMIFS al detalle por código
+        cs=ws.cell(rr,6,f'=SUMIFS({Hs},{Dc},$A{rr})'); cs.number_format='#,##0'; cs.alignment=center
+        cv=ws.cell(rr,7,f'=SUMIFS({Ii},{Dc},$A{rr})'); cv.number_format='#,##0'; cv.alignment=center
+        cto=ws.cell(rr,8,f'=SUMIFS({Jt},{Dc},$A{rr})'); cto.number_format='#,##0'; cto.alignment=center
+        for c in range(1,nbc+1):
+            cc=ws.cell(rr,c); cc.border=border_all
+            if c==2:
+                cc.fill=fill(TIPO_LT.get(e['tipo'],"F4F4F4")); cc.font=font(10,True,TIPO_COL.get(e['tipo'],TXT)); cc.alignment=center
+            else:
+                cc.font=font(10)
+        rr+=1
+    # Fila TOTAL de la tablita
+    tb0=ws.cell(bt_total,1,"TOTAL"); tb0.fill=fill(NAVY); tb0.font=font(10,True,WHITE)
+    tb0.alignment=center; tb0.border=border_all
+    ws.merge_cells(start_row=bt_total,end_row=bt_total,start_column=1,end_column=3)
+    for c in range(2,4): ws.cell(bt_total,c).border=border_all
+    for c in (5,6,7,8):  # Total equipos, subtotal, iva, total c/IVA
+        L=get_column_letter(c)
+        cc=ws.cell(bt_total,c,f"=SUM({L}{bt_d0}:{L}{bt_d1})")
+        cc.fill=fill(TEAL); cc.font=font(11 if c==8 else 10,True,WHITE)
+        cc.alignment=center; cc.border=border_all; cc.number_format='#,##0'
+    ws.cell(bt_total,4).fill=fill(NAVY); ws.cell(bt_total,4).border=border_all  # valor unit no se suma
 
     # ════ SECCIÓN 2 · DETALLE POR PRODUCTO (con fórmulas) ════
     dcols=[("Mes / Año",16),("Tipo",10),("Categoría",11),("Código",9),
