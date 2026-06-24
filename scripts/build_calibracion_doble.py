@@ -117,12 +117,13 @@ def build_hoja2(wb, det_csv):
 
     # ── KPIs fila 3 ──
     hdr = 4; d0 = 5; d1 = d0 + N - 1
+    # KPIs como fórmulas vivas sobre el detalle (B=serial, C=código)
     kpis = [
-        ("Total equipos", N),
-        ("TC Baja (5496)",  sum(1 for r in rows if r.get('codigo')=='5496')),
-        ("TC Media (5498)", sum(1 for r in rows if r.get('codigo')=='5498')),
-        ("TP Media (5497)", sum(1 for r in rows if r.get('codigo')=='5497')),
-        ("Medidor (6024)",  sum(1 for r in rows if r.get('codigo')=='6024')),
+        ("Total equipos",   f"=COUNTA(B{d0}:B{d1})"),
+        ("TC Baja (5496)",  f'=COUNTIF(C{d0}:C{d1},"5496")'),
+        ("TC Media (5498)", f'=COUNTIF(C{d0}:C{d1},"5498")'),
+        ("TP Media (5497)", f'=COUNTIF(C{d0}:C{d1},"5497")'),
+        ("Medidor (6024)",  f'=COUNTIF(C{d0}:C{d1},"6024")'),
     ]
     col = 1
     for lbl, val in kpis:
@@ -153,8 +154,9 @@ def build_hoja2(wb, det_csv):
         dia = r.get('dia_vencimiento', '')
         tipo = tipo_from_desc(r.get('descripcion',''), r.get('categoria',''))
         vu = tonum(r.get('valor_unitario', 0))
-        iva = round(vu * 0.19)
-        tot = vu + iva
+        # IVA y Total como FÓRMULAS vivas (I=Valor Unit, J=IVA, K=Total)
+        iva = f"=ROUND(I{rr}*0.19,0)"
+        tot = f"=I{rr}+J{rr}"
 
         # Urgencia: solo TEXTO de color en la fecha (no se rellena la fila)
         try:
@@ -210,9 +212,25 @@ def build_hoja2(wb, det_csv):
 
     ws.freeze_panes = f"A{d0}"
 
+    # ── Fila TOTAL (fórmulas SUM) debajo de la tabla ──
+    tr = d1 + 1
+    tc0 = ws.cell(tr, 1, "TOTAL")
+    tc0.fill = A.fill(A.NAVY); tc0.font = A.font(10, True, A.WHITE)
+    tc0.alignment = A.center; tc0.border = A.border_all
+    ws.merge_cells(start_row=tr, end_row=tr, start_column=1, end_column=8)
+    for c in range(2, 9):
+        ws.cell(tr, c).border = A.border_all
+    # Suma Valor Unit (I), IVA (J), Total c/IVA (K)
+    for c in (9, 10, 11):
+        L = get_column_letter(c)
+        cc = ws.cell(tr, c, f"=SUM({L}{d0}:{L}{d1})")
+        cc.fill = A.fill(A.TEAL); cc.font = A.font(11 if c == 11 else 10, True, A.WHITE)
+        cc.alignment = A.center; cc.border = A.border_all; cc.number_format = '#,##0'
+    ws.cell(tr, 12).border = A.border_all
+
     # ── Nota al pie ──
-    ws.cell(d1 + 2, 1, NOTA_DISC).font = A.font(9, False, "7A8094")
-    ws.merge_cells(start_row=d1+2, end_row=d1+2,
+    ws.cell(tr + 2, 1, NOTA_DISC).font = A.font(9, False, "7A8094")
+    ws.merge_cells(start_row=tr+2, end_row=tr+2,
                    start_column=1, end_column=NC)
 
     ws.sheet_properties.tabColor = '5B6BFF'
