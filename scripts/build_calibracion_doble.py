@@ -99,7 +99,8 @@ def build_hoja2(wb, det_csv):
         ("Código",    8),
         ("Tipo",     10),
         ("Categoría",11),
-        ("SKU / Descripción",40),
+        ("SKU / Equipo",       42),
+        ("Descripción Servicio",20),
         ("Vencimiento",      14),
         ("Mes Vence",        13),
         ("Valor Unit. COP",  15),
@@ -154,9 +155,9 @@ def build_hoja2(wb, det_csv):
         dia = r.get('dia_vencimiento', '')
         tipo = tipo_from_desc(r.get('descripcion',''), r.get('categoria',''))
         vu = tonum(r.get('valor_unitario', 0))
-        # IVA y Total como FÓRMULAS vivas (I=Valor Unit, J=IVA, K=Total)
-        iva = f"=ROUND(I{rr}*0.19,0)"
-        tot = f"=I{rr}+J{rr}"
+        # IVA y Total como FÓRMULAS vivas (J=Valor Unit, K=IVA, L=Total)
+        iva = f"=ROUND(J{rr}*0.19,0)"
+        tot = f"=J{rr}+K{rr}"
 
         # Urgencia: solo TEXTO de color en la fecha (no se rellena la fila)
         try:
@@ -174,7 +175,8 @@ def build_hoja2(wb, det_csv):
             (r.get('codigo',''), 'center', None),
             (tipo,        'center', None),
             (r.get('categoria',''), 'center', None),
-            (r.get('descripcion','').replace(r.get('sku','XXX'),'').strip() or r.get('sku',''), 'left', None),
+            (r.get('sku',''),         'left', None),   # SKU / Equipo (detalle real)
+            (r.get('descripcion',''), 'left', None),   # Descripción del servicio
             (dia,         'center', None),
             (mes_label(mes), 'center', None),
             (vu,          'center', '#,##0'),
@@ -190,15 +192,15 @@ def build_hoja2(wb, det_csv):
             if ci == 4:  # Tipo — chip de color suave
                 cc.fill = A.fill(TIPO_LT.get(tipo, A.GREY_LT))
                 cc.font = A.font(9, True, TIPO_COL.get(tipo, A.TXT))
-            elif ci in (7, 8):  # Vencimiento / Mes Vence — texto de urgencia
+            elif ci in (8, 9):  # Vencimiento / Mes Vence — texto de urgencia
                 cc.font = A.font(9, fecha_bold, fecha_color)
             if isinstance(extra, str) and extra:
                 cc.number_format = extra
 
-        # Hipervínculo certificado
+        # Hipervínculo certificado (col 13)
         url = r.get('certificado_url', '')
         if url and url.startswith('http'):
-            link_cell = ws.cell(rr, 12)
+            link_cell = ws.cell(rr, 13)
             link_cell.hyperlink = url
             link_cell.font = A.font(9, False, '1A6FB8')
 
@@ -217,16 +219,16 @@ def build_hoja2(wb, det_csv):
     tc0 = ws.cell(tr, 1, "TOTAL")
     tc0.fill = A.fill(A.NAVY); tc0.font = A.font(10, True, A.WHITE)
     tc0.alignment = A.center; tc0.border = A.border_all
-    ws.merge_cells(start_row=tr, end_row=tr, start_column=1, end_column=8)
-    for c in range(2, 9):
+    ws.merge_cells(start_row=tr, end_row=tr, start_column=1, end_column=9)
+    for c in range(2, 10):
         ws.cell(tr, c).border = A.border_all
-    # Suma Valor Unit (I), IVA (J), Total c/IVA (K)
-    for c in (9, 10, 11):
+    # Suma Valor Unit (J), IVA (K), Total c/IVA (L)
+    for c in (10, 11, 12):
         L = get_column_letter(c)
         cc = ws.cell(tr, c, f"=SUM({L}{d0}:{L}{d1})")
-        cc.fill = A.fill(A.TEAL); cc.font = A.font(11 if c == 11 else 10, True, A.WHITE)
+        cc.fill = A.fill(A.TEAL); cc.font = A.font(11 if c == 12 else 10, True, A.WHITE)
         cc.alignment = A.center; cc.border = A.border_all; cc.number_format = '#,##0'
-    ws.cell(tr, 12).border = A.border_all
+    ws.cell(tr, 13).border = A.border_all
 
     # ── Nota al pie ──
     ws.cell(tr + 2, 1, NOTA_DISC).font = A.font(9, False, "7A8094")
