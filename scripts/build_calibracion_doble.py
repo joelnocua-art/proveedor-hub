@@ -170,7 +170,7 @@ def build_hoja2(wb, det_csv):
             (idx,         'center', None),
             (r.get('serial',''), 'left', None),
             (r.get('codigo',''), 'center', None),
-            (tipo,        'center', TIPO_LT.get(tipo, A.GREY_LT)),
+            (tipo,        'center', None),
             (r.get('categoria',''), 'center', None),
             (r.get('descripcion','').replace(r.get('sku','XXX'),'').strip() or r.get('sku',''), 'left', None),
             (dia,         'center', None),
