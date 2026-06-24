@@ -156,16 +156,15 @@ def build_hoja2(wb, det_csv):
         iva = round(vu * 0.19)
         tot = vu + iva
 
-        # Color de fila según urgencia
+        # Urgencia: solo TEXTO de color en la fecha (no se rellena la fila)
         try:
             y, m = mes.split('-')
             diff = (int(y)*12 + int(m)) - (today.year*12 + today.month)
         except Exception:
             diff = 99
-        if diff < 0:    rf, rt = 'F0F0F0', '999999'
-        elif diff == 0: rf, rt = A.RED_LT,  A.RED
-        elif diff == 1: rf, rt = A.GOLD_LT, A.GOLD
-        else:           rf, rt = None,       A.TXT
+        if diff <= 0:   fecha_color, fecha_bold = A.RED,  True   # vence este mes o antes
+        elif diff == 1: fecha_color, fecha_bold = A.GOLD, True   # próximo mes
+        else:           fecha_color, fecha_bold = A.TXT,  False
 
         vals = [
             (idx,         'center', None),
@@ -185,12 +184,12 @@ def build_hoja2(wb, det_csv):
             cc = ws.cell(rr, ci, val)
             cc.alignment = A.center if align == 'center' else A.left
             cc.border = A.border_all
-            cc.font = A.font(9, False, rt)
-            if ci == 4:  # Tipo — color propio
+            cc.font = A.font(9)
+            if ci == 4:  # Tipo — chip de color suave
                 cc.fill = A.fill(TIPO_LT.get(tipo, A.GREY_LT))
                 cc.font = A.font(9, True, TIPO_COL.get(tipo, A.TXT))
-            elif rf:
-                cc.fill = A.fill(rf)
+            elif ci in (7, 8):  # Vencimiento / Mes Vence — texto de urgencia
+                cc.font = A.font(9, fecha_bold, fecha_color)
             if isinstance(extra, str) and extra:
                 cc.number_format = extra
 
