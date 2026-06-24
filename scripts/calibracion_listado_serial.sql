@@ -27,11 +27,12 @@ WITH certs_calibracion AS (
 base AS (
     SELECT
         inventory.id                                    AS inventory_id,
-        inventory.serial                                AS serial,            -- ⬅️ AJUSTA si la columna tiene otro nombre
-        sku.name                                        AS sku_nombre,
-        certs_calibracion.end_date                      AS fecha_vencimiento,
-        certs_calibracion.url                           AS certificado_url,
-        TO_CHAR(certs_calibracion.end_date, 'YYYY-MM')  AS mes,
+        inventory.serial                                   AS serial,            -- ⬅️ AJUSTA si la columna tiene otro nombre
+        sku.name                                           AS sku_nombre,
+        certs_calibracion.end_date::date                   AS fecha_vencimiento, -- día exacto (sin hora)
+        certs_calibracion.url                              AS certificado_url,
+        TO_CHAR(certs_calibracion.end_date, 'YYYY-MM-DD')  AS dia_vencimiento,   -- día con formato
+        TO_CHAR(certs_calibracion.end_date, 'YYYY-MM')     AS mes,
         CASE
             WHEN sku.name ILIKE 'TC%' AND sku.name ILIKE '%0,72 kV%' THEN '5496'
             WHEN sku.name ILIKE 'TC%'           THEN '5498'
@@ -63,7 +64,8 @@ SELECT
         WHEN base.codigo_servicio IN ('6021','6022','6024')    THEN 'Medidor'
         ELSE 'Sin clasificar'
     END                                                 AS categoria,
-    base.fecha_vencimiento                              AS fecha_vencimiento,
+    base.fecha_vencimiento                              AS fecha_vencimiento,  -- día exacto de vencimiento
+    base.dia_vencimiento                                AS dia_vencimiento,
     base.mes                                            AS mes_vencimiento,
     precios.vr_unitario                                 AS valor_unitario,   -- precio unitario por equipo
     base.certificado_url                                AS certificado_url
