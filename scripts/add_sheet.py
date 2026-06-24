@@ -811,7 +811,7 @@ def build_calibracion(wb):
         cct=ws.cell(rr,7,it['cant']); cct.number_format='#,##0'; cct.alignment=center
         # Fórmulas:
         csub=ws.cell(rr,8,f"=F{rr}*G{rr}"); csub.number_format='#,##0'; csub.alignment=center
-        civa=ws.cell(rr,9,f"=ROUND(H{rr}*{IVA_RATE},0)"); civa.number_format='#,##0'; civa.alignment=center
+        civa=ws.cell(rr,9,f"=ROUND(F{rr}*{IVA_RATE},0)*G{rr}"); civa.number_format='#,##0'; civa.alignment=center
         ctot=ws.cell(rr,10,f"=H{rr}+I{rr}"); ctot.number_format='#,##0'; ctot.alignment=center
         for c in range(1,11):
             cc=ws.cell(rr,c); cc.border=border_all
