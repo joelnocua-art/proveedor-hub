@@ -56,17 +56,45 @@ def tonum(s):
 
 
 # ══════════════════════════════════════════════════════════════════
-# HOJA 1 — igual que build_calibracion() ya existente
+# HOJA 1 — resumen mensual (mismo build_calibracion existente)
 # ══════════════════════════════════════════════════════════════════
-def build_hoja1(wb, agg_csv):
-    calib = []
-    with open(agg_csv, newline='', encoding='utf-8-sig') as f:
+def _agregar_desde_detalle(det_csv):
+    """Agrega el CSV granular (1 fila/serial) al formato que espera
+    build_calibracion: 1 fila por (mes, código). Garantiza que el total
+    de la Hoja 1 cuadre exactamente con el de la Hoja 2."""
+    import collections
+    grupos = collections.OrderedDict()  # (mes, codigo) -> dict acumulado
+    with open(det_csv, newline='', encoding='utf-8-sig') as f:
         for r in csv.DictReader(f):
-            calib.append({k.strip(): v for k, v in r.items() if k})
+            mes = (r.get('mes_vencimiento') or '').strip()
+            cod = (r.get('codigo') or '').strip()
+            if not mes or not cod:
+                continue
+            k = (mes, cod)
+            g = grupos.get(k)
+            if g is None:
+                grupos[k] = {
+                    "mes": mes,
+                    "categoria": r.get('categoria', ''),    # Media / Baja / Medidor
+                    "codigo": cod,
+                    "descripcion": r.get('descripcion', ''),  # "TC Media Tensión", etc.
+                    "valor_unitario": tonum(r.get('valor_unitario', 0)),
+                    "cantidad_equipos": 1,
+                }
+            else:
+                g["cantidad_equipos"] += 1
+    return list(grupos.values())
+
+
+def build_hoja1(wb, det_csv):
+    # Se agrega DESDE el detalle granular → misma fuente que la Hoja 2
+    calib = _agregar_desde_detalle(det_csv)
     A._load_kb_data = lambda: {"calib_data": calib}
     A.build_calibracion(wb)
     ws = wb["📅 Calibraciones"]
     ws.sheet_properties.tabColor = A.TAB_COLORS.get("📅 Calibraciones", "009688")
+    total = sum(int(c["cantidad_equipos"]) for c in calib)
+    print(f"📅 Hoja 1 agregada desde el detalle: {total} equipos en {len(calib)} líneas")
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -87,10 +115,10 @@ def build_hoja2(wb, det_csv):
 
     N = len(rows)
 
-    # Nota de verificación cruzada
+    # Nota al pie: ambas hojas salen del mismo detalle → totales cuadran
     NOTA_DISC = (
-        "⚠  Nota de verificación: 726 equipos (este listado) vs 723 en el agregado de la Hoja 1 — "
-        "diferencia de 3 unidades TC Media en sep-2026, posiblemente ingresadas entre ambas exportaciones."
+        f"Listado fila-por-serial · {N} equipos · El resumen de la Hoja 1 se agrega desde este mismo "
+        "detalle, por lo que los totales de ambas hojas coinciden exactamente."
     )
 
     COLS = [
@@ -243,17 +271,17 @@ def build_hoja2(wb, det_csv):
 # ══════════════════════════════════════════════════════════════════
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--csv-agg", required=True,
-                    help="CSV agregado (card #75406) p.ej. data_calib/calibraciones_meta.csv")
     ap.add_argument("--csv-det", required=True,
-                    help="CSV granular por serial (resultado del SQL listado)")
+                    help="CSV granular por serial (resultado del SQL listado). "
+                         "Ambas hojas se construyen desde este archivo.")
+    ap.add_argument("--csv-agg", help="(opcional, ya no se usa: la Hoja 1 se agrega desde --csv-det)")
     ap.add_argument("--out", default=str(ROOT / "Calibraciones.xlsx"))
     args = ap.parse_args()
 
     wb = Workbook()
     wb.remove(wb.active)
 
-    build_hoja1(wb, args.csv_agg)
+    build_hoja1(wb, args.csv_det)   # agrega desde el detalle → cuadra con Hoja 2
     build_hoja2(wb, args.csv_det)
 
     wb.save(args.out)
