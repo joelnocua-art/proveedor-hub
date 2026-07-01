@@ -278,9 +278,47 @@ export default async function handler(req, res) {
       });
     }
 
+    // ── Equipos por SERIAL — búsqueda parcial sobre TODAS las filas ──
+    // Trae el equipo real (con su precio_unitario de Metabase) sin necesidad
+    // de seleccionar primero el cliente.
+    if (type === 'serial') {
+      const term = (q || '').trim().toLowerCase();
+      if (term.length < 2) {
+        return res.status(400).json({
+          success: false,
+          error: 'q (serial) requiere al menos 2 caracteres'
+        });
+      }
+      const equipment = rows
+        .filter(r => String(r.serial || '').toLowerCase().includes(term))
+        .slice(0, 30)
+        .map(r => ({
+          codigo_bia:        r.codigo_bia,
+          razon_social:      r.razon_social,
+          nombre_sku:        r.nombre_sku,
+          serial:            r.serial,
+          marca:             r.marca,
+          modelo:            r.modelo,
+          precio_unitario:   r.precio_unitario,
+          estado:            r.estado,
+          operador_red:      r.operador_red,
+          ciudad:            r.ciudad,
+          frontera:          r.frontera,
+          titulo:            r.titulo,
+          propiedad_activos: r.propiedad_activos,
+          fecha_instalacion: r.fecha_instalacion
+        }));
+
+      return res.status(200).json({
+        success: true,
+        count: equipment.length,
+        equipment
+      });
+    }
+
     return res.status(400).json({
       success: false,
-      error: 'Parámetro "type" inválido. Usa: type=clients | type=equipment&codigo_bia=... | debug=1'
+      error: 'Parámetro "type" inválido. Usa: type=clients | type=equipment&codigo_bia=... | type=serial&q=... | debug=1'
     });
 
   } catch (err) {
