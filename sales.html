@@ -892,16 +892,10 @@
     };
 
     // ═══ BUSCADOR DE SKU (Paso 2) — agregar equipos desde el catálogo ═══
-    // Precio de referencia: mejor oferta registrada para ese SKU (si existe).
-    function bestBaseForSkuId(skuId){
-      try{
-        var offers = (window._sbData && window._sbData.skuOffers && window._sbData.skuOffers[String(skuId)]) || [];
-        var prices = offers.map(function(o){ return Number(o.price_sin_iva)||0; }).filter(function(p){ return p>0; });
-        return prices.length ? Math.min.apply(null, prices) : 0;
-      }catch(_){ return 0; }
-    }
-
-    // Agrega un SKU del catálogo como ítem a vender
+    // NOTA: no se prellena precio. El precio de sku_offers es de COMPRA a
+    // proveedores, no de venta; y el de Metabase es por equipo/serial del
+    // inventario del cliente. Para un SKU genérico del catálogo no hay un
+    // precio de venta fiable, así que el usuario lo escribe (campo editable).
     window.addCatalogSku = function(skuId){
       var cat = (window.skuCatalogData || []).find(function(s){ return String(s.id) === String(skuId); });
       if(!cat) return;
@@ -910,13 +904,13 @@
         nombre_sku:   cat.sku || cat.name || 'SKU',
         serial:'', marca:'', modelo:'', estado:'',
         operador_red: selectedClient ? selectedClient.operador_red : '',
-        precio_base:  bestBaseForSkuId(cat.id),
+        precio_base:  0,
         cantidad:1, margen_pct:0, manual:true
       });
       renderEquipmentList();
       var s = document.getElementById('salesSkuSearch'); if(s) s.value='';
       var dd = document.getElementById('salesSkuDropdown'); if(dd) dd.style.display='none';
-      if(typeof showToast==='function') showToast('Agregado: '+(cat.sku||cat.name),'success');
+      if(typeof showToast==='function') showToast('Agregado: '+(cat.sku||cat.name)+' — escribe el precio de venta','success');
     };
 
     // Botón "+ Crear nuevo SKU" — fila en blanco con nombre y precio editables
@@ -958,12 +952,10 @@
         drop.innerHTML = matches.map(function(s){
           var name = esc(s.sku || s.name || '');
           var c    = esc(s.category || s.categoria || '');
-          var base = bestBaseForSkuId(s.id);
-          var baseLbl = base>0 ? fmtCOPLocal(base) : 'sin precio ref.';
           var sid = String(s.id).replace(/'/g,"\\'");
           return '<div style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.05);transition:background .13s;" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'\'" onclick="addCatalogSku(\''+sid+'\')">'+
             '<div><div style="font-weight:600;font-size:13px;">'+name+'</div>'+(c?'<div style="font-size:11px;color:var(--text-3);">'+c+'</div>':'')+'</div>'+
-            '<span style="font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;margin-left:14px;">'+baseLbl+' &nbsp;＋</span></div>';
+            '<span style="font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;margin-left:14px;">Agregar ＋</span></div>';
         }).join('');
         drop.style.display='block';
       });
