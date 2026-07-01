@@ -174,7 +174,7 @@
             <div class="card"><div class="card-header"><div class="card-title">Equipos a vender</div><div class="card-subtitle">Selecciona SKUs del catálogo y configura precios con margen.</div></div>
               <div class="card-body">
                 <div style="position:relative;margin-bottom:16px;">
-                  <input type="text" class="input" id="salesSkuSearch" placeholder="Buscar SKU del catálogo: TC, Medidor, P2000..." style="font-size:14px;padding:12px 16px;" autocomplete="off" />
+                  <input type="text" class="input" id="salesSkuSearch" placeholder="Buscar por SKU (P2000, Medidor...) o por serial del equipo" style="font-size:14px;padding:12px 16px;" autocomplete="off" />
                   <div id="salesSkuDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:var(--bg-2,#12141c);border:1px solid rgba(255,255,255,0.12);border-radius:var(--r-md);margin-top:4px;max-height:320px;overflow-y:auto;box-shadow:0 12px 32px rgba(0,0,0,.45);"></div>
                 </div>
                 <!-- Items (cargados desde Metabase según el cliente seleccionado en Paso 1) -->
@@ -812,10 +812,10 @@
         return '<div class="item-row">'+
           '<div>'+descCell+(subStr?'<div style="font-size:11px;color:var(--text-3);">'+subStr+'</div>':'')+'</div>'+
           '<div style="text-align:center;"><input type="number" min="0" class="input" value="'+cantidad+'" data-eq-idx="'+idx+'" data-eq-field="cantidad" style="width:60px;text-align:center;padding:6px;" /></div>'+
-          '<div style="text-align:right;"><input type="number" min="0" step="any" class="input" value="'+precioBase+'" data-eq-idx="'+idx+'" data-eq-field="precio_base" style="width:110px;text-align:right;padding:6px;" /></div>'+
+          '<div style="text-align:right;"><input type="number" min="0" step="any" class="input" value="'+(precioBase||'')+'" placeholder="0" data-eq-idx="'+idx+'" data-eq-field="precio_base" style="width:110px;text-align:right;padding:6px;" /></div>'+
           '<div style="text-align:center;"><input type="number" min="0" class="input" value="'+margen+'" data-eq-idx="'+idx+'" data-eq-field="margen_pct" style="width:60px;text-align:center;padding:6px;" />%</div>'+
-          '<div style="text-align:right;font-weight:600;color:var(--accent);">'+fmtCOPLocal(precioFinal)+'</div>'+
-          '<div style="text-align:right;font-weight:600;">'+fmtCOPLocal(subtotal)+'</div>'+
+          '<div style="text-align:right;font-weight:600;color:var(--accent);" data-eq-final="'+idx+'">'+fmtCOPLocal(precioFinal)+'</div>'+
+          '<div style="text-align:right;font-weight:600;" data-eq-subtotal="'+idx+'">'+fmtCOPLocal(subtotal)+'</div>'+
           '<div><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;" data-eq-remove="'+idx+'" title="Quitar">×</button></div>'+
         '</div>';
       }).join('');
@@ -824,22 +824,22 @@
       if(label)   label.textContent = 'Total cotización ('+equipmentItems.length+' ítems, '+totalUnidades+' unidades)';
       if(totalEl) totalEl.textContent = fmtCOPLocal(totalCop);
 
-      // Wire input listeners (cantidad y margen)
+      // Wire input listeners — actualización EN EL SITIO (no re-render), así el
+      // input conserva el foco y se puede escribir el número completo.
       list.querySelectorAll('input[data-eq-idx]').forEach(function(inp){
         inp.addEventListener('input', function(){
           var idx = parseInt(this.getAttribute('data-eq-idx'),10);
           var field = this.getAttribute('data-eq-field');
           if(!equipmentItems[idx]) return;
           if(field === 'nombre_sku'){
-            // Campo de texto: guardar tal cual y NO re-renderizar (conserva el foco)
-            equipmentItems[idx][field] = this.value;
+            equipmentItems[idx][field] = this.value;   // texto: solo guardar
           } else {
             equipmentItems[idx][field] = Number(this.value)||0;
-            renderEquipmentList();
+            recalcEquipmentTotals();                    // recalcula sin reconstruir inputs
           }
         });
       });
-      // Wire botones de remover
+      // Wire botones de remover (sí re-renderiza: cambia el nº de filas)
       list.querySelectorAll('button[data-eq-remove]').forEach(function(btn){
         btn.addEventListener('click', function(){
           var idx = parseInt(this.getAttribute('data-eq-remove'),10);
@@ -847,6 +847,30 @@
           renderEquipmentList();
         });
       });
+    }
+
+    // Recalcula Precio final / Subtotal de cada fila y los totales del pie,
+    // sin volver a crear los <input> (para no perder el foco al escribir).
+    function recalcEquipmentTotals(){
+      var list = document.getElementById('swzEquipmentList');
+      if(!list) return;
+      var totalUnidades = 0, totalCop = 0;
+      equipmentItems.forEach(function(item, idx){
+        var precioFinal = (Number(item.precio_base)||0) * (1 + (Number(item.margen_pct)||0)/100);
+        var subtotal    = precioFinal * (Number(item.cantidad)||0);
+        totalUnidades += (Number(item.cantidad)||0);
+        totalCop      += subtotal;
+        var fEl = list.querySelector('[data-eq-final="'+idx+'"]');
+        var sEl = list.querySelector('[data-eq-subtotal="'+idx+'"]');
+        if(fEl) fEl.textContent = fmtCOPLocal(precioFinal);
+        if(sEl) sEl.textContent = fmtCOPLocal(subtotal);
+      });
+      var badge = document.getElementById('swzEquipmentCount');
+      var label = document.getElementById('swzEquipmentTotalLabel');
+      var totalEl = document.getElementById('swzEquipmentTotal');
+      if(badge)   badge.textContent = String(equipmentItems.length);
+      if(label)   label.textContent = 'Total cotización ('+equipmentItems.length+' ítems, '+totalUnidades+' unidades)';
+      if(totalEl) totalEl.textContent = fmtCOPLocal(totalCop);
     }
 
     async function loadEquipmentForClient(){
@@ -913,6 +937,30 @@
       if(typeof showToast==='function') showToast('Agregado: '+(cat.sku||cat.name)+' — escribe el precio de venta','success');
     };
 
+    // Agrega un EQUIPO REAL encontrado por serial en Metabase (con su precio real)
+    window._serialHits = [];   // cache de la última búsqueda por serial
+    window.addSerialEquipment = function(i){
+      var e = (window._serialHits || [])[i];
+      if(!e) return;
+      equipmentItems.push({
+        codigo_bia:   e.codigo_bia || (selectedClient ? selectedClient.codigo_bia : null),
+        nombre_sku:   e.nombre_sku || 'Equipo',
+        serial:       e.serial || '',
+        marca:        e.marca || '',
+        modelo:       e.modelo || '',
+        estado:       e.estado || '',
+        operador_red: e.operador_red || (selectedClient ? selectedClient.operador_red : ''),
+        ciudad:       e.ciudad || '',
+        frontera:     e.frontera || '',
+        precio_base:  Number(e.precio_unitario) || 0,   // precio real de Metabase
+        cantidad:1, margen_pct:0, manual:false          // equipo real → muestra serial/marca
+      });
+      renderEquipmentList();
+      var s = document.getElementById('salesSkuSearch'); if(s) s.value='';
+      var dd = document.getElementById('salesSkuDropdown'); if(dd) dd.style.display='none';
+      if(typeof showToast==='function') showToast('Equipo agregado: '+(e.serial||e.nombre_sku),'success');
+    };
+
     // Botón "+ Crear nuevo SKU" — fila en blanco con nombre y precio editables
     window.addManualSku = function(){
       equipmentItems.push({
@@ -925,39 +973,87 @@
       if(typeof showToast==='function') showToast('Fila nueva — escribe el SKU y el precio','info');
     };
 
-    // Cablear el buscador del catálogo
+    // Cablear el buscador: por NOMBRE en el catálogo + por SERIAL en Metabase
     (function wireSkuSearch(){
       var input = document.getElementById('salesSkuSearch');
       var drop  = document.getElementById('salesSkuDropdown');
       if(!input || !drop) return;
-      input.addEventListener('input', function(){
-        var q = (input.value||'').trim().toLowerCase();
-        if(q.length < 2){ drop.style.display='none'; return; }
+      var serialTimer = null;
+
+      function catalogMatches(q){
         var catalog = window.skuCatalogData || [];
-        if(!catalog.length){
-          drop.innerHTML = '<div style="padding:12px 16px;color:var(--text-3);font-size:13px;">Catálogo aún no cargado… espera un momento y reintenta.</div>';
-          drop.style.display='block';
-          return;
-        }
-        var matches = catalog.filter(function(s){
+        return catalog.filter(function(s){
           var name = String(s.sku || s.name || '').toLowerCase();
           var c    = String(s.category || s.categoria || '').toLowerCase();
           return name.indexOf(q) >= 0 || c.indexOf(q) >= 0;
-        }).slice(0, 30);
-        if(!matches.length){
-          drop.innerHTML = '<div style="padding:12px 16px;color:var(--text-3);font-size:13px;">Sin resultados en el catálogo. Usa "+ Crear nuevo SKU".</div>';
-          drop.style.display='block';
-          return;
+        }).slice(0, 20);
+      }
+
+      function sectionHdr(txt, accent){
+        return '<div style="padding:6px 16px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:'+(accent?'var(--accent)':'var(--text-3)')+';background:rgba(255,255,255,.03);">'+esc(txt)+'</div>';
+      }
+
+      function render(q, serialLoading){
+        var html = '';
+        var hits = window._serialHits || [];
+        // 1) Equipos reales por serial (Metabase) — con su precio real
+        if(serialLoading){
+          html += '<div style="padding:10px 16px;font-size:11px;color:var(--text-3);">🔎 Buscando serial en Metabase…</div>';
+        } else if(hits.length){
+          html += sectionHdr('Equipos por serial (Metabase)', true);
+          html += hits.map(function(e, i){
+            var name = esc(e.nombre_sku || 'Equipo');
+            var meta = [];
+            if(e.serial)     meta.push('Serial: '+esc(e.serial));
+            if(e.estado)     meta.push(esc(e.estado));
+            if(e.codigo_bia) meta.push('BIA: '+esc(e.codigo_bia));
+            var price = Number(e.precio_unitario)||0;
+            return '<div style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.05);" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'\'" onclick="addSerialEquipment('+i+')">'+
+              '<div><div style="font-weight:600;font-size:13px;">'+name+'</div><div style="font-size:11px;color:var(--text-3);">'+meta.join(' • ')+'</div></div>'+
+              '<span style="font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;margin-left:14px;">'+(price>0?fmtCOPLocal(price):'')+' ＋</span></div>';
+          }).join('');
         }
-        drop.innerHTML = matches.map(function(s){
-          var name = esc(s.sku || s.name || '');
-          var c    = esc(s.category || s.categoria || '');
-          var sid = String(s.id).replace(/'/g,"\\'");
-          return '<div style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.05);transition:background .13s;" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'\'" onclick="addCatalogSku(\''+sid+'\')">'+
-            '<div><div style="font-weight:600;font-size:13px;">'+name+'</div>'+(c?'<div style="font-size:11px;color:var(--text-3);">'+c+'</div>':'')+'</div>'+
-            '<span style="font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;margin-left:14px;">Agregar ＋</span></div>';
-        }).join('');
-        drop.style.display='block';
+        // 2) SKUs del catálogo (por nombre/categoría)
+        var cats = catalogMatches(q);
+        if(cats.length){
+          html += sectionHdr('Catálogo de SKUs', false);
+          html += cats.map(function(s){
+            var name = esc(s.sku || s.name || '');
+            var c    = esc(s.category || s.categoria || '');
+            var sid  = String(s.id).replace(/'/g,"\\'");
+            return '<div style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.05);" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'\'" onclick="addCatalogSku(\''+sid+'\')">'+
+              '<div><div style="font-weight:600;font-size:13px;">'+name+'</div>'+(c?'<div style="font-size:11px;color:var(--text-3);">'+c+'</div>':'')+'</div>'+
+              '<span style="font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;margin-left:14px;">Agregar ＋</span></div>';
+          }).join('');
+        }
+        if(!html){
+          html = '<div style="padding:12px 16px;color:var(--text-3);font-size:13px;">Sin resultados. Usa "+ Crear nuevo SKU".</div>';
+        }
+        drop.innerHTML = html;
+        drop.style.display = 'block';
+      }
+
+      input.addEventListener('input', function(){
+        var q = (input.value||'').trim().toLowerCase();
+        if(q.length < 2){ drop.style.display='none'; if(serialTimer) clearTimeout(serialTimer); return; }
+        // Render inmediato: catálogo + spinner de serial
+        render(q, true);
+        if(serialTimer) clearTimeout(serialTimer);
+        serialTimer = setTimeout(function(){
+          var qAtFetch = q;
+          fetch('/api/metabase-proxy?type=serial&q='+encodeURIComponent(qAtFetch))
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+              if((input.value||'').trim().toLowerCase() !== qAtFetch) return; // la query cambió
+              window._serialHits = (data && data.success && Array.isArray(data.equipment)) ? data.equipment : [];
+              render(qAtFetch, false);
+            })
+            .catch(function(){
+              if((input.value||'').trim().toLowerCase() !== qAtFetch) return;
+              window._serialHits = [];
+              render(qAtFetch, false);
+            });
+        }, 300);
       });
       document.addEventListener('click', function(e){
         if(!e.target.closest('#salesSkuSearch') && !e.target.closest('#salesSkuDropdown')) drop.style.display='none';
