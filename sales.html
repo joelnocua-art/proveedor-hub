@@ -174,7 +174,8 @@
             <div class="card"><div class="card-header"><div class="card-title">Equipos a vender</div><div class="card-subtitle">Selecciona SKUs del catálogo y configura precios con margen.</div></div>
               <div class="card-body">
                 <div style="position:relative;margin-bottom:16px;">
-                  <input type="text" class="input" id="salesSkuSearch" placeholder="Buscar SKU: TC, Medidor, Condensador..." style="font-size:14px;padding:12px 16px;" autocomplete="off" />
+                  <input type="text" class="input" id="salesSkuSearch" placeholder="Buscar SKU del catálogo: TC, Medidor, P2000..." style="font-size:14px;padding:12px 16px;" autocomplete="off" />
+                  <div id="salesSkuDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:var(--bg-2,#12141c);border:1px solid rgba(255,255,255,0.12);border-radius:var(--r-md);margin-top:4px;max-height:320px;overflow-y:auto;box-shadow:0 12px 32px rgba(0,0,0,.45);"></div>
                 </div>
                 <!-- Items (cargados desde Metabase según el cliente seleccionado en Paso 1) -->
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -191,7 +192,7 @@
                 </div>
                 <div style="display:flex;gap:10px;margin-top:14px;">
                   <button class="btn" style="font-size:12px;" onclick="reloadEquipmentFromMetabase()">↻ Recargar desde Metabase</button>
-                  <button class="btn" style="font-size:12px;border-color:rgba(0,229,200,.3);color:var(--accent);">+ Crear nuevo SKU</button>
+                  <button class="btn" style="font-size:12px;border-color:rgba(0,229,200,.3);color:var(--accent);" onclick="addManualSku()">+ Crear nuevo SKU</button>
                 </div>
                 <div style="margin-top:16px;padding:14px 16px;background:rgba(91,107,255,.06);border:1px solid rgba(91,107,255,.2);border-radius:var(--r-md);display:flex;justify-content:space-between;align-items:center;">
                   <span id="swzEquipmentTotalLabel" style="font-size:13px;color:var(--text-2);">Total cotización (0 ítems)</span>
@@ -766,9 +767,9 @@
         list.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-3);font-size:13px;">'+
           (selectedClient
             ? (equipmentLoaded
-                ? 'Este cliente no tiene equipos en Metabase.'
+                ? 'Este cliente no tiene equipos en Metabase. Busca un SKU arriba o usa "+ Crear nuevo SKU".'
                 : 'Cargando equipos...')
-            : 'Selecciona un cliente en el Paso 1 para cargar sus equipos desde Metabase.')+
+            : 'Carga los equipos del cliente desde Metabase, o busca un SKU del catálogo arriba (o usa "+ Crear nuevo SKU").')+
           '</div>';
         if(badge) badge.textContent = '0';
         if(label) label.textContent = 'Total cotización (0 ítems)';
@@ -787,7 +788,6 @@
         totalUnidades += cantidad;
         totalCop      += subtotal;
 
-        var desc = esc(item.nombre_sku || 'SKU sin nombre');
         var subParts = [];
         if(item.marca)  subParts.push(esc(item.marca));
         if(item.modelo) subParts.push(esc(item.modelo));
@@ -795,10 +795,15 @@
         if(item.estado) subParts.push('Estado: '+esc(item.estado));
         var subStr = subParts.join(' • ');
 
+        // Ítems agregados manualmente (buscador o "+ Crear nuevo SKU") → nombre editable
+        var descCell = item.manual
+          ? '<input type="text" class="input" value="'+esc(item.nombre_sku||'').replace(/"/g,'&quot;')+'" data-eq-idx="'+idx+'" data-eq-field="nombre_sku" placeholder="Nombre del SKU / equipo" style="width:100%;font-size:13px;padding:6px 8px;font-weight:600;" />'
+          : '<div style="font-weight:600;font-size:13px;">'+esc(item.nombre_sku || 'SKU sin nombre')+'</div>';
+
         return '<div class="item-row">'+
-          '<div><div style="font-weight:600;font-size:13px;">'+desc+'</div><div style="font-size:11px;color:var(--text-3);">'+subStr+'</div></div>'+
+          '<div>'+descCell+(subStr?'<div style="font-size:11px;color:var(--text-3);">'+subStr+'</div>':'')+'</div>'+
           '<div style="text-align:center;"><input type="number" min="0" class="input" value="'+cantidad+'" data-eq-idx="'+idx+'" data-eq-field="cantidad" style="width:60px;text-align:center;padding:6px;" /></div>'+
-          '<div style="text-align:right;color:var(--text-2);font-size:13px;">'+fmtCOPLocal(precioBase)+'</div>'+
+          '<div style="text-align:right;"><input type="number" min="0" step="any" class="input" value="'+precioBase+'" data-eq-idx="'+idx+'" data-eq-field="precio_base" style="width:110px;text-align:right;padding:6px;" /></div>'+
           '<div style="text-align:center;"><input type="number" min="0" class="input" value="'+margen+'" data-eq-idx="'+idx+'" data-eq-field="margen_pct" style="width:60px;text-align:center;padding:6px;" />%</div>'+
           '<div style="text-align:right;font-weight:600;color:var(--accent);">'+fmtCOPLocal(precioFinal)+'</div>'+
           '<div style="text-align:right;font-weight:600;">'+fmtCOPLocal(subtotal)+'</div>'+
@@ -815,7 +820,11 @@
         inp.addEventListener('input', function(){
           var idx = parseInt(this.getAttribute('data-eq-idx'),10);
           var field = this.getAttribute('data-eq-field');
-          if(equipmentItems[idx]){
+          if(!equipmentItems[idx]) return;
+          if(field === 'nombre_sku'){
+            // Campo de texto: guardar tal cual y NO re-renderizar (conserva el foco)
+            equipmentItems[idx][field] = this.value;
+          } else {
             equipmentItems[idx][field] = Number(this.value)||0;
             renderEquipmentList();
           }
@@ -872,6 +881,87 @@
       equipmentLoaded = false;
       loadEquipmentForClient();
     };
+
+    // ═══ BUSCADOR DE SKU (Paso 2) — agregar equipos desde el catálogo ═══
+    // Precio de referencia: mejor oferta registrada para ese SKU (si existe).
+    function bestBaseForSkuId(skuId){
+      try{
+        var offers = (window._sbData && window._sbData.skuOffers && window._sbData.skuOffers[String(skuId)]) || [];
+        var prices = offers.map(function(o){ return Number(o.price_sin_iva)||0; }).filter(function(p){ return p>0; });
+        return prices.length ? Math.min.apply(null, prices) : 0;
+      }catch(_){ return 0; }
+    }
+
+    // Agrega un SKU del catálogo como ítem a vender
+    window.addCatalogSku = function(skuId){
+      var cat = (window.skuCatalogData || []).find(function(s){ return String(s.id) === String(skuId); });
+      if(!cat) return;
+      equipmentItems.push({
+        codigo_bia:   selectedClient ? selectedClient.codigo_bia : null,
+        nombre_sku:   cat.sku || cat.name || 'SKU',
+        serial:'', marca:'', modelo:'', estado:'',
+        operador_red: selectedClient ? selectedClient.operador_red : '',
+        precio_base:  bestBaseForSkuId(cat.id),
+        cantidad:1, margen_pct:0, manual:true
+      });
+      renderEquipmentList();
+      var s = document.getElementById('salesSkuSearch'); if(s) s.value='';
+      var dd = document.getElementById('salesSkuDropdown'); if(dd) dd.style.display='none';
+      if(typeof showToast==='function') showToast('Agregado: '+(cat.sku||cat.name),'success');
+    };
+
+    // Botón "+ Crear nuevo SKU" — fila en blanco con nombre y precio editables
+    window.addManualSku = function(){
+      equipmentItems.push({
+        codigo_bia:   selectedClient ? selectedClient.codigo_bia : null,
+        nombre_sku:'', serial:'', marca:'', modelo:'', estado:'',
+        operador_red: selectedClient ? selectedClient.operador_red : '',
+        precio_base:0, cantidad:1, margen_pct:0, manual:true
+      });
+      renderEquipmentList();
+      if(typeof showToast==='function') showToast('Fila nueva — escribe el SKU y el precio','info');
+    };
+
+    // Cablear el buscador del catálogo
+    (function wireSkuSearch(){
+      var input = document.getElementById('salesSkuSearch');
+      var drop  = document.getElementById('salesSkuDropdown');
+      if(!input || !drop) return;
+      input.addEventListener('input', function(){
+        var q = (input.value||'').trim().toLowerCase();
+        if(q.length < 2){ drop.style.display='none'; return; }
+        var catalog = window.skuCatalogData || [];
+        if(!catalog.length){
+          drop.innerHTML = '<div style="padding:12px 16px;color:var(--text-3);font-size:13px;">Catálogo aún no cargado… espera un momento y reintenta.</div>';
+          drop.style.display='block';
+          return;
+        }
+        var matches = catalog.filter(function(s){
+          var name = String(s.sku || s.name || '').toLowerCase();
+          var c    = String(s.category || s.categoria || '').toLowerCase();
+          return name.indexOf(q) >= 0 || c.indexOf(q) >= 0;
+        }).slice(0, 30);
+        if(!matches.length){
+          drop.innerHTML = '<div style="padding:12px 16px;color:var(--text-3);font-size:13px;">Sin resultados en el catálogo. Usa "+ Crear nuevo SKU".</div>';
+          drop.style.display='block';
+          return;
+        }
+        drop.innerHTML = matches.map(function(s){
+          var name = esc(s.sku || s.name || '');
+          var c    = esc(s.category || s.categoria || '');
+          var base = bestBaseForSkuId(s.id);
+          var baseLbl = base>0 ? fmtCOPLocal(base) : 'sin precio ref.';
+          var sid = String(s.id).replace(/'/g,"\\'");
+          return '<div style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.05);transition:background .13s;" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'\'" onclick="addCatalogSku(\''+sid+'\')">'+
+            '<div><div style="font-weight:600;font-size:13px;">'+name+'</div>'+(c?'<div style="font-size:11px;color:var(--text-3);">'+c+'</div>':'')+'</div>'+
+            '<span style="font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;margin-left:14px;">'+baseLbl+' &nbsp;＋</span></div>';
+        }).join('');
+        drop.style.display='block';
+      });
+      document.addEventListener('click', function(e){
+        if(!e.target.closest('#salesSkuSearch') && !e.target.closest('#salesSkuDropdown')) drop.style.display='none';
+      });
+    })();
 
     // ═══ CONFIRMAR Y GUARDAR EN SUPABASE ═══
     window.confirmAndSaveSale = async function(){
