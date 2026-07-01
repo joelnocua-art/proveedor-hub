@@ -29,11 +29,16 @@ exports/
 # Commercial data — generated files, not source
 KB_BIA_*.xlsx
 bia_knowledge_base.csv
+bia_knowledge_base*.csv
 *_wms_*.csv
 scripts/kb_data_cache.json
 .env
 scripts/Homologacion_SKU.xlsx
 data_calib/*.csv
+
+# Data dumps from Supabase (contienen precios y data comercial)
+bia_dump*.json
+*_dump.json
 
 # Hoja generada (puede contener datos)
 Calibraciones.xlsx

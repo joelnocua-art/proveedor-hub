@@ -23,33 +23,31 @@ export default async function handler(req, res) {
   // ── GET: listar usuarios ──
   if (req.method === 'GET') {
     try {
-      // Listar usuarios de auth.users via Admin API
       const authResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=500`, { headers });
       if (!authResp.ok) {
-        const err = await authResp.text();
-        return res.status(500).json({ error: 'Error al listar usuarios: ' + err.substring(0, 300) });
+        const errText = await authResp.text();
+        return res.status(500).json({
+          error: 'Auth Admin API falló (' + authResp.status + '): ' + errText.substring(0, 200) +
+            ' — Usa la service_role JWT key (eyJ...) desde "Legacy anon, service_role API keys" en Supabase.'
+        });
       }
       const authData = await authResp.json();
       const authUsers = authData.users || authData || [];
 
-      // Listar perfiles existentes (bypassa RLS con service key)
-      const profResp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=*`, {
-        headers: { ...headers, 'Prefer': 'return=representation' }
+      const users = authUsers.map(u => {
+        // role/area guardados en user_metadata (vía Admin API)
+        const meta = u.user_metadata || u.raw_user_meta_data || {};
+        return {
+          id: u.id,
+          email: u.email || '',
+          full_name: meta.full_name || '',
+          avatar_url: meta.avatar_url || null,
+          created_at: u.created_at,
+          last_sign_in: u.last_sign_in_at,
+          role: meta.role || null,
+          area: meta.area || null
+        };
       });
-      const profiles = profResp.ok ? await profResp.json() : [];
-      const profMap = {};
-      (Array.isArray(profiles) ? profiles : []).forEach(p => { profMap[p.id] = p; });
-
-      const users = authUsers.map(u => ({
-        id: u.id,
-        email: u.email || '',
-        full_name: u.user_metadata?.full_name || u.raw_user_meta_data?.full_name || '',
-        avatar_url: u.user_metadata?.avatar_url || u.raw_user_meta_data?.avatar_url || null,
-        created_at: u.created_at,
-        last_sign_in: u.last_sign_in_at,
-        role: profMap[u.id]?.role || null,
-        area: profMap[u.id]?.area || null
-      }));
 
       users.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
       return res.status(200).json({ users });
@@ -59,7 +57,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── POST: actualizar rol/área ──
+  // ── POST: actualizar rol/área via Auth Admin API ──
   if (req.method === 'POST') {
     const { userId, role, area } = req.body || {};
     if (!userId || !role) {
@@ -72,32 +70,31 @@ export default async function handler(req, res) {
     }
 
     try {
-      // Obtener email del usuario desde auth
-      const authResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, { headers });
-      const authUser = authResp.ok ? await authResp.json() : null;
-      const email = authUser?.email || '';
-      const fullName = authUser?.user_metadata?.full_name || authUser?.raw_user_meta_data?.full_name || '';
+      // Leer metadata existente para no pisar otros campos
+      const getResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, { headers });
+      if (!getResp.ok) {
+        const err = await getResp.text();
+        return res.status(500).json({ error: 'No se encontró el usuario: ' + err.substring(0, 200) });
+      }
+      const authUser = await getResp.json();
+      const existingMeta = authUser.user_metadata || authUser.raw_user_meta_data || {};
 
-      // Upsert en profiles (crea si no existe, actualiza si existe)
-      const upsertResp = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Prefer': 'resolution=merge-duplicates,return=representation'
-        },
+      // Actualizar user_metadata con el nuevo rol/área
+      const updateResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+        method: 'PUT',
+        headers,
         body: JSON.stringify({
-          id: userId,
-          email,
-          full_name: fullName,
-          role,
-          area: area || null,
-          updated_at: new Date().toISOString()
+          user_metadata: {
+            ...existingMeta,
+            role,
+            area: area || null
+          }
         })
       });
 
-      if (!upsertResp.ok) {
-        const err = await upsertResp.text();
-        return res.status(500).json({ error: 'Error al actualizar perfil: ' + err.substring(0, 300) });
+      if (!updateResp.ok) {
+        const err = await updateResp.text();
+        return res.status(500).json({ error: 'Error al actualizar usuario (Admin API): ' + err.substring(0, 300) });
       }
 
       return res.status(200).json({ ok: true });

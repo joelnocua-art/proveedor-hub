@@ -210,30 +210,30 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── Clientes únicos — busca por código BIA o razón social ──
+    // ── Clientes únicos — busca SOLO por código BIA ──
     if (type === 'clients') {
       const searchQuery = (q || '').toLowerCase().trim();
       const seen = new Set();
       const clients = [];
 
       for (const row of rows) {
-        if (!row.codigo_bia || !row.razon_social) continue;
+        if (!row.codigo_bia) continue;
         if (seen.has(row.codigo_bia)) continue;
 
         if (searchQuery) {
-          const haystack = (row.codigo_bia + ' ' + row.razon_social).toLowerCase();
+          const haystack = String(row.codigo_bia).toLowerCase();
           if (!haystack.includes(searchQuery)) continue;
         }
 
         seen.add(row.codigo_bia);
         clients.push({
           codigo_bia:   row.codigo_bia,
-          razon_social: row.razon_social,
+          razon_social: row.razon_social || '',
           operador_red: row.operador_red
         });
       }
 
-      clients.sort((a, b) => (a.razon_social || '').localeCompare(b.razon_social || ''));
+      clients.sort((a, b) => String(a.codigo_bia).localeCompare(String(b.codigo_bia)));
 
       return res.status(200).json({
         success: true,
