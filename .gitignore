@@ -44,3 +44,6 @@ bia_dump*.json
 Calibraciones.xlsx
 LeadTimes.xlsx
 Contactos.xlsx
+
+# Transcripciones / documentos generados (entregables, no fuente)
+Conversacion_*.pdf
