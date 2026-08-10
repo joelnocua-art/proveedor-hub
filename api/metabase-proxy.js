@@ -84,24 +84,28 @@ function pick(obj, candidates) {
   return null;
 }
 
+// Nombres de columna confirmados vía /api/card/:id/query/json (export) —
+// las columnas que vienen de una tabla unida (join) en la card 51119
+// se exportan con el nombre de la tabla de origen antepuesto, ej.
+// "Activacion Global - codigo_bia → Razon Social De La Empresa".
 function normalizeRow(r) {
   return {
-    codigo_bia:        pick(r, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
-    razon_social:      pick(r, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
-    operador_red:      pick(r, ['operador_de_red', 'Operador de Red', 'operador_red']),
+    codigo_bia:        pick(r, ['Código BIA- Final', 'codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
+    razon_social:      pick(r, ['Activacion Global - codigo_bia → Razon Social De La Empresa', 'razon_social_de_la_empresa', 'Razón social', 'razon_social']),
+    operador_red:      pick(r, ['Activacion Global - codigo_bia → Operador De Red', 'operador_de_red', 'Operador de Red', 'operador_red']),
     nombre_sku:        pick(r, ['nombre_sku', 'Nombre SKU', 'sku']),
     serial:            pick(r, ['serial', 'Serial']),
     marca:             pick(r, ['brand', 'Marca', 'marca']),
     modelo:            pick(r, ['model', 'Modelo', 'modelo']),
-    precio_unitario:   Number(pick(r, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
+    precio_unitario:   Number(pick(r, ["Precios SKU's - nombre_sku → precio_sheet", 'precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
     estado:            pick(r, ['state', 'Estado', 'estado', 'Estado Contrato']),
     ciudad:            pick(r, ['ciudad', 'Ciudad']),
     frontera:          pick(r, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
     titulo:            pick(r, ['titulo', 'Titulo']),
-    propiedad_activos: pick(r, ['Propiedad de Activos']),
-    fecha_instalacion: pick(r, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
-    fecha_ingreso:     pick(r, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
-    fecha_retiro:      pick(r, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
+    propiedad_activos: pick(r, ['Bd Telemedida - Codigo Interno Odoobia → Propiedad De Activos', 'Propiedad de Activos']),
+    fecha_instalacion: pick(r, ['Bd Telemedida - Codigo Interno Odoobia → Fecha Instalación (mm/dd/yyyy)', 'Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
+    fecha_ingreso:     pick(r, ['Bd Telemedida - Codigo Interno Odoobia → Fecha Ingreso (mm/dd/aa)', 'Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
+    fecha_retiro:      pick(r, ['Bd Telemedida - Codigo Interno Odoobia → Fecha Retiro (mm/dd/aa)', 'Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
   };
 }
 
