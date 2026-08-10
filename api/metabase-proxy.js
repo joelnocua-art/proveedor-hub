@@ -109,6 +109,20 @@ function normalizeRow(r) {
   };
 }
 
+// ─── Helper: deduplicar equipos — la card 51119 repite cada fila por un
+// join que hace fan-out (mismo equipo, misma info, aparece 2 veces) ────────
+function dedupeEquipment(list) {
+  const seen = new Set();
+  const result = [];
+  for (const item of list) {
+    const key = [item.codigo_bia, item.nombre_sku, item.serial].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+  return result;
+}
+
 // ─── Helper: convertir formato cols+rows a lista de objetos con nombre ────
 function rowsToRecords(cols, rows) {
   return rows.map(rowArr => {
@@ -313,7 +327,7 @@ export default async function handler(req, res) {
       }
 
       const targetCode = codigo_bia.trim();
-      const equipment = rows
+      const equipment = dedupeEquipment(rows
         .filter(r => (r.codigo_bia || '').trim() === targetCode)
         .map(r => ({
           codigo_bia:        r.codigo_bia,
@@ -330,7 +344,7 @@ export default async function handler(req, res) {
           titulo:            r.titulo,
           propiedad_activos: r.propiedad_activos,
           fecha_instalacion: r.fecha_instalacion
-        }));
+        })));
 
       return res.status(200).json({
         success: true,
@@ -350,9 +364,8 @@ export default async function handler(req, res) {
           error: 'q (serial) requiere al menos 2 caracteres'
         });
       }
-      const equipment = rows
+      const equipment = dedupeEquipment(rows
         .filter(r => String(r.serial || '').toLowerCase().includes(term))
-        .slice(0, 30)
         .map(r => ({
           codigo_bia:        r.codigo_bia,
           razon_social:      r.razon_social,
@@ -368,7 +381,7 @@ export default async function handler(req, res) {
           titulo:            r.titulo,
           propiedad_activos: r.propiedad_activos,
           fecha_instalacion: r.fecha_instalacion
-        }));
+        }))).slice(0, 30);
 
       return res.status(200).json({
         success: true,
