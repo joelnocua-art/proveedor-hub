@@ -32,8 +32,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
 let cachedCardId = null;
 let cachedRows = null;
-let cachedRawCols = null;
-let cachedRawRows = null;
+let cachedRawRecords = null;
 let cacheTime = 0;
 
 // ─── Discovery del card ID ─────────────────────────────────────────────
@@ -106,64 +105,88 @@ function normalizeRow(r) {
   };
 }
 
-// ─── Helper: normalizar fila desde formato cols+rows ──────────────────
-function normalizeRowFromCols(cols, rowArr) {
-  const obj = {};
-  cols.forEach((c, idx) => {
-    if (c.name) obj[c.name] = rowArr[idx];
-    if (c.display_name && obj[c.display_name] === undefined) obj[c.display_name] = rowArr[idx];
+// ─── Helper: convertir formato cols+rows a lista de objetos con nombre ────
+function rowsToRecords(cols, rows) {
+  return rows.map(rowArr => {
+    const obj = {};
+    cols.forEach((c, idx) => {
+      if (c.name) obj[c.name] = rowArr[idx];
+      if (c.display_name && obj[c.display_name] === undefined) obj[c.display_name] = rowArr[idx];
+    });
+    return obj;
   });
-  return normalizeRow(obj);
 }
 
-// ─── Fetch todas las filas — bypassea el límite de 2000 vía /api/dataset ───
+// ─── Fetch todas las filas — bypassea el límite de 2000 filas ─────────────
 //
-// Estrategia: obtener el dataset_query del card (MBQL o SQL nativa) y
-// ejecutarlo directamente vía /api/dataset con constraints altos para
-// que Metabase no aplique el límite por defecto de 2000 filas.
+// Estrategia principal: el endpoint de exportación /query/json ejecuta la
+// card sin el límite por defecto de 2000 filas ("bare rows") que sí aplica
+// /api/card/:id/query y /api/dataset. Si por lo que sea no está disponible
+// (permisos, versión de Metabase), caemos a los métodos anteriores — pero
+// esos SIEMPRE devuelven máximo 2000 filas, así que un código que exista
+// más allá de esa ventana no aparecerá.
 async function fetchAllRows(apiKey) {
   if (cachedRows && (Date.now() - cacheTime) < CACHE_TTL_MS) {
     return cachedRows;
   }
 
   const cardId = await discoverCardId(apiKey);
-  let cols = [];
-  let rows = [];
+  let records = null;
 
-  // Intento 1: dataset con constraints altos (bypassa límite por defecto)
+  // Intento 1: endpoint de exportación (sin límite de 2000 filas)
   try {
-    const cardResp = await fetch(`${METABASE_URL}/api/card/${cardId}`, {
-      headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }
+    const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query/json`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({})
     });
-    if (cardResp.ok) {
-      const card = await cardResp.json();
-      if (card.dataset_query) {
-        const dsResp = await fetch(`${METABASE_URL}/api/dataset`, {
-          method: 'POST',
-          headers: {
-            'x-api-key': apiKey,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            ...card.dataset_query,
-            constraints: {
-              'max-results': 1000000,
-              'max-results-bare-rows': 1000000
-            }
-          })
-        });
-        if (dsResp.ok) {
-          const dsResult = await dsResp.json();
-          cols = dsResult.data?.cols || [];
-          rows = dsResult.data?.rows || [];
-        }
-      }
+    if (resp.ok) {
+      const data = await resp.json();
+      if (Array.isArray(data) && data.length > 0) records = data;
     }
   } catch (_) { /* fallback abajo */ }
 
-  // Intento 2 (fallback): query estándar del card (max 2000 filas)
-  if (rows.length === 0) {
+  // Intento 2 (fallback): dataset con constraints altos
+  if (!records) {
+    try {
+      const cardResp = await fetch(`${METABASE_URL}/api/card/${cardId}`, {
+        headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }
+      });
+      if (cardResp.ok) {
+        const card = await cardResp.json();
+        if (card.dataset_query) {
+          const dsResp = await fetch(`${METABASE_URL}/api/dataset`, {
+            method: 'POST',
+            headers: {
+              'x-api-key': apiKey,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              ...card.dataset_query,
+              constraints: {
+                'max-results': 1000000,
+                'max-results-bare-rows': 1000000
+              }
+            })
+          });
+          if (dsResp.ok) {
+            const dsResult = await dsResp.json();
+            const cols = dsResult.data?.cols || [];
+            const rows = dsResult.data?.rows || [];
+            if (rows.length > 0) records = rowsToRecords(cols, rows);
+          }
+        }
+      }
+    } catch (_) { /* fallback abajo */ }
+  }
+
+  // Intento 3 (último fallback): query estándar del card (max 2000 filas)
+  if (!records) {
     const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
       method: 'POST',
       headers: {
@@ -178,13 +201,11 @@ async function fetchAllRows(apiKey) {
       throw new Error(`Card ${cardId} query failed (${resp.status}): ${errText.substring(0, 300)}`);
     }
     const result = await resp.json();
-    cols = result.data?.cols || [];
-    rows = result.data?.rows || [];
+    records = rowsToRecords(result.data?.cols || [], result.data?.rows || []);
   }
 
-  cachedRows = rows.map(rowArr => normalizeRowFromCols(cols, rowArr));
-  cachedRawCols = cols;
-  cachedRawRows = rows;
+  cachedRows = records.map(normalizeRow);
+  cachedRawRecords = records;
   cacheTime = Date.now();
   return cachedRows;
 }
@@ -213,14 +234,12 @@ export default async function handler(req, res) {
       // de columna o filas excluidas por el filtro propio de la card.
       const rawTerm = (req.query.raw || '').toString().trim().toLowerCase();
       if (rawTerm) {
-        const colNames = (cachedRawCols || []).map(c => c.display_name || c.name);
+        const records = cachedRawRecords || [];
         const matches = [];
-        for (const rowArr of (cachedRawRows || [])) {
-          const hasMatch = rowArr.some(v => String(v ?? '').toLowerCase().includes(rawTerm));
+        for (const record of records) {
+          const hasMatch = Object.values(record).some(v => String(v ?? '').toLowerCase().includes(rawTerm));
           if (hasMatch) {
-            const obj = {};
-            colNames.forEach((name, idx) => { obj[name] = rowArr[idx]; });
-            matches.push(obj);
+            matches.push(record);
             if (matches.length >= 10) break;
           }
         }
@@ -228,7 +247,7 @@ export default async function handler(req, res) {
           success: true,
           cardId,
           totalRows: rows.length,
-          rawColumnNames: colNames,
+          rawColumnNames: records[0] ? Object.keys(records[0]) : [],
           rawSearchTerm: rawTerm,
           rawMatchCount: matches.length,
           rawMatches: matches
