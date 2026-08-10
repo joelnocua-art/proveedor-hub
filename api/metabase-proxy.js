@@ -15,6 +15,12 @@
  *   GET /api/metabase-proxy?debug=1
  *     → Devuelve metadata del dataset (cardId, totalRows, sample, etc.)
  *
+ *   GET /api/metabase-proxy?debug=1&raw=<término>
+ *     → Busca <término> en TODAS las columnas originales de la card
+ *       (sin pasar por pick()/normalizeRow). Útil para diagnosticar
+ *       si un código BIA existe en la card pero con otro nombre de
+ *       columna, o si simplemente no está en el dataset filtrado.
+ *
  * Fuente: Dashboard 11584, tab 12706 (Asignadas-Instaladas).
  * Usa el endpoint /query/json (export) que NO tiene límite de 2000 filas.
  */
@@ -26,6 +32,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
 let cachedCardId = null;
 let cachedRows = null;
+let cachedRawRecords = null;
 let cacheTime = 0;
 
 // ─── Discovery del card ID ─────────────────────────────────────────────
@@ -77,85 +84,127 @@ function pick(obj, candidates) {
   return null;
 }
 
+// Nombres de columna confirmados vía /api/card/:id/query/json (export) —
+// las columnas que vienen de una tabla unida (join) en la card 51119
+// se exportan con el nombre de la tabla de origen antepuesto, ej.
+// "Activacion Global - codigo_bia → Razon Social De La Empresa".
 function normalizeRow(r) {
   return {
-    codigo_bia:        pick(r, ['codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
-    razon_social:      pick(r, ['razon_social_de_la_empresa', 'Razón social', 'razon_social']),
-    operador_red:      pick(r, ['operador_de_red', 'Operador de Red', 'operador_red']),
+    codigo_bia:        pick(r, ['Código BIA- Final', 'codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
+    razon_social:      pick(r, ['Activacion Global - codigo_bia → Razon Social De La Empresa', 'razon_social_de_la_empresa', 'Razón social', 'razon_social']),
+    operador_red:      pick(r, ['Activacion Global - codigo_bia → Operador De Red', 'operador_de_red', 'Operador de Red', 'operador_red']),
     nombre_sku:        pick(r, ['nombre_sku', 'Nombre SKU', 'sku']),
     serial:            pick(r, ['serial', 'Serial']),
     marca:             pick(r, ['brand', 'Marca', 'marca']),
     modelo:            pick(r, ['model', 'Modelo', 'modelo']),
-    precio_unitario:   Number(pick(r, ['precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
+    precio_unitario:   Number(pick(r, ["Precios SKU's - nombre_sku → precio_sheet", 'precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
     estado:            pick(r, ['state', 'Estado', 'estado', 'Estado Contrato']),
     ciudad:            pick(r, ['ciudad', 'Ciudad']),
     frontera:          pick(r, ['nombre_de_la_frontera', 'Nombre De La Frontera']),
     titulo:            pick(r, ['titulo', 'Titulo']),
-    propiedad_activos: pick(r, ['Propiedad de Activos']),
-    fecha_instalacion: pick(r, ['Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
-    fecha_ingreso:     pick(r, ['Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
-    fecha_retiro:      pick(r, ['Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
+    propiedad_activos: pick(r, ['Bd Telemedida - Codigo Interno Odoobia → Propiedad De Activos', 'Propiedad de Activos']),
+    fecha_instalacion: pick(r, ['Bd Telemedida - Codigo Interno Odoobia → Fecha Instalación (mm/dd/yyyy)', 'Fecha Instalación\n(MM/DD/YYYY)', 'Fecha de instalación', 'fecha_instalacion']),
+    fecha_ingreso:     pick(r, ['Bd Telemedida - Codigo Interno Odoobia → Fecha Ingreso (mm/dd/aa)', 'Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
+    fecha_retiro:      pick(r, ['Bd Telemedida - Codigo Interno Odoobia → Fecha Retiro (mm/dd/aa)', 'Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
   };
 }
 
-// ─── Helper: normalizar fila desde formato cols+rows ──────────────────
-function normalizeRowFromCols(cols, rowArr) {
-  const obj = {};
-  cols.forEach((c, idx) => {
-    if (c.name) obj[c.name] = rowArr[idx];
-    if (c.display_name && obj[c.display_name] === undefined) obj[c.display_name] = rowArr[idx];
-  });
-  return normalizeRow(obj);
+// ─── Helper: deduplicar equipos — la card 51119 repite cada fila por un
+// join que hace fan-out (mismo equipo, misma info, aparece 2 veces) ────────
+function dedupeEquipment(list) {
+  const seen = new Set();
+  const result = [];
+  for (const item of list) {
+    const key = [item.codigo_bia, item.nombre_sku, item.serial].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+  return result;
 }
 
-// ─── Fetch todas las filas — bypassea el límite de 2000 vía /api/dataset ───
+// ─── Helper: convertir formato cols+rows a lista de objetos con nombre ────
+function rowsToRecords(cols, rows) {
+  return rows.map(rowArr => {
+    const obj = {};
+    cols.forEach((c, idx) => {
+      if (c.name) obj[c.name] = rowArr[idx];
+      if (c.display_name && obj[c.display_name] === undefined) obj[c.display_name] = rowArr[idx];
+    });
+    return obj;
+  });
+}
+
+// ─── Fetch todas las filas — bypassea el límite de 2000 filas ─────────────
 //
-// Estrategia: obtener el dataset_query del card (MBQL o SQL nativa) y
-// ejecutarlo directamente vía /api/dataset con constraints altos para
-// que Metabase no aplique el límite por defecto de 2000 filas.
+// Estrategia principal: el endpoint de exportación /query/json ejecuta la
+// card sin el límite por defecto de 2000 filas ("bare rows") que sí aplica
+// /api/card/:id/query y /api/dataset. Si por lo que sea no está disponible
+// (permisos, versión de Metabase), caemos a los métodos anteriores — pero
+// esos SIEMPRE devuelven máximo 2000 filas, así que un código que exista
+// más allá de esa ventana no aparecerá.
 async function fetchAllRows(apiKey) {
   if (cachedRows && (Date.now() - cacheTime) < CACHE_TTL_MS) {
     return cachedRows;
   }
 
   const cardId = await discoverCardId(apiKey);
-  let cols = [];
-  let rows = [];
+  let records = null;
 
-  // Intento 1: dataset con constraints altos (bypassa límite por defecto)
+  // Intento 1: endpoint de exportación (sin límite de 2000 filas)
   try {
-    const cardResp = await fetch(`${METABASE_URL}/api/card/${cardId}`, {
-      headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }
+    const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query/json`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({})
     });
-    if (cardResp.ok) {
-      const card = await cardResp.json();
-      if (card.dataset_query) {
-        const dsResp = await fetch(`${METABASE_URL}/api/dataset`, {
-          method: 'POST',
-          headers: {
-            'x-api-key': apiKey,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            ...card.dataset_query,
-            constraints: {
-              'max-results': 1000000,
-              'max-results-bare-rows': 1000000
-            }
-          })
-        });
-        if (dsResp.ok) {
-          const dsResult = await dsResp.json();
-          cols = dsResult.data?.cols || [];
-          rows = dsResult.data?.rows || [];
-        }
-      }
+    if (resp.ok) {
+      const data = await resp.json();
+      if (Array.isArray(data) && data.length > 0) records = data;
     }
   } catch (_) { /* fallback abajo */ }
 
-  // Intento 2 (fallback): query estándar del card (max 2000 filas)
-  if (rows.length === 0) {
+  // Intento 2 (fallback): dataset con constraints altos
+  if (!records) {
+    try {
+      const cardResp = await fetch(`${METABASE_URL}/api/card/${cardId}`, {
+        headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }
+      });
+      if (cardResp.ok) {
+        const card = await cardResp.json();
+        if (card.dataset_query) {
+          const dsResp = await fetch(`${METABASE_URL}/api/dataset`, {
+            method: 'POST',
+            headers: {
+              'x-api-key': apiKey,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              ...card.dataset_query,
+              constraints: {
+                'max-results': 1000000,
+                'max-results-bare-rows': 1000000
+              }
+            })
+          });
+          if (dsResp.ok) {
+            const dsResult = await dsResp.json();
+            const cols = dsResult.data?.cols || [];
+            const rows = dsResult.data?.rows || [];
+            if (rows.length > 0) records = rowsToRecords(cols, rows);
+          }
+        }
+      }
+    } catch (_) { /* fallback abajo */ }
+  }
+
+  // Intento 3 (último fallback): query estándar del card (max 2000 filas)
+  if (!records) {
     const resp = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
       method: 'POST',
       headers: {
@@ -170,11 +219,11 @@ async function fetchAllRows(apiKey) {
       throw new Error(`Card ${cardId} query failed (${resp.status}): ${errText.substring(0, 300)}`);
     }
     const result = await resp.json();
-    cols = result.data?.cols || [];
-    rows = result.data?.rows || [];
+    records = rowsToRecords(result.data?.cols || [], result.data?.rows || []);
   }
 
-  cachedRows = rows.map(rowArr => normalizeRowFromCols(cols, rowArr));
+  cachedRows = records.map(normalizeRow);
+  cachedRawRecords = records;
   cacheTime = Date.now();
   return cachedRows;
 }
@@ -197,6 +246,32 @@ export default async function handler(req, res) {
     // ── Modo debug ──
     if (debug === '1') {
       const cardId = await discoverCardId(apiKey);
+
+      // Búsqueda cruda: ?debug=1&raw=<término> busca en TODAS las columnas
+      // originales (antes de pick()), para detectar mismatches de nombre
+      // de columna o filas excluidas por el filtro propio de la card.
+      const rawTerm = (req.query.raw || '').toString().trim().toLowerCase();
+      if (rawTerm) {
+        const records = cachedRawRecords || [];
+        const matches = [];
+        for (const record of records) {
+          const hasMatch = Object.values(record).some(v => String(v ?? '').toLowerCase().includes(rawTerm));
+          if (hasMatch) {
+            matches.push(record);
+            if (matches.length >= 10) break;
+          }
+        }
+        return res.status(200).json({
+          success: true,
+          cardId,
+          totalRows: rows.length,
+          rawColumnNames: records[0] ? Object.keys(records[0]) : [],
+          rawSearchTerm: rawTerm,
+          rawMatchCount: matches.length,
+          rawMatches: matches
+        });
+      }
+
       // Conteo de codigos_bia únicos
       const uniqueCodes = new Set();
       for (const r of rows) if (r.codigo_bia) uniqueCodes.add(r.codigo_bia);
@@ -252,7 +327,7 @@ export default async function handler(req, res) {
       }
 
       const targetCode = codigo_bia.trim();
-      const equipment = rows
+      const equipment = dedupeEquipment(rows
         .filter(r => (r.codigo_bia || '').trim() === targetCode)
         .map(r => ({
           codigo_bia:        r.codigo_bia,
@@ -269,7 +344,7 @@ export default async function handler(req, res) {
           titulo:            r.titulo,
           propiedad_activos: r.propiedad_activos,
           fecha_instalacion: r.fecha_instalacion
-        }));
+        })));
 
       return res.status(200).json({
         success: true,
@@ -289,9 +364,8 @@ export default async function handler(req, res) {
           error: 'q (serial) requiere al menos 2 caracteres'
         });
       }
-      const equipment = rows
+      const equipment = dedupeEquipment(rows
         .filter(r => String(r.serial || '').toLowerCase().includes(term))
-        .slice(0, 30)
         .map(r => ({
           codigo_bia:        r.codigo_bia,
           razon_social:      r.razon_social,
@@ -307,7 +381,7 @@ export default async function handler(req, res) {
           titulo:            r.titulo,
           propiedad_activos: r.propiedad_activos,
           fecha_instalacion: r.fecha_instalacion
-        }));
+        }))).slice(0, 30);
 
       return res.status(200).json({
         success: true,
