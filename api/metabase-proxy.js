@@ -15,6 +15,12 @@
  *   GET /api/metabase-proxy?debug=1
  *     → Devuelve metadata del dataset (cardId, totalRows, sample, etc.)
  *
+ *   GET /api/metabase-proxy?debug=1&raw=<término>
+ *     → Busca <término> en TODAS las columnas originales de la card
+ *       (sin pasar por pick()/normalizeRow). Útil para diagnosticar
+ *       si un código BIA existe en la card pero con otro nombre de
+ *       columna, o si simplemente no está en el dataset filtrado.
+ *
  * Fuente: Dashboard 11584, tab 12706 (Asignadas-Instaladas).
  * Usa el endpoint /query/json (export) que NO tiene límite de 2000 filas.
  */
@@ -26,6 +32,8 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
 let cachedCardId = null;
 let cachedRows = null;
+let cachedRawCols = null;
+let cachedRawRows = null;
 let cacheTime = 0;
 
 // ─── Discovery del card ID ─────────────────────────────────────────────
@@ -175,6 +183,8 @@ async function fetchAllRows(apiKey) {
   }
 
   cachedRows = rows.map(rowArr => normalizeRowFromCols(cols, rowArr));
+  cachedRawCols = cols;
+  cachedRawRows = rows;
   cacheTime = Date.now();
   return cachedRows;
 }
@@ -197,6 +207,34 @@ export default async function handler(req, res) {
     // ── Modo debug ──
     if (debug === '1') {
       const cardId = await discoverCardId(apiKey);
+
+      // Búsqueda cruda: ?debug=1&raw=<término> busca en TODAS las columnas
+      // originales (antes de pick()), para detectar mismatches de nombre
+      // de columna o filas excluidas por el filtro propio de la card.
+      const rawTerm = (req.query.raw || '').toString().trim().toLowerCase();
+      if (rawTerm) {
+        const colNames = (cachedRawCols || []).map(c => c.display_name || c.name);
+        const matches = [];
+        for (const rowArr of (cachedRawRows || [])) {
+          const hasMatch = rowArr.some(v => String(v ?? '').toLowerCase().includes(rawTerm));
+          if (hasMatch) {
+            const obj = {};
+            colNames.forEach((name, idx) => { obj[name] = rowArr[idx]; });
+            matches.push(obj);
+            if (matches.length >= 10) break;
+          }
+        }
+        return res.status(200).json({
+          success: true,
+          cardId,
+          totalRows: rows.length,
+          rawColumnNames: colNames,
+          rawSearchTerm: rawTerm,
+          rawMatchCount: matches.length,
+          rawMatches: matches
+        });
+      }
+
       // Conteo de codigos_bia únicos
       const uniqueCodes = new Set();
       for (const r of rows) if (r.codigo_bia) uniqueCodes.add(r.codigo_bia);
