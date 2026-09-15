@@ -7,10 +7,14 @@
  *
  * Endpoints:
  *   GET /api/metabase-proxy?type=clients&q=<búsqueda>
- *     → Devuelve clientes únicos. q puede ser código BIA o razón social.
+ *     → Devuelve clientes (sedes) únicos. q puede ser código BIA o razón social.
  *
- *   GET /api/metabase-proxy?type=equipment&codigo_bia=<código>
- *     → Devuelve todos los equipos del cliente.
+ *   GET /api/metabase-proxy?type=companies&q=<búsqueda>
+ *     → Agrupa por razón social y devuelve las sedes de cada empresa, para
+ *       poder cotizar varias sedes de la misma compañía de una sola vez.
+ *
+ *   GET /api/metabase-proxy?type=equipment&codigo_bia=<código[,código2,...]>
+ *     → Devuelve todos los equipos del cliente (acepta varias sedes).
  *
  *   GET /api/metabase-proxy?debug=1
  *     → Devuelve metadata del dataset (cardId, totalRows, sample, etc.)
@@ -24,6 +28,8 @@
  * Fuente: Dashboard 11584, tab 12706 (Asignadas-Instaladas).
  * Usa el endpoint /query/json (export) que NO tiene límite de 2000 filas.
  */
+
+import { getAssetOwnership } from '../data/asset-ownership.mjs';
 
 const METABASE_URL = 'https://bia.metabaseapp.com';
 const DASHBOARD_ID = 11584;
@@ -89,12 +95,16 @@ function pick(obj, candidates) {
 // se exportan con el nombre de la tabla de origen antepuesto, ej.
 // "Activacion Global - codigo_bia → Razon Social De La Empresa".
 function normalizeRow(r) {
+  const serial = pick(r, ['serial', 'Serial']);
   return {
+    // 'RENTEK' | 'BIA' | null — quién es dueño del activo. Los equipos
+    // Rentek NO se pueden vender (ver data/asset-ownership.mjs).
+    propiedad:         getAssetOwnership(serial),
     codigo_bia:        pick(r, ['Código BIA- Final', 'codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
     razon_social:      pick(r, ['Activacion Global - codigo_bia → Razon Social De La Empresa', 'razon_social_de_la_empresa', 'Razón social', 'razon_social']),
     operador_red:      pick(r, ['Activacion Global - codigo_bia → Operador De Red', 'operador_de_red', 'Operador de Red', 'operador_red']),
     nombre_sku:        pick(r, ['nombre_sku', 'Nombre SKU', 'sku']),
-    serial:            pick(r, ['serial', 'Serial']),
+    serial:            serial,
     marca:             pick(r, ['brand', 'Marca', 'marca']),
     modelo:            pick(r, ['model', 'Modelo', 'modelo']),
     precio_unitario:   Number(pick(r, ["Precios SKU's - nombre_sku → precio_sheet", 'precio_sheet', 'Precio unitario', 'precio_unitario'])) || 0,
@@ -107,6 +117,15 @@ function normalizeRow(r) {
     fecha_ingreso:     pick(r, ['Bd Telemedida - Codigo Interno Odoobia → Fecha Ingreso (mm/dd/aa)', 'Fecha \nIngreso\n(mm/dd/aa)', 'Fecha de ingreso']),
     fecha_retiro:      pick(r, ['Bd Telemedida - Codigo Interno Odoobia → Fecha Retiro (mm/dd/aa)', 'Fecha Retiro \n(mm/dd/aa)', 'Fecha de retiro'])
   };
+}
+
+// ─── Helper: ¿la fila coincide con el término buscado? ─────────────────
+// Se busca por código BIA (CO0100...) y por razón social, porque el
+// vendedor casi siempre conoce el nombre de la empresa, no el código.
+function matchesClient(row, searchQuery) {
+  const codigo = String(row.codigo_bia || '').toLowerCase();
+  const razon  = String(row.razon_social || '').toLowerCase();
+  return codigo.includes(searchQuery) || razon.includes(searchQuery);
 }
 
 // ─── Helper: deduplicar equipos — la card 51119 repite cada fila por un
@@ -285,7 +304,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── Clientes únicos — busca SOLO por código BIA ──
+    // ── Clientes (sedes) únicos — busca por código BIA o razón social ──
     if (type === 'clients') {
       const searchQuery = (q || '').toLowerCase().trim();
       const seen = new Set();
@@ -295,10 +314,7 @@ export default async function handler(req, res) {
         if (!row.codigo_bia) continue;
         if (seen.has(row.codigo_bia)) continue;
 
-        if (searchQuery) {
-          const haystack = String(row.codigo_bia).toLowerCase();
-          if (!haystack.includes(searchQuery)) continue;
-        }
+        if (searchQuery && !matchesClient(row, searchQuery)) continue;
 
         seen.add(row.codigo_bia);
         clients.push({
@@ -317,6 +333,65 @@ export default async function handler(req, res) {
       });
     }
 
+    // ── Empresas con sus sedes — para cotizar varias sedes de una compañía ──
+    // Agrupa por razón social; cada sede es un código BIA con su conteo de
+    // equipos y cuántos de ellos son Rentek (no vendibles).
+    if (type === 'companies') {
+      const searchQuery = (q || '').toLowerCase().trim();
+      const companies = new Map();
+
+      for (const row of rows) {
+        if (!row.codigo_bia) continue;
+        if (searchQuery && !matchesClient(row, searchQuery)) continue;
+
+        // Sin razón social la sede se muestra bajo su propio código.
+        const razonSocial = (row.razon_social || '').trim();
+        const key = razonSocial.toLowerCase() || `__sin_nombre__${row.codigo_bia}`;
+
+        if (!companies.has(key)) {
+          companies.set(key, { razon_social: razonSocial, sedes: new Map() });
+        }
+        const company = companies.get(key);
+        if (!company.razon_social && razonSocial) company.razon_social = razonSocial;
+
+        if (!company.sedes.has(row.codigo_bia)) {
+          company.sedes.set(row.codigo_bia, {
+            codigo_bia:   row.codigo_bia,
+            operador_red: row.operador_red || '',
+            // La card repite filas por el fan-out del join, así que los
+            // equipos se cuentan por clave única, no por fila.
+            vistos:       new Set(),
+            rentek:       new Set()
+          });
+        }
+        const sede = company.sedes.get(row.codigo_bia);
+        const equipoKey = [row.nombre_sku, row.serial].join('|');
+        sede.vistos.add(equipoKey);
+        if (row.propiedad === 'RENTEK') sede.rentek.add(equipoKey);
+      }
+
+      const result = Array.from(companies.values())
+        .map(c => ({
+          razon_social: c.razon_social,
+          total_sedes:  c.sedes.size,
+          sedes: Array.from(c.sedes.values())
+            .map(s => ({
+              codigo_bia:     s.codigo_bia,
+              operador_red:   s.operador_red,
+              equipos:        s.vistos.size,
+              equipos_rentek: s.rentek.size
+            }))
+            .sort((a, b) => String(a.codigo_bia).localeCompare(String(b.codigo_bia)))
+        }))
+        .sort((a, b) => String(a.razon_social).localeCompare(String(b.razon_social)));
+
+      return res.status(200).json({
+        success: true,
+        count: result.length,
+        companies: result.slice(0, 20)
+      });
+    }
+
     // ── Equipos por código BIA — filtrado en memoria sobre TODAS las filas ──
     if (type === 'equipment') {
       if (!codigo_bia) {
@@ -326,11 +401,15 @@ export default async function handler(req, res) {
         });
       }
 
-      const targetCode = codigo_bia.trim();
+      // Acepta varias sedes separadas por coma: codigo_bia=CO01...,CO05...
+      const targetCodes = new Set(
+        codigo_bia.split(',').map(c => c.trim()).filter(Boolean)
+      );
       const equipment = dedupeEquipment(rows
-        .filter(r => (r.codigo_bia || '').trim() === targetCode)
+        .filter(r => targetCodes.has((r.codigo_bia || '').trim()))
         .map(r => ({
           codigo_bia:        r.codigo_bia,
+          propiedad:         r.propiedad,
           razon_social:      r.razon_social,
           nombre_sku:        r.nombre_sku,
           serial:            r.serial,
@@ -368,6 +447,7 @@ export default async function handler(req, res) {
         .filter(r => String(r.serial || '').toLowerCase().includes(term))
         .map(r => ({
           codigo_bia:        r.codigo_bia,
+          propiedad:         r.propiedad,
           razon_social:      r.razon_social,
           nombre_sku:        r.nombre_sku,
           serial:            r.serial,
