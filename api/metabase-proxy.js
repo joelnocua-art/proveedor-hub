@@ -29,8 +29,6 @@
  * Usa el endpoint /query/json (export) que NO tiene límite de 2000 filas.
  */
 
-import { getAssetOwnership } from '../data/asset-ownership.mjs';
-
 const METABASE_URL = 'https://bia.metabaseapp.com';
 const DASHBOARD_ID = 11584;
 const TAB_ID = 12706;
@@ -40,6 +38,28 @@ let cachedCardId = null;
 let cachedRows = null;
 let cachedRawRecords = null;
 let cacheTime = 0;
+
+// ─── Propiedad del activo (BIA / Rentek) ───────────────────────────────
+// El listado se carga bajo demanda y de forma tolerante a fallos: si no
+// se pudiera cargar, los equipos salen sin clasificar (propiedad null)
+// pero el buscador sigue funcionando. Se importa de forma dinámica para
+// que un problema de módulos no tumbe toda la función.
+let ownershipFn = null;
+let ownershipError = null;
+
+async function loadOwnership() {
+  if (ownershipFn || ownershipError) return ownershipFn;
+  try {
+    const mod = await import('./_asset-ownership.js');
+    // Según cómo se compile el módulo, la función queda en la raíz o en default.
+    ownershipFn = mod.getAssetOwnership || (mod.default && mod.default.getAssetOwnership) || null;
+    if (!ownershipFn) ownershipError = 'El módulo no exporta getAssetOwnership';
+  } catch (err) {
+    ownershipError = err.message || 'No se pudo cargar el listado de propiedad';
+    console.error('[Metabase Proxy] Asset ownership no disponible:', err);
+  }
+  return ownershipFn;
+}
 
 // ─── Discovery del card ID ─────────────────────────────────────────────
 async function discoverCardId(apiKey) {
@@ -98,8 +118,8 @@ function normalizeRow(r) {
   const serial = pick(r, ['serial', 'Serial']);
   return {
     // 'RENTEK' | 'BIA' | null — quién es dueño del activo. Los equipos
-    // Rentek NO se pueden vender (ver data/asset-ownership.mjs).
-    propiedad:         getAssetOwnership(serial),
+    // Rentek NO se pueden vender (ver api/_asset-ownership.js).
+    propiedad:         ownershipFn ? ownershipFn(serial) : null,
     codigo_bia:        pick(r, ['Código BIA- Final', 'codigo_bia', 'Código BIA', 'code_bia', 'bia_code']),
     razon_social:      pick(r, ['Activacion Global - codigo_bia → Razon Social De La Empresa', 'razon_social_de_la_empresa', 'Razón social', 'razon_social']),
     operador_red:      pick(r, ['Activacion Global - codigo_bia → Operador De Red', 'operador_de_red', 'Operador de Red', 'operador_red']),
@@ -167,6 +187,7 @@ async function fetchAllRows(apiKey) {
     return cachedRows;
   }
 
+  await loadOwnership();   // normalizeRow lo necesita para marcar BIA/Rentek
   const cardId = await discoverCardId(apiKey);
   let records = null;
 
@@ -299,6 +320,11 @@ export default async function handler(req, res) {
         cardId,
         totalRows: rows.length,
         uniqueClients: uniqueCodes.size,
+        // Estado del listado de propiedad BIA/Rentek
+        ownershipOk: !!ownershipFn,
+        ownershipError,
+        rentekRows: rows.filter(r => r.propiedad === 'RENTEK').length,
+        biaRows: rows.filter(r => r.propiedad === 'BIA').length,
         sampleRow: rows[0] || null,
         cacheAgeMs: Date.now() - cacheTime
       });

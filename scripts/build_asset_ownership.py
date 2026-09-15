@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Genera data/asset-ownership.mjs a partir del Excel de PROPIEDAD exportado
+Genera api/_asset-ownership.js a partir del Excel de PROPIEDAD exportado
 desde Metabase (hoja "Hoja 1" con columnas state, sku_id, nombre_sku,
 serial, PROPIEDAD).
 
@@ -13,8 +13,13 @@ Uso:
     python3 scripts/build_asset_ownership.py ruta/al/PROPIEDAD.xlsx
 
 El Excel no se versiona (contiene datos de inventario); solo se versiona
-el .mjs generado. Para actualizar el listado, exporta de nuevo desde
+el .js generado. Para actualizar el listado, exporta de nuevo desde
 Metabase y vuelve a correr este script.
+
+El archivo vive dentro de api/ y con guion bajo al inicio a propósito:
+Vercel no lo publica como endpoint y queda junto a la función que lo usa,
+con la misma extensión .js que el resto de api/ (un .mjs fuera de api/
+hacía fallar la función al desplegar).
 """
 
 import re
@@ -28,7 +33,7 @@ except ImportError:
     sys.exit("Falta openpyxl. Instálalo con: pip install openpyxl")
 
 SHEET = "Hoja 1"
-OUT = Path(__file__).resolve().parent.parent / "data" / "asset-ownership.mjs"
+OUT = Path(__file__).resolve().parent.parent / "api" / "_asset-ownership.js"
 
 
 def norm(serial):
