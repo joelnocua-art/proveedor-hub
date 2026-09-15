@@ -145,8 +145,24 @@
             <div class="card"><div class="card-header"><div class="card-title">¿A quién le vendes?</div><div class="card-subtitle">Busca un cliente existente o registra uno nuevo.</div></div>
               <div class="card-body">
                 <div style="position:relative;margin-bottom:16px;">
-                  <input type="text" class="input" id="clientSearch" placeholder="Busca por Código BIA (CO...)" style="font-size:14px;padding:12px 16px;" autocomplete="off" />
+                  <input type="text" class="input" id="clientSearch" placeholder="Busca por empresa (razón social) o por Código BIA (CO...)" style="font-size:14px;padding:12px 16px;" autocomplete="off" />
                   <div id="clientDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:360px;overflow-y:auto;border:1px solid var(--border-md);border-radius:var(--r-md);background:var(--bg-raised);margin-top:6px;box-shadow:0 16px 40px rgba(0,0,0,0.6);z-index:20;"></div>
+                </div>
+
+                <!-- Sedes de la empresa seleccionada (se llena al elegir una empresa) -->
+                <div id="sedesPicker" style="display:none;margin-bottom:16px;padding:16px;border:1px solid rgba(0,229,200,.25);border-radius:var(--r-md);background:rgba(0,229,200,.04);">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+                    <div>
+                      <div id="sedesEmpresaNombre" style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;">—</div>
+                      <div id="sedesResumen" style="font-size:12px;color:var(--text-2);margin-top:2px;">—</div>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                      <button class="btn" style="font-size:11px;padding:6px 10px;" onclick="marcarTodasLasSedes(true)">Todas</button>
+                      <button class="btn" style="font-size:11px;padding:6px 10px;" onclick="marcarTodasLasSedes(false)">Ninguna</button>
+                    </div>
+                  </div>
+                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px;">Sedes a cotizar</div>
+                  <div id="sedesLista" style="max-height:260px;overflow-y:auto;"></div>
                 </div>
                 <div id="clientNewToggle" style="margin-bottom:16px;">
                   <button class="btn" onclick="document.getElementById('clientForm').style.display='block';this.style.display='none';" style="font-size:12px;">+ Registrar cliente nuevo</button>
@@ -176,6 +192,12 @@
                 <div style="position:relative;margin-bottom:16px;">
                   <input type="text" class="input" id="salesSkuSearch" placeholder="Buscar por SKU (P2000, Medidor...) o por serial del equipo" style="font-size:14px;padding:12px 16px;" autocomplete="off" />
                   <div id="salesSkuDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:var(--bg-2,#12141c);border:1px solid rgba(255,255,255,0.12);border-radius:var(--r-md);margin-top:4px;max-height:320px;overflow-y:auto;box-shadow:0 12px 32px rgba(0,0,0,.45);"></div>
+                </div>
+                <!-- Aviso de equipos Rentek (se muestra solo si hay alguno) -->
+                <div id="swzRentekAviso" style="display:none;margin-bottom:14px;padding:14px 16px;background:rgba(255,77,79,.07);border:1px solid rgba(255,77,79,.35);border-radius:var(--r-md);">
+                  <div style="font-size:13px;font-weight:700;color:#ff6b6d;">⚠️ Hay equipos de Rentek en esta cotización</div>
+                  <div id="swzRentekAvisoDetalle" style="font-size:12px;color:var(--text-2);margin-top:4px;"></div>
+                  <button class="btn" onclick="quitarEquiposRentek()" style="margin-top:10px;font-size:12px;border-color:rgba(255,77,79,.4);color:#ff6b6d;">Quitar equipos Rentek</button>
                 </div>
                 <!-- Items (cargados desde Metabase según el cliente seleccionado en Paso 1) -->
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -350,6 +372,34 @@
   </div>
 
 
+  <!-- ═══ MODAL: Advertencia de equipos Rentek ═══ -->
+  <!-- Bloquea el avance de la cotización hasta que se quiten los equipos
+       Rentek o se acepte explícitamente la advertencia. -->
+  <div id="rentekModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2100;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--bg-raised);border:1px solid rgba(255,77,79,.45);border-radius:var(--r-lg);padding:28px;width:100%;max-width:560px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
+      <button onclick="closeRentekModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;line-height:1;" title="Cerrar">×</button>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;margin-bottom:4px;color:#ff6b6d;">⚠️ Equipos Rentek: no se pueden vender</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:16px;">
+        Los siguientes equipos son propiedad de <strong>Rentek</strong>, no de BIA, así que
+        <strong>no deben incluirse en una cotización de venta</strong>. Los equipos marcados
+        como BIA sí se pueden vender con normalidad.
+      </div>
+
+      <div id="rentekModalLista" style="max-height:230px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:16px;"></div>
+
+      <label style="display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--text-2);cursor:pointer;margin-bottom:18px;padding:12px 14px;background:rgba(255,77,79,.05);border:1px solid rgba(255,77,79,.2);border-radius:var(--r-md);">
+        <input type="checkbox" id="rentekAceptar" onchange="toggleRentekAceptar(this.checked)" style="margin-top:2px;cursor:pointer;" />
+        <span>Entiendo que estos equipos son de Rentek y asumo la responsabilidad de continuar con la cotización de todas formas.</span>
+      </label>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
+        <button class="btn" onclick="closeRentekModal()">Cancelar</button>
+        <button class="btn" id="btnRentekContinuar" disabled onclick="continuarConRentek()" style="opacity:.55;">Continuar de todas formas</button>
+        <button class="btn btn-accent" onclick="quitarEquiposRentek(true)">✓ Quitar equipos Rentek</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ MODAL: Subir cotización firmada ═══ -->
   <div id="signedQuoteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;align-items:center;justify-content:center;padding:20px;">
     <div style="background:var(--bg-raised);border:1px solid var(--border-md);border-radius:var(--r-lg);padding:28px;width:100%;max-width:460px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,0.6);">
@@ -516,7 +566,9 @@
 
     // ═══ WIZARD STATE ═══
     var wizStep = 1;
-    var selectedClient = null;       // { codigo_bia, razon_social, operador_red }
+    var selectedCompany = null;      // { razon_social, total_sedes, sedes:[...] }
+    var selectedSedes   = [];        // sedes marcadas para cotizar
+    var selectedClient = null;       // sede principal { codigo_bia, razon_social, operador_red }
     var equipmentItems = [];          // [{ nombre_sku, serial, marca, modelo, precio_base, cantidad, margen_pct, ... }]
     var equipmentLoaded = false;      // true cuando ya cargamos equipos del cliente actual
     var currentSale = null;           // sale object shown in Step 4
@@ -524,6 +576,11 @@
     // ═══ WIZARD NAV ═══
     window.salesWizGo = function(s){
       if(s<1||s>4) return;
+
+      // No se puede pasar del Paso 2 con equipos Rentek sin aceptar antes la
+      // advertencia (los equipos Rentek no son de BIA y no se venden).
+      if(s > 2 && wizStep <= 2 && bloqueadoPorRentek(function(){ salesWizGo(s); })) return;
+
       wizStep = s;
       for(var i=1;i<=4;i++){
         var el=document.querySelector('#salesWizardView .wz-step[data-step="'+i+'"]');
@@ -559,7 +616,8 @@
         var tel = (document.getElementById('sClientTel')||{}).value;
         if(rName) rName.textContent = nm;
         var parts = [];
-        if(selectedClient && selectedClient.codigo_bia) parts.push('BIA: '+selectedClient.codigo_bia);
+        if(selectedSedes.length > 1) parts.push(selectedSedes.length+' sedes: '+selectedSedes.map(function(s){ return s.codigo_bia; }).join(', '));
+        else if(selectedClient && selectedClient.codigo_bia) parts.push('BIA: '+selectedClient.codigo_bia);
         if(nit)  parts.push('NIT: '+nit);
         if(rep)  parts.push('Rep: '+rep);
         if(tipo) parts.push(tipo.charAt(0).toUpperCase()+tipo.slice(1));
@@ -592,6 +650,7 @@
               return '<tr'+(isLast?'':' style="border-bottom:1px solid var(--border);"')+'>'+
                 '<td style="padding:8px 0;font-weight:600;">'+esc(sku)+
                   '<div style="font-size:11px;color:var(--text-3);font-weight:400;">'+esc(serial.replace(/^ • /,''))+'</div>'+
+                  (it.manual?'':'<div style="margin-top:3px;">'+badgePropiedad(it.propiedad)+'</div>')+
                 '</td>'+
                 '<td style="text-align:center;">×'+cant+'</td>'+
                 '<td style="text-align:right;">'+margen+'%</td>'+
@@ -608,11 +667,24 @@
 
         // Banner de confirmación con número de solicitud dinámico
         var bannerText = document.getElementById('revConfirmText');
+        var banner     = document.getElementById('revConfirmBanner');
         if(bannerText){
           var nextNum = 'VTA-' + new Date().getFullYear() + '-' + String(SALES_DATA.length + 1).padStart(3, '0');
-          bannerText.textContent = equipmentItems.length
-            ? '✓ Se generará la solicitud ' + nextNum + ' con ' + equipmentItems.length + ' ítems por ' + fmtCOP(totalFinal)
-            : '⚠️ Agrega al menos un equipo en el paso 2 antes de confirmar';
+          var nRentek = itemsRentek().length;
+          if(nRentek){
+            bannerText.textContent = '⚠️ La cotización incluye ' + nRentek +
+              (nRentek === 1 ? ' equipo de Rentek, que no se puede vender' : ' equipos de Rentek, que no se pueden vender');
+          } else {
+            bannerText.textContent = equipmentItems.length
+              ? '✓ Se generará la solicitud ' + nextNum + ' con ' + equipmentItems.length + ' ítems por ' + fmtCOP(totalFinal)
+              : '⚠️ Agrega al menos un equipo en el paso 2 antes de confirmar';
+          }
+          // El banner pasa a rojo cuando hay equipos Rentek.
+          if(banner){
+            banner.style.background  = nRentek ? 'rgba(255,77,79,.07)' : 'rgba(0,229,200,.06)';
+            banner.style.borderColor = nRentek ? 'rgba(255,77,79,.35)' : 'rgba(0,229,200,.2)';
+          }
+          bannerText.style.color = nRentek ? '#ff6b6d' : 'var(--accent)';
         }
       }
     };
@@ -620,8 +692,15 @@
     window.showWizard = function(){
       // Reset state al abrir el wizard (nueva solicitud)
       selectedClient = null;
+      selectedCompany = null;
+      selectedSedes = [];
       equipmentItems = [];
       equipmentLoaded = false;
+      rentekAceptadoPorUsuario = false;
+      var picker = document.getElementById('sedesPicker');
+      if(picker) picker.style.display = 'none';
+      var buscador = document.getElementById('clientSearch');
+      if(buscador) buscador.value = '';
       renderEquipmentList();
       document.getElementById('salesListView').style.display='none';
       document.getElementById('salesWizardView').style.display='block';
@@ -640,24 +719,30 @@
     // ═══ METABASE CLIENT SEARCH ═══
     var clientSearchTimer = null;
 
-    async function fetchMetabaseClients(query){
+    // Busca empresas (razón social) con sus sedes. Una empresa puede tener
+    // varias sedes/códigos BIA y se pueden cotizar varias a la vez.
+    async function fetchMetabaseCompanies(query){
       try{
-        var res = await fetch('/api/metabase-proxy?type=clients&q='+encodeURIComponent(query));
+        var res = await fetch('/api/metabase-proxy?type=companies&q='+encodeURIComponent(query));
         var data = await res.json();
         if(!data.success){
-          console.error('[Sales] Client search failed:', data.error);
+          console.error('[Sales] Company search failed:', data.error);
           return { error: data.error || 'Error desconocido' };
         }
-        return data.clients || [];
+        return data.companies || [];
       }catch(err){
-        console.error('[Sales] Client fetch error:', err);
+        console.error('[Sales] Company fetch error:', err);
         return { error: 'No se pudo conectar al servidor (' + err.message + ')' };
       }
     }
 
-    async function fetchMetabaseEquipment(codigoBia){
+    // Acepta un código o un array de códigos (varias sedes de una empresa).
+    async function fetchMetabaseEquipment(codigosBia){
+      var codigos = Array.isArray(codigosBia) ? codigosBia : [codigosBia];
+      codigos = codigos.filter(Boolean);
+      if(!codigos.length) return [];
       try{
-        var res = await fetch('/api/metabase-proxy?type=equipment&codigo_bia='+encodeURIComponent(codigoBia));
+        var res = await fetch('/api/metabase-proxy?type=equipment&codigo_bia='+encodeURIComponent(codigos.join(',')));
         var data = await res.json();
         if(!data.success){ console.error('[Sales] Equipment fetch failed:', data.error); return []; }
         return data.equipment || [];
@@ -682,32 +767,28 @@
 
         if(clientSearchTimer) clearTimeout(clientSearchTimer);
         clientSearchTimer = setTimeout(async function(){
-          var clients = await fetchMetabaseClients(q);
+          var companies = await fetchMetabaseCompanies(q);
 
           // Si es un objeto de error, mostrarlo al usuario
-          if(clients && clients.error){
-            cDrop.innerHTML='<div style="padding:12px 16px;color:var(--danger);font-size:12px;">⚠️ '+esc(clients.error)+'</div>';
+          if(companies && companies.error){
+            cDrop.innerHTML='<div style="padding:12px 16px;color:var(--danger);font-size:12px;">⚠️ '+esc(companies.error)+'</div>';
             return;
           }
 
-          if(!clients.length){
+          if(!companies.length){
             cDrop.innerHTML='<div style="padding:12px 16px;color:var(--text-3);font-size:13px;">Sin resultados en Metabase. Usa "+ Registrar cliente nuevo"</div>';
             return;
           }
-          cDrop.innerHTML = clients.map(function(c){
-            var rawName = c.razon_social||'';
-            var hasName = !!rawName.trim();
-            var name = esc(rawName);
-            var cbia = esc(c.codigo_bia||'');
-            var op   = esc(c.operador_red||'');
-            var safeName = name.replace(/'/g,"\\'");
-            var safeCbia = cbia.replace(/'/g,"\\'");
-            var safeOp   = op.replace(/'/g,"\\'");
-            var title    = hasName ? name : cbia;
+          window._companyHits = companies;
+          cDrop.innerHTML = companies.map(function(c, i){
+            var hasName = !!(c.razon_social||'').trim();
+            var title   = hasName ? esc(c.razon_social) : esc((c.sedes[0]||{}).codigo_bia || 'Sin nombre');
+            var nSedes  = c.total_sedes || (c.sedes||[]).length;
+            var equipos = (c.sedes||[]).reduce(function(s, x){ return s + (x.equipos||0); }, 0);
             var subtitle = hasName
-              ? ('BIA: '+cbia+(op?' &nbsp;·&nbsp; '+op:''))
-              : ('Sin razón social en Metabase — completa el nombre manualmente'+(op?' &nbsp;·&nbsp; '+op:''));
-            return '<div style="padding:14px 18px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.05);transition:background .13s;" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'\'" onclick="selectMetabaseClient(\''+safeCbia+'\',\''+safeName+'\',\''+safeOp+'\')">'+
+              ? (nSedes === 1 ? '1 sede' : nSedes+' sedes') + ' &nbsp;·&nbsp; ' + equipos + ' equipos'
+              : 'Sin razón social en Metabase — completa el nombre manualmente';
+            return '<div style="padding:14px 18px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.05);transition:background .13s;" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'\'" onclick="selectMetabaseCompany('+i+')">'+
               '<div><div style="font-weight:600;font-size:14px;margin-bottom:3px;">'+title+'</div><div style="font-size:12px;color:var(--text-3);">'+subtitle+'</div></div>'+
               '<span style="font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;margin-left:16px;">Seleccionar →</span></div>';
           }).join('');
@@ -718,25 +799,50 @@
       });
     }
 
-    window.selectMetabaseClient = function(codigoBia, name, operadorRed){
-      // Si cambia el cliente, resetear equipos
-      if(!selectedClient || selectedClient.codigo_bia !== codigoBia){
-        equipmentItems = [];
-        equipmentLoaded = false;
+    // Se elige una EMPRESA del dropdown; sus sedes salen marcadas y el
+    // vendedor deja solo las que va a cotizar.
+    window.selectMetabaseCompany = function(i){
+      var company = (window._companyHits || [])[i];
+      if(!company) return;
+
+      selectedCompany = company;
+      selectedSedes   = (company.sedes || []).slice();   // todas por defecto
+      equipmentItems  = [];
+      equipmentLoaded = false;
+      rentekAceptadoPorUsuario = false;
+
+      var nombre = (company.razon_social || '').trim();
+      aplicarClienteSeleccionado(nombre);
+      renderSedesPicker();
+      renderEquipmentList();
+
+      document.getElementById('clientSearch').value = nombre || (selectedSedes[0]||{}).codigo_bia || '';
+      document.getElementById('clientDropdown').style.display = 'none';
+
+      if(typeof showToast==='function'){
+        var n = selectedSedes.length;
+        showToast('Empresa seleccionada: '+(nombre || 'sin razón social')+' — '+(n===1?'1 sede':n+' sedes'),'success');
       }
-      var safeName = (name||'').trim();
-      selectedClient = {
-        codigo_bia: codigoBia,
-        razon_social: safeName,
-        operador_red: operadorRed || ''
-      };
-      document.getElementById('clientSearch').value = safeName || codigoBia;
-      document.getElementById('clientDropdown').style.display='none';
+    };
+
+    // Deja el formulario del paso 1 alineado con la empresa y las sedes
+    // marcadas. selectedClient apunta a la primera sede: es la que viaja
+    // como código BIA principal de la solicitud.
+    function aplicarClienteSeleccionado(nombre){
+      var principal = selectedSedes[0] || {};
+      selectedClient = selectedSedes.length ? {
+        codigo_bia:   principal.codigo_bia,
+        razon_social: nombre || '',
+        operador_red: principal.operador_red || ''
+      } : null;
+
       document.getElementById('clientForm').style.display='block';
       document.getElementById('clientNewToggle').style.display='none';
-      document.getElementById('sClientName').value = safeName;
       var sNameEl = document.getElementById('sClientName');
-      if(sNameEl && !safeName) sNameEl.focus();
+      if(sNameEl){
+        sNameEl.value = nombre || '';
+        if(!nombre) sNameEl.focus();
+      }
       // NIT, Representante, Tipo de contrato, Email y Teléfono se completan manualmente
       document.getElementById('sClientNit').value = '';
       document.getElementById('sClientRep').value = '';
@@ -744,20 +850,235 @@
       document.getElementById('sClientTel').value = '';
       var tipoSel = document.getElementById('sClientTipo');
       if(tipoSel) tipoSel.value = '';
-      // Actualizar la tarjeta preview con datos reales del cliente
+
       var preview = document.querySelector('#clientForm .client-card');
       if(preview){
         var nameEl = preview.querySelector('.client-name');
-        if(nameEl) nameEl.textContent = safeName || ('Cliente '+codigoBia);
+        if(nameEl) nameEl.textContent = nombre || ('Cliente '+(principal.codigo_bia||''));
         var sub = preview.querySelector('div[style*="font-size:12px"]');
-        if(sub) sub.textContent = 'Código BIA: '+codigoBia+(operadorRed?' • '+operadorRed:'');
+        if(sub) sub.textContent = resumenSedes();
       }
-      if(typeof showToast==='function') showToast('Cliente seleccionado: '+(safeName || codigoBia),'success');
+    }
+
+    function resumenSedes(){
+      if(!selectedSedes.length) return 'Sin sedes seleccionadas';
+      if(selectedSedes.length === 1){
+        var s = selectedSedes[0];
+        return 'Código BIA: '+s.codigo_bia+(s.operador_red?' • '+s.operador_red:'');
+      }
+      return selectedSedes.length+' sedes: '+selectedSedes.map(function(s){ return s.codigo_bia; }).join(', ');
+    }
+
+    // Lista de sedes con checkbox. El conteo de equipos y de Rentek viene
+    // del proxy, así se ve de una qué sede trae equipos no vendibles.
+    function renderSedesPicker(){
+      var box    = document.getElementById('sedesPicker');
+      var lista  = document.getElementById('sedesLista');
+      var nombre = document.getElementById('sedesEmpresaNombre');
+      var resumen= document.getElementById('sedesResumen');
+      if(!box || !lista) return;
+
+      if(!selectedCompany || !(selectedCompany.sedes||[]).length){
+        box.style.display = 'none';
+        return;
+      }
+      box.style.display = 'block';
+      if(nombre)  nombre.textContent = selectedCompany.razon_social || 'Sin razón social';
+      if(resumen) resumen.textContent = resumenSedes();
+
+      var marcadas = {};
+      selectedSedes.forEach(function(s){ marcadas[s.codigo_bia] = true; });
+
+      lista.innerHTML = selectedCompany.sedes.map(function(s){
+        var checked = marcadas[s.codigo_bia] ? ' checked' : '';
+        var meta = [];
+        if(s.operador_red) meta.push(esc(s.operador_red));
+        meta.push(s.equipos + (s.equipos === 1 ? ' equipo' : ' equipos'));
+        var avisoRentek = s.equipos_rentek
+          ? '<span style="margin-left:8px;font-size:10px;font-weight:700;color:#ff6b6d;">'+s.equipos_rentek+' Rentek</span>'
+          : '';
+        return '<label style="display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:var(--r-sm);cursor:pointer;" '+
+            'onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" onmouseout="this.style.background=\'\'">'+
+          '<input type="checkbox" data-sede="'+esc(s.codigo_bia)+'"'+checked+' style="margin-top:3px;cursor:pointer;" />'+
+          '<span><span style="font-weight:600;font-size:13px;">'+esc(s.codigo_bia)+'</span>'+avisoRentek+
+            '<span style="display:block;font-size:11px;color:var(--text-3);">'+meta.join(' • ')+'</span></span>'+
+        '</label>';
+      }).join('');
+
+      lista.querySelectorAll('input[data-sede]').forEach(function(chk){
+        chk.addEventListener('change', function(){
+          var codigo = this.getAttribute('data-sede');
+          if(this.checked){
+            var sede = selectedCompany.sedes.find(function(s){ return s.codigo_bia === codigo; });
+            if(sede && !selectedSedes.some(function(s){ return s.codigo_bia === codigo; })) selectedSedes.push(sede);
+          } else {
+            selectedSedes = selectedSedes.filter(function(s){ return s.codigo_bia !== codigo; });
+          }
+          // Respetar el orden original de las sedes de la empresa.
+          selectedSedes.sort(function(a,b){
+            return selectedCompany.sedes.indexOf(a) - selectedCompany.sedes.indexOf(b);
+          });
+          onSedesCambiaron();
+        });
+      });
+    }
+
+    // Al cambiar las sedes hay que recargar los equipos del paso 2.
+    function onSedesCambiaron(){
+      equipmentItems  = [];
+      equipmentLoaded = false;
+      rentekAceptadoPorUsuario = false;
+      aplicarClienteSeleccionado((selectedCompany && selectedCompany.razon_social) || '');
+      var resumen = document.getElementById('sedesResumen');
+      if(resumen) resumen.textContent = resumenSedes();
+      renderEquipmentList();
+    }
+
+    window.marcarTodasLasSedes = function(todas){
+      if(!selectedCompany) return;
+      selectedSedes = todas ? (selectedCompany.sedes || []).slice() : [];
+      renderSedesPicker();
+      onSedesCambiaron();
     };
 
-    // Alias de compatibilidad (por si quedó algún call al nombre viejo)
+    // Alias de compatibilidad: selecciona una sola sede por código BIA.
+    window.selectMetabaseClient = function(codigoBia, name, operadorRed){
+      selectedCompany = {
+        razon_social: (name||'').trim(),
+        total_sedes: 1,
+        sedes: [{ codigo_bia: codigoBia, operador_red: operadorRed||'', equipos: 0, equipos_rentek: 0 }]
+      };
+      selectedSedes = selectedCompany.sedes.slice();
+      equipmentItems = [];
+      equipmentLoaded = false;
+      rentekAceptadoPorUsuario = false;
+      aplicarClienteSeleccionado(selectedCompany.razon_social);
+      renderSedesPicker();
+      renderEquipmentList();
+    };
+
     window.selectMockClient = function(name, nit){
       window.selectMetabaseClient(nit, name, '');
+    };
+
+    // ═══ PROPIEDAD DEL ACTIVO: BIA vs RENTEK ═══════════════════════════
+    // Los equipos de Rentek NO son de BIA y no se pueden vender. El proxy
+    // marca cada equipo con propiedad = 'BIA' | 'RENTEK' | null (null =
+    // sin serial o serial que no está en el listado de propiedad).
+    function esRentek(item){
+      return item && item.propiedad === 'RENTEK';
+    }
+
+    function itemsRentek(){
+      return equipmentItems.filter(esRentek);
+    }
+
+    // Chip de propiedad para mostrar junto a cada equipo.
+    function badgePropiedad(propiedad){
+      if(propiedad === 'RENTEK'){
+        return '<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+
+          'background:rgba(255,77,79,.14);color:#ff6b6d;border:1px solid rgba(255,77,79,.35);letter-spacing:.03em;" '+
+          'title="Equipo de Rentek — no se puede vender">RENTEK · NO VENDIBLE</span>';
+      }
+      if(propiedad === 'BIA'){
+        return '<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+
+          'background:rgba(0,229,200,.12);color:var(--accent);border:1px solid rgba(0,229,200,.3);letter-spacing:.03em;" '+
+          'title="Equipo propiedad de BIA — se puede vender">BIA · VENDIBLE</span>';
+      }
+      return '<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+
+        'background:rgba(255,184,0,.12);color:#ffb800;border:1px solid rgba(255,184,0,.3);letter-spacing:.03em;" '+
+        'title="Sin serial o serial no encontrado en el listado de propiedad — verifica antes de cotizar">SIN CLASIFICAR</span>';
+    }
+
+    // Actualiza el aviso del Paso 2 según cuántos equipos Rentek haya.
+    function renderRentekAviso(){
+      var box = document.getElementById('swzRentekAviso');
+      var det = document.getElementById('swzRentekAvisoDetalle');
+      if(!box) return;
+      var rentek = itemsRentek();
+      if(!rentek.length){ box.style.display = 'none'; return; }
+      box.style.display = 'block';
+      if(det){
+        det.textContent = rentek.length === 1
+          ? '1 equipo de la lista es de Rentek y no se puede vender. Quítalo antes de cotizar.'
+          : rentek.length+' equipos de la lista son de Rentek y no se pueden vender. Quítalos antes de cotizar.';
+      }
+    }
+
+    // Quita del carrito todos los equipos Rentek.
+    window.quitarEquiposRentek = function(cerrarModal){
+      var antes = equipmentItems.length;
+      equipmentItems = equipmentItems.filter(function(it){ return !esRentek(it); });
+      var quitados = antes - equipmentItems.length;
+      if(cerrarModal) closeRentekModal();
+      renderEquipmentList();
+      if(typeof showToast==='function'){
+        showToast(quitados === 1 ? '1 equipo Rentek quitado' : quitados+' equipos Rentek quitados','success');
+      }
+    };
+
+    // Acción pendiente que se retoma si el usuario acepta la advertencia.
+    var rentekAccionPendiente = null;
+    // Se marca cuando el usuario acepta la advertencia, para no repetirla en
+    // cada paso. Se reinicia al abrir el wizard o al cambiar de cliente.
+    var rentekAceptadoPorUsuario = false;
+
+    function abrirRentekModal(accionSiAcepta){
+      var rentek = itemsRentek();
+      if(!rentek.length) return false;   // no hay nada que advertir
+
+      rentekAccionPendiente = accionSiAcepta || null;
+      var lista = document.getElementById('rentekModalLista');
+      if(lista){
+        lista.innerHTML = rentek.map(function(it){
+          var meta = [];
+          if(it.serial) meta.push('Serial: '+esc(it.serial));
+          if(it.marca)  meta.push(esc(it.marca));
+          if(it.codigo_bia) meta.push('BIA: '+esc(it.codigo_bia));
+          return '<div style="padding:10px 14px;border-bottom:1px solid var(--border);">'+
+            '<div style="font-weight:600;font-size:13px;">'+esc(it.nombre_sku || 'Equipo')+'</div>'+
+            (meta.length?'<div style="font-size:11px;color:var(--text-3);margin-top:2px;">'+meta.join(' • ')+'</div>':'')+
+          '</div>';
+        }).join('');
+      }
+      var chk = document.getElementById('rentekAceptar');
+      var btn = document.getElementById('btnRentekContinuar');
+      if(chk) chk.checked = false;
+      if(btn){ btn.disabled = true; btn.style.opacity = '.55'; }
+      var modal = document.getElementById('rentekModal');
+      if(modal) modal.style.display = 'flex';
+      return true;
+    }
+
+    window.closeRentekModal = function(){
+      var modal = document.getElementById('rentekModal');
+      if(modal) modal.style.display = 'none';
+      rentekAccionPendiente = null;
+    };
+
+    window.continuarConRentek = function(){
+      var chk = document.getElementById('rentekAceptar');
+      if(!chk || !chk.checked) return;   // solo se sigue con aceptación explícita
+      var accion = rentekAccionPendiente;
+      var modal = document.getElementById('rentekModal');
+      if(modal) modal.style.display = 'none';
+      rentekAccionPendiente = null;
+      rentekAceptadoPorUsuario = true;
+      if(typeof accion === 'function') accion();
+    };
+
+    // Devuelve true si hay que frenar: hay Rentek y aún no se ha aceptado.
+    function bloqueadoPorRentek(accionSiAcepta){
+      if(rentekAceptadoPorUsuario) return false;
+      return abrirRentekModal(accionSiAcepta);
+    }
+
+    // Solo se puede continuar tras marcar la casilla de la advertencia.
+    window.toggleRentekAceptar = function(aceptado){
+      var btn = document.getElementById('btnRentekContinuar');
+      if(!btn) return;
+      btn.disabled = !aceptado;
+      btn.style.opacity = aceptado ? '1' : '.55';
     };
 
     // ═══ EQUIPMENT RENDER (Step 2) ═══
@@ -783,6 +1104,7 @@
         if(badge) badge.textContent = '0';
         if(label) label.textContent = 'Total cotización (0 ítems)';
         if(totalEl) totalEl.textContent = '$0';
+        renderRentekAviso();
         return;
       }
 
@@ -798,6 +1120,8 @@
         totalCop      += subtotal;
 
         var subParts = [];
+        // Con varias sedes hay que poder distinguir de cuál es cada equipo.
+        if(selectedSedes.length > 1 && item.codigo_bia) subParts.push('Sede: '+esc(item.codigo_bia));
         if(item.marca)  subParts.push(esc(item.marca));
         if(item.modelo) subParts.push(esc(item.modelo));
         if(item.serial) subParts.push('Serial: '+esc(item.serial));
@@ -809,8 +1133,15 @@
           ? '<input type="text" class="input" value="'+esc(item.nombre_sku||'').replace(/"/g,'&quot;')+'" data-eq-idx="'+idx+'" data-eq-field="nombre_sku" placeholder="Nombre del SKU / equipo" style="width:100%;font-size:13px;padding:6px 8px;font-weight:600;" />'
           : '<div style="font-weight:600;font-size:13px;">'+esc(item.nombre_sku || 'SKU sin nombre')+'</div>';
 
-        return '<div class="item-row">'+
-          '<div>'+descCell+(subStr?'<div style="font-size:11px;color:var(--text-3);">'+subStr+'</div>':'')+'</div>'+
+        // Los equipos que vienen de Metabase traen propiedad; los creados a
+        // mano no son un activo del inventario, así que no llevan chip.
+        var chip = item.manual ? '' : '<div style="margin-top:3px;">'+badgePropiedad(item.propiedad)+'</div>';
+        var filaRentek = esRentek(item)
+          ? ' style="background:rgba(255,77,79,.05);border-left:3px solid rgba(255,77,79,.5);"'
+          : '';
+
+        return '<div class="item-row"'+filaRentek+'>'+
+          '<div>'+descCell+(subStr?'<div style="font-size:11px;color:var(--text-3);">'+subStr+'</div>':'')+chip+'</div>'+
           '<div style="text-align:center;"><input type="number" min="0" class="input" value="'+cantidad+'" data-eq-idx="'+idx+'" data-eq-field="cantidad" style="width:60px;text-align:center;padding:6px;" /></div>'+
           '<div style="text-align:right;"><input type="number" min="0" step="any" class="input" value="'+(precioBase||'')+'" placeholder="0" data-eq-idx="'+idx+'" data-eq-field="precio_base" style="width:110px;text-align:right;padding:6px;" /></div>'+
           '<div style="text-align:center;"><input type="number" min="0" class="input" value="'+margen+'" data-eq-idx="'+idx+'" data-eq-field="margen_pct" style="width:60px;text-align:center;padding:6px;" />%</div>'+
@@ -823,6 +1154,7 @@
       if(badge)   badge.textContent = String(equipmentItems.length);
       if(label)   label.textContent = 'Total cotización ('+equipmentItems.length+' ítems, '+totalUnidades+' unidades)';
       if(totalEl) totalEl.textContent = fmtCOPLocal(totalCop);
+      renderRentekAviso();
 
       // Wire input listeners — actualización EN EL SITIO (no re-render), así el
       // input conserva el foco y se puede escribir el número completo.
@@ -874,7 +1206,8 @@
     }
 
     async function loadEquipmentForClient(){
-      if(!selectedClient || !selectedClient.codigo_bia){
+      var codigos = selectedSedes.map(function(s){ return s.codigo_bia; }).filter(Boolean);
+      if(!codigos.length){
         equipmentItems = [];
         renderEquipmentList();
         return;
@@ -882,10 +1215,15 @@
       var list = document.getElementById('swzEquipmentList');
       if(list) list.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-3);font-size:13px;">⏳ Cargando equipos desde Metabase...</div>';
 
-      var equipment = await fetchMetabaseEquipment(selectedClient.codigo_bia);
+      var equipment = await fetchMetabaseEquipment(codigos);
+      // Agrupados por sede, en el mismo orden en que aparecen las sedes.
+      equipment.sort(function(a, b){
+        return codigos.indexOf(a.codigo_bia) - codigos.indexOf(b.codigo_bia);
+      });
       equipmentItems = equipment.map(function(e){
         return {
           codigo_bia: e.codigo_bia,
+          propiedad:  e.propiedad || null,
           nombre_sku: e.nombre_sku,
           serial:     e.serial,
           marca:      e.marca,
@@ -900,14 +1238,15 @@
       equipmentLoaded = true;
       renderEquipmentList();
       if(typeof showToast==='function'){
-        if(equipmentItems.length) showToast(equipmentItems.length+' equipos cargados desde Metabase','success');
+        var deSedes = codigos.length > 1 ? ' de '+codigos.length+' sedes' : '';
+        if(equipmentItems.length) showToast(equipmentItems.length+' equipos cargados desde Metabase'+deSedes,'success');
         else showToast('El cliente no tiene equipos en Metabase','info');
       }
     }
 
     // Botón "Recargar desde Metabase" (en Paso 2)
     window.reloadEquipmentFromMetabase = function(){
-      if(!selectedClient){
+      if(!selectedSedes.length){
         if(typeof showToast==='function') showToast('Primero selecciona un cliente en el Paso 1','error');
         return;
       }
@@ -944,6 +1283,7 @@
       if(!e) return;
       equipmentItems.push({
         codigo_bia:   e.codigo_bia || (selectedClient ? selectedClient.codigo_bia : null),
+        propiedad:    e.propiedad || null,
         nombre_sku:   e.nombre_sku || 'Equipo',
         serial:       e.serial || '',
         marca:        e.marca || '',
@@ -958,7 +1298,13 @@
       renderEquipmentList();
       var s = document.getElementById('salesSkuSearch'); if(s) s.value='';
       var dd = document.getElementById('salesSkuDropdown'); if(dd) dd.style.display='none';
-      if(typeof showToast==='function') showToast('Equipo agregado: '+(e.serial||e.nombre_sku),'success');
+      if(typeof showToast==='function'){
+        if(e.propiedad === 'RENTEK'){
+          showToast('⚠️ '+(e.serial||e.nombre_sku)+' es de Rentek — no se puede vender','error');
+        } else {
+          showToast('Equipo agregado: '+(e.serial||e.nombre_sku),'success');
+        }
+      }
     };
 
     // Botón "+ Crear nuevo SKU" — fila en blanco con nombre y precio editables
@@ -1008,8 +1354,8 @@
             if(e.estado)     meta.push(esc(e.estado));
             if(e.codigo_bia) meta.push('BIA: '+esc(e.codigo_bia));
             var price = Number(e.precio_unitario)||0;
-            return '<div style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.05);" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'\'" onclick="addSerialEquipment('+i+')">'+
-              '<div><div style="font-weight:600;font-size:13px;">'+name+'</div><div style="font-size:11px;color:var(--text-3);">'+meta.join(' • ')+'</div></div>'+
+            return '<div style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.05);'+(e.propiedad==='RENTEK'?'background:rgba(255,77,79,.05);':'')+'" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\''+(e.propiedad==='RENTEK'?'rgba(255,77,79,.05)':'')+'\'" onclick="addSerialEquipment('+i+')">'+
+              '<div><div style="font-weight:600;font-size:13px;">'+name+'</div><div style="font-size:11px;color:var(--text-3);">'+meta.join(' • ')+'</div><div style="margin-top:3px;">'+badgePropiedad(e.propiedad)+'</div></div>'+
               '<span style="font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;margin-left:14px;">'+(price>0?fmtCOPLocal(price):'')+' ＋</span></div>';
           }).join('');
         }
@@ -1074,6 +1420,8 @@
         if(typeof showToast==='function') showToast('Agrega al menos un equipo (paso 2)','error');
         return;
       }
+      // Última barrera antes de guardar: equipos Rentek sin aceptación previa.
+      if(bloqueadoPorRentek(function(){ confirmAndSaveSale(); })) return;
       if(typeof sbInsertSale !== 'function'){
         if(typeof showToast==='function') showToast('Supabase no está cargado. Recarga la página.','error');
         return;
@@ -1483,8 +1831,11 @@
     }
 
     function fmtFechaLarga(d){
-      var meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-      return d.getDate() + ' de ' + meses[d.getMonth()] + ' de ' + d.getFullYear();
+      // Mes en minúscula (así se escribe en español) y espacios duros para
+      // que la fecha no se parta en dos líneas dentro del documento.
+      var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      var NBSP = ' ';
+      return d.getDate() + NBSP + 'de' + NBSP + meses[d.getMonth()] + NBSP + 'de' + NBSP + d.getFullYear();
     }
 
     function fmtCOPDocx(n){
@@ -1535,7 +1886,7 @@
         }
 
         doc.render({
-          ciudad_fecha:             'Bogotá, D.C., ' + fmtFechaLarga(fecha),
+          ciudad_fecha:             'Bogotá, D.C., ' + fmtFechaLarga(fecha),
           razon_social:             razonSocial,
           razon_social_aceptacion:  razonSocial,
           items:                    items,
