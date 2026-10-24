@@ -86,7 +86,7 @@ function toggleSidebar(forceOpen) {
 }
 
 // Venta de Activos ahora es una app aparte (a cargo de CX)
-const VENTA_ACTIVOS_URL = 'https://bia-asset-sales-desk.lovable.app/';
+const VENTA_ACTIVOS_URL = 'https://venta-de-activos-bia.lovable.app/';
 
 // Roles permitidos por página
 const PAGE_ROLES = {

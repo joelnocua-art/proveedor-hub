@@ -29,9 +29,9 @@
     }
   ],
   "redirects": [
-    { "source": "/ventas", "destination": "https://bia-asset-sales-desk.lovable.app/", "permanent": false },
-    { "source": "/sales", "destination": "https://bia-asset-sales-desk.lovable.app/", "permanent": false },
-    { "source": "/sales.html", "destination": "https://bia-asset-sales-desk.lovable.app/", "permanent": false }
+    { "source": "/ventas", "destination": "https://venta-de-activos-bia.lovable.app/", "permanent": false },
+    { "source": "/sales", "destination": "https://venta-de-activos-bia.lovable.app/", "permanent": false },
+    { "source": "/sales.html", "destination": "https://venta-de-activos-bia.lovable.app/", "permanent": false }
   ],
   "rewrites": [
     { "source": "/login", "destination": "/index.html" },
