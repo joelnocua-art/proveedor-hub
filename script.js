@@ -85,9 +85,12 @@ function toggleSidebar(forceOpen) {
   overlay?.classList.remove('open');
 }
 
+// Venta de Activos ahora es una app aparte (a cargo de CX)
+const VENTA_ACTIVOS_URL = 'https://venta-de-activos-bia.lovable.app/';
+
 // Roles permitidos por página
 const PAGE_ROLES = {
-  'home':            ['admin', 'supply', 'sales', 'viewer'],
+  'home':            ['admin', 'supply', 'viewer'],
   'providers':       ['admin', 'supply'],
   'provider_detail': ['admin', 'supply'],
   'new_provider':    ['admin', 'supply'],
@@ -95,19 +98,17 @@ const PAGE_ROLES = {
   'quote_detail':    ['admin', 'supply'],
   'compare':         ['admin', 'supply'],
   'sku':             ['admin', 'supply'],
-  'sales':           ['admin', 'supply', 'sales'],
   'usuarios':        ['admin']
 };
 
 function filterNavByRole(role) {
   const NAV_ROLES = {
-    'home':         ['admin', 'supply', 'sales', 'viewer'],
+    'home':         ['admin', 'supply', 'viewer'],
     'providers':    ['admin', 'supply'],
     'new_provider': ['admin', 'supply'],
     'quotes':       ['admin', 'supply'],
     'compare':      ['admin', 'supply'],
     'sku':          ['admin', 'supply'],
-    'sales':        ['admin', 'supply', 'sales'],
     'usuarios':     ['admin']
   };
   document.querySelectorAll('.nav a[data-nav]').forEach(a => {
@@ -152,7 +153,7 @@ function renderUserChip(sbUser) {
     ? `<img src="${escapeHtml(avatar)}" style="width:28px;height:28px;border-radius:50%;margin-right:8px;vertical-align:-8px;object-fit:cover;" />`
     : `<span style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;margin-right:8px;vertical-align:-8px;color:#0a0d1a;">${escapeHtml(initial)}</span>`;
 
-  const roleLabels = { admin: 'Admin', supply: 'Supply', sales: 'Ventas', viewer: 'Solo lectura' };
+  const roleLabels = { admin: 'Admin', supply: 'Supply', viewer: 'Solo lectura' };
   const role = window._userRole || '';
   const roleTag = role
     ? `<span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:700;background:rgba(0,229,200,0.12);color:var(--accent);letter-spacing:.5px;">${escapeHtml(roleLabels[role] || role)}</span>`
@@ -2662,9 +2663,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       window._userRole = userRole;
 
+      // El rol sales ya no tiene páginas aquí: quien aún lo tenga va a la app nueva
+      if (userRole === 'sales') {
+        window.location.href = VENTA_ACTIVOS_URL;
+        return;
+      }
+
       const allowed = PAGE_ROLES[page];
       if (allowed && !allowed.includes(userRole)) {
-        window.location.href = userRole === 'sales' ? 'sales.html' : 'home.html';
+        window.location.href = 'home.html';
         return;
       }
 
@@ -2754,10 +2761,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   // SKU page
   if (page === 'sku') {
     setupSkuPage();
-  }
-
-  // Sales page (visual prototype — no setup needed yet)
-  if (page === 'sales') {
-    // Future: setupSalesPage();
   }
 });

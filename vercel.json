@@ -28,6 +28,11 @@
       ]
     }
   ],
+  "redirects": [
+    { "source": "/ventas", "destination": "https://venta-de-activos-bia.lovable.app/", "permanent": false },
+    { "source": "/sales", "destination": "https://venta-de-activos-bia.lovable.app/", "permanent": false },
+    { "source": "/sales.html", "destination": "https://venta-de-activos-bia.lovable.app/", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/login", "destination": "/index.html" },
     { "source": "/registro", "destination": "/register.html" },
@@ -37,7 +42,6 @@
     { "source": "/comparativo", "destination": "/compare.html" },
     { "source": "/sku", "destination": "/sku.html" },
     { "source": "/respuesta", "destination": "/respuesta.html" },
-    { "source": "/ventas", "destination": "/sales.html" },
     { "source": "/usuarios", "destination": "/usuarios.html" }
   ]
 }
