@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'userId y role son requeridos.' });
     }
 
-    const validRoles = ['admin', 'supply', 'sales', 'viewer'];
+    const validRoles = ['admin', 'supply', 'viewer'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: 'Rol inválido. Opciones: ' + validRoles.join(', ') });
     }
