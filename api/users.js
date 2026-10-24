@@ -4,11 +4,19 @@
  *
  * GET  /api/users  → Lista todos los usuarios con su perfil
  * POST /api/users  → Actualiza rol/área de un usuario { userId, role, area }
+ *
+ * Solo para admins: exige Authorization: Bearer <access_token> de Supabase
+ * con rol admin en app_metadata (ver api/_auth.js).
  */
+
+import { requireUser } from './_auth.js';
 
 const SUPABASE_URL = 'https://fepivzcobbdybztuiyge.supabase.co';
 
 export default async function handler(req, res) {
+  const caller = await requireUser(req, res, { roles: ['admin'] });
+  if (!caller) return;
+
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) {
     return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY no configurada en Vercel.' });
@@ -35,8 +43,10 @@ export default async function handler(req, res) {
       const authUsers = authData.users || authData || [];
 
       const users = authUsers.map(u => {
-        // role/area guardados en user_metadata (vía Admin API)
+        // role en app_metadata (fuente de verdad) y copia en user_metadata;
+        // area solo en user_metadata
         const meta = u.user_metadata || u.raw_user_meta_data || {};
+        const appMeta = u.app_metadata || u.raw_app_meta_data || {};
         return {
           id: u.id,
           email: u.email || '',
@@ -44,7 +54,7 @@ export default async function handler(req, res) {
           avatar_url: meta.avatar_url || null,
           created_at: u.created_at,
           last_sign_in: u.last_sign_in_at,
-          role: meta.role || null,
+          role: appMeta.role || meta.role || null,
           area: meta.area || null
         };
       });
@@ -79,11 +89,13 @@ export default async function handler(req, res) {
       const authUser = await getResp.json();
       const existingMeta = authUser.user_metadata || authUser.raw_user_meta_data || {};
 
-      // Actualizar user_metadata con el nuevo rol/área
+      // El rol va en app_metadata (el usuario no lo puede editar) y se copia
+      // en user_metadata por compatibilidad con lo que ya estaba guardado
       const updateResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
+          app_metadata: { role },
           user_metadata: {
             ...existingMeta,
             role,

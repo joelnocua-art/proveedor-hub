@@ -5,6 +5,9 @@
  * Variables de entorno requeridas en Vercel:
  *   METABASE_API_KEY  — la API key generada en Metabase
  *
+ * Todas las rutas exigen Authorization: Bearer <access_token> de Supabase
+ * de una cuenta @bia.app / @bia.com (ver api/_auth.js).
+ *
  * Endpoints:
  *   GET /api/metabase-proxy?type=clients&q=<búsqueda>
  *     → Devuelve clientes (sedes) únicos. q puede ser código BIA o razón social.
@@ -28,6 +31,8 @@
  * Fuente: Dashboard 11584, tab 12706 (Asignadas-Instaladas).
  * Usa el endpoint /query/json (export) que NO tiene límite de 2000 filas.
  */
+
+import { requireUser } from './_auth.js';
 
 const METABASE_URL = 'https://bia.metabaseapp.com';
 const DASHBOARD_ID = 11584;
@@ -270,6 +275,8 @@ async function fetchAllRows(apiKey) {
 
 // ─── Handler ───────────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return;
+
   const apiKey = process.env.METABASE_API_KEY;
   if (!apiKey) {
     return res.status(500).json({

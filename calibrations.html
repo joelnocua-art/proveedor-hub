@@ -364,7 +364,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="supabase-client.js?v=23"></script>
+  <script src="supabase-client.js?v=24"></script>
   <script src="script.js?v=15"></script>
   <script src="components.js"></script>
   <script>
@@ -411,7 +411,7 @@
       var gridEl = document.getElementById('calibMonthGrid');
       if(gridEl) gridEl.innerHTML='<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--text-3);font-size:13px;">⏳ Cargando cronograma desde Metabase...</div>';
       try{
-        var res = await fetch('/api/calibraciones-proxy?type=schedule');
+        var res = await sbAuthFetch('/api/calibraciones-proxy?type=schedule');
         var data = await res.json();
         if(data.success && data.schedule && data.schedule.length){
           CALIB_SCHED = data.schedule;

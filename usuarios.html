@@ -60,7 +60,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="supabase-client.js?v=16"></script>
+  <script src="supabase-client.js?v=24"></script>
   <script src="script.js?v=16"></script>
   <script src="components.js?v=16"></script>
   <script>
@@ -170,7 +170,7 @@
   }
 
   async function apiSaveRole(userId, role, area) {
-    const resp = await fetch('/api/users', {
+    const resp = await sbAuthFetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, role, area: area || null })
@@ -212,13 +212,14 @@
     const row = document.querySelector(`tr[data-id="${userId}"]`);
     const roleSelect = row ? row.querySelector('.role-select') : null;
     const role = roleSelect ? roleSelect.value : 'viewer';
-    await apiSaveRole(userId, role, newArea);
+    const { ok, error } = await apiSaveRole(userId, role, newArea);
+    if (!ok) showToast('No se pudo guardar el área: ' + (error || 'Error desconocido'), 'error');
   }
 
   async function loadUsers() {
     const container = document.getElementById('usersContainer');
     try {
-      const resp = await fetch('/api/users');
+      const resp = await sbAuthFetch('/api/users');
       let data;
       const contentType = resp.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
@@ -234,6 +235,13 @@
           1. Ve a Vercel → Deployments y verifica que el último deploy fue exitoso.<br>
           2. Asegúrate de que <code>SUPABASE_SERVICE_ROLE_KEY</code> esté configurada y redespliega.<br>
           3. En Supabase usa la key de la pestaña <strong>"Legacy anon, service_role API keys"</strong> (empieza con <code>eyJ...</code>).
+        </div>`;
+        return;
+      }
+      if (resp.status === 401 || resp.status === 403) {
+        container.innerHTML = `<div style="padding:24px;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.3);border-radius:14px;color:#ff4d6d;font-size:13px;line-height:1.7;">
+          <strong>⚠️ Sin acceso a la gestión de usuarios</strong><br><br>
+          ${esc(data.error || 'No autorizado')}
         </div>`;
         return;
       }

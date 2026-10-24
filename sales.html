@@ -435,7 +435,7 @@
   <script src="https://unpkg.com/pizzip@3.1.6/dist/pizzip-utils.js"></script>
   <script src="https://unpkg.com/docxtemplater@3.50.0/build/docxtemplater.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-  <script src="supabase-client.js?v=23"></script>
+  <script src="supabase-client.js?v=24"></script>
   <script src="script.js?v=15"></script>
   <script src="components.js"></script>
   <script>
@@ -723,7 +723,7 @@
     // varias sedes/códigos BIA y se pueden cotizar varias a la vez.
     async function fetchMetabaseCompanies(query){
       try{
-        var res = await fetch('/api/metabase-proxy?type=companies&q='+encodeURIComponent(query));
+        var res = await sbAuthFetch('/api/metabase-proxy?type=companies&q='+encodeURIComponent(query));
         var data = await res.json();
         if(!data.success){
           console.error('[Sales] Company search failed:', data.error);
@@ -742,7 +742,7 @@
       codigos = codigos.filter(Boolean);
       if(!codigos.length) return [];
       try{
-        var res = await fetch('/api/metabase-proxy?type=equipment&codigo_bia='+encodeURIComponent(codigos.join(',')));
+        var res = await sbAuthFetch('/api/metabase-proxy?type=equipment&codigo_bia='+encodeURIComponent(codigos.join(',')));
         var data = await res.json();
         if(!data.success){ console.error('[Sales] Equipment fetch failed:', data.error); return []; }
         return data.equipment || [];
@@ -1387,7 +1387,7 @@
         if(serialTimer) clearTimeout(serialTimer);
         serialTimer = setTimeout(function(){
           var qAtFetch = q;
-          fetch('/api/metabase-proxy?type=serial&q='+encodeURIComponent(qAtFetch))
+          sbAuthFetch('/api/metabase-proxy?type=serial&q='+encodeURIComponent(qAtFetch))
             .then(function(r){ return r.json(); })
             .then(function(data){
               if((input.value||'').trim().toLowerCase() !== qAtFetch) return; // la query cambió

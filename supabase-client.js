@@ -344,6 +344,17 @@ async function sbGetUser() {
   return data?.user || null;
 }
 
+// fetch() a /api/* con el access_token de la sesión en Authorization:
+// los endpoints serverless lo validan (ver api/_auth.js).
+async function sbAuthFetch(url, options = {}) {
+  const sb = getSupabase();
+  const { data } = sb ? await sb.auth.getSession() : { data: null };
+  const token = data?.session?.access_token;
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', 'Bearer ' + token);
+  return fetch(url, { ...options, headers });
+}
+
 async function sbSignIn(email, password) {
   const sb = getSupabase();
   if (!sb) return { error: 'Supabase not ready' };
@@ -369,7 +380,8 @@ async function sbGetProfile() {
     id: user.id,
     email: user.email,
     full_name: meta.full_name || '',
-    role: meta.role || null,
+    // app_metadata.role lo escribe /api/users y el usuario no lo puede editar
+    role: user.app_metadata?.role || meta.role || null,
     area: meta.area || null
   };
 }

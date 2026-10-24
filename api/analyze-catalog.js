@@ -1,7 +1,31 @@
+import { requireUser } from './_auth.js';
+
+// Si Gemini llega al límite de tokens de salida el JSON queda cortado:
+// se rescatan los objetos completos hasta la última '}' y se cierra el arreglo.
+function parseOffers(content) {
+  try {
+    return JSON.parse(content);
+  } catch (parseErr) {
+    console.warn('JSON parcial detectado. Recuperando objetos extraídos...');
+    const lastBrace = content.lastIndexOf('}');
+    if (lastBrace === -1) throw new Error('Respuesta ilegible de IA.');
+    let truncated = content.substring(0, lastBrace + 1);
+    if (!truncated.trim().startsWith('[')) truncated = '[' + truncated;
+    truncated += ']';
+    try {
+      return JSON.parse(truncated);
+    } catch (err2) {
+      throw new Error('La IA se quedó sin memoria y tampoco se pudo recuperar el texto parcial.');
+    }
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
+
+  if (!(await requireUser(req, res))) return;
 
   const { text, skus } = req.body;
   if (!text || !skus || !Array.isArray(skus)) {
@@ -64,7 +88,7 @@ export default async function handler(req, res) {
     if (content.startsWith('```json')) content = content.replace(/```json/g, '').replace(/```$/g, '').trim();
     if (content.startsWith('```')) content = content.replace(/```/g, '').trim();
     
-    return res.status(200).json(JSON.parse(content));
+    return res.status(200).json(parseOffers(content));
   } catch (error) {
     console.error('Error in analyze-catalog:', error);
     return res.status(500).json({ error: error.message });

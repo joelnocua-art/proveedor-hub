@@ -7,6 +7,9 @@
  *   METABASE_API_KEY       — API key de Metabase
  *   METABASE_CALIB_CARD    — ID de la card (default: 75406)
  *
+ * Todas las rutas exigen Authorization: Bearer <access_token> de Supabase
+ * de una cuenta @bia.app / @bia.com (ver api/_auth.js).
+ *
  * Endpoints:
  *   GET /api/calibraciones-proxy?type=schedule
  *     → Devuelve [{mes, tipo, cantidad, costo_sin_iva, costo_con_iva}]
@@ -15,6 +18,8 @@
  *   GET /api/calibraciones-proxy?debug=1
  *     → Metadata: cardId, totalRows, sample, cacheAgeMs
  */
+
+import { requireUser } from './_auth.js';
 
 const METABASE_URL = 'https://bia.metabaseapp.com';
 
@@ -114,6 +119,8 @@ async function getSchedule(apiKey, cardId) {
 
 // ─── Handler ───────────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return;
+
   const apiKey = process.env.METABASE_API_KEY;
   if (!apiKey) {
     return res.status(500).json({
